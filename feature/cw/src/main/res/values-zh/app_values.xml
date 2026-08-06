@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_500">#ff6200ee</color>
+    <integer name="default_font_size">18</integer>
+    <string name="idle">空闲</string>
+    <string name="waterfall_display">瀑布图</string>
+    <string name="frequency_scale">频率刻度</string>
+    <string name="decoded_text">解码文本</string>
+    <string name="clear">清除</string>
+    <string name="pause">暂停解码</string>
+    <string name="save_text">保存文本</string>
+    <string name="record_signals">录音信号</string>
+    <string name="settings">设置</string>
+    <string name="help">在线帮助</string>
+    <string name="rate">评价此应用</string>
+    <string name="premium">获取高级版</string>
+    <string name="tap_back_again_to_close">再次按返回键退出应用</string>
+    <string name="message_type">消息类型</string>
+    <string name="cw_mic_permission">CW 解码需要麦克风权限</string>
+    <string name="cw_grant_permission">授予权限</string>
+    <string name="cw_open_settings">打开应用设置</string>
+</resources>

@@ -17,6 +17,8 @@
  */
 package com.rtbishop.look4sat.feature.radar
 
+import android.app.Activity
+import android.view.LayoutInflater
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -41,7 +43,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,6 +51,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +71,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.constraintlayout.widget.ConstraintLayout
 import com.rtbishop.look4sat.core.domain.model.SatRadio
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
 import com.rtbishop.look4sat.core.domain.utility.DopplerFrequencyCalculator
@@ -75,6 +80,8 @@ import com.rtbishop.look4sat.core.presentation.CardButton
 import com.rtbishop.look4sat.core.presentation.R
 import com.rtbishop.look4sat.core.presentation.formatFrequency
 import com.rtbishop.look4sat.core.presentation.infiniteMarquee
+import com.rtbishop.look4sat.feature.cw.R as CwR
+import com.ve3nea.morse_expert.MainActivity
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -82,11 +89,8 @@ import kotlin.time.Duration.Companion.milliseconds
 fun TransceiversPage(
     transceivers: List<SatRadio>,
     selectedUuid: String?,
-    orbitalPos: OrbitalPos?,
-    cw: CwSubState,
     radioControl: RadioControlSubState,
     onAction: (RadarAction) -> Unit,
-    requestMicPermission: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (transceivers.isEmpty()) {
@@ -109,14 +113,92 @@ fun TransceiversPage(
                 TransceiverItem(
                     radio = radio,
                     isExpanded = isExpanded,
-                    orbitalPos = orbitalPos,
-                    cw = cw,
                     radioControl = radioControl,
                     onAction = onAction,
-                    requestMicPermission = requestMicPermission,
                     onToggle = { onAction(RadarAction.SelectTransmitter(radio.uuid)) }
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun CalculatorPage(
+    transceivers: List<SatRadio>,
+    selectedUuid: String?,
+    orbitalPos: OrbitalPos?,
+    cw: CwSubState,
+    onAction: (RadarAction) -> Unit,
+    requestMicPermission: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val calculatorTransceivers = remember(transceivers) {
+        transceivers.filter(DopplerFrequencyCalculator::isNamedLinearTransponder)
+    }
+    val selectedTransceiver = remember(calculatorTransceivers, selectedUuid) {
+        calculatorTransceivers.firstOrNull { it.uuid == selectedUuid }
+            ?: calculatorTransceivers.firstOrNull()
+    }
+
+    if (selectedTransceiver == null) {
+        EmptyTransceiversContent(modifier)
+        return
+    }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (calculatorTransceivers.size > 1) {
+            item {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    calculatorTransceivers.forEach { radio ->
+                        FilterChip(
+                            selected = radio.uuid == selectedTransceiver.uuid,
+                            onClick = {
+                                if (radio.uuid != selectedUuid) onAction(RadarAction.SelectTransmitter(radio.uuid))
+                            },
+                            label = {
+                                Text(
+                                    text = transceiverTitle(radio),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            DopplerFrequencyCalculator(
+                transponder = selectedTransceiver,
+                orbitalPos = orbitalPos,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        item {
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+            )
+        }
+
+        item {
+            CwDecoderPanel(
+                cw = cw,
+                onAction = onAction,
+                requestMicPermission = requestMicPermission,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -148,11 +230,8 @@ private fun EmptyTransceiversContent(modifier: Modifier = Modifier) {
 private fun TransceiverItem(
     radio: SatRadio,
     isExpanded: Boolean,
-    orbitalPos: OrbitalPos?,
-    cw: CwSubState,
     radioControl: RadioControlSubState,
     onAction: (RadarAction) -> Unit,
-    requestMicPermission: () -> Unit,
     onToggle: () -> Unit
 ) {
     val bgColor = if (isExpanded) MaterialTheme.colorScheme.surfaceContainerHighest
@@ -193,11 +272,8 @@ private fun TransceiverItem(
                     )
                 }
                 // Title with mode
-                val title = if (radio.isInverted) "INV: ${radio.info}" else radio.info
-                val mode = "${radio.downlinkMode ?: "--"}/${radio.uplinkMode ?: "--"}"
-                val fullTitle = "$title ($mode)"
                 Text(
-                    text = fullTitle,
+                    text = transceiverTitle(radio),
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -245,11 +321,8 @@ private fun TransceiverItem(
         ) {
             ExpandedRadioControl(
                 radio = radio,
-                orbitalPos = orbitalPos,
-                cw = cw,
                 radioControl = radioControl,
-                onAction = onAction,
-                requestMicPermission = requestMicPermission
+                onAction = onAction
             )
         }
 
@@ -318,11 +391,8 @@ private fun UnifiedFrequencyRow(
 @Composable
 private fun ExpandedRadioControl(
     radio: SatRadio,
-    orbitalPos: OrbitalPos?,
-    cw: CwSubState,
     radioControl: RadioControlSubState,
     onAction: (RadarAction) -> Unit,
-    requestMicPermission: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -429,23 +499,6 @@ private fun ExpandedRadioControl(
                     }
                 }
             }
-        }
-
-        // Doppler frequency calculator (linear transponders only)
-        DopplerFrequencyCalculator(
-            transponder = radio,
-            orbitalPos = orbitalPos,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // CW decoder panel (linear transponders only)
-        if (DopplerFrequencyCalculator.isLinearTransponder(radio)) {
-            CwDecoderPanel(
-                cw = cw,
-                onAction = onAction,
-                requestMicPermission = requestMicPermission,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
 
         // Control buttons
@@ -565,7 +618,7 @@ private fun DopplerFrequencyCalculator(
             },
             label = { Text(stringResource(R.string.radar_doppler_offset_hint)) },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -661,19 +714,54 @@ private fun CwDecoderPanel(
         }
 
         AnimatedVisibility(visible = cw.isExpanded) {
+            // PR #1 Morse Expert engine: mini layout with waterfall + decoded text.
+            // Keep the old Kotlin decoder state/actions as fallback code, but this panel no longer feeds it.
+            val context = LocalContext.current
+            val activity = remember { context as? Activity }
+            val controller = remember { MainActivity() }
+            val rootView = remember {
+                LayoutInflater.from(context).inflate(CwR.layout.cw_panel_main, null) as ConstraintLayout
+            }
+            var initialized by remember { mutableStateOf(false) }
+            var listening by remember { mutableStateOf(false) }
+
+            DisposableEffect(Unit) {
+                if (activity != null) {
+                    controller.onCreate(activity, rootView, false)
+                }
+                onDispose {
+                    controller.onPause()
+                    controller.onDestroy()
+                }
+            }
+
+            LaunchedEffect(cw.hasPermission) {
+                if (cw.hasPermission && !initialized) {
+                    controller.onPermissionGranted()
+                    controller.onResume()
+                    initialized = true
+                    listening = true
+                }
+            }
+
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Control buttons row
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    if (cw.status == CwStatus.Idle) {
+                    if (!listening) {
                         Button(
                             onClick = {
                                 if (!cw.hasPermission) {
                                     requestMicPermission()
+                                } else if (!initialized) {
+                                    controller.onPermissionGranted()
+                                    controller.onResume()
+                                    initialized = true
+                                    listening = true
                                 } else {
-                                    onAction(RadarAction.CwStartListening)
+                                    controller.onResume()
+                                    listening = true
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -682,58 +770,29 @@ private fun CwDecoderPanel(
                         }
                     } else {
                         Button(
-                            onClick = { onAction(RadarAction.CwStopListening) },
+                            onClick = {
+                                controller.onPause()
+                                listening = false
+                            },
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(stringResource(R.string.radar_cw_stop))
                         }
                     }
                     OutlinedButton(
-                        onClick = { onAction(RadarAction.CwReset) },
+                        onClick = { controller.clearDecoded() },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(stringResource(R.string.radar_cw_reset))
                     }
                 }
 
-                // Signal strength indicator
-                if (cw.status == CwStatus.Listening && cw.signalStrength > 0f) {
-                    val strengthPct = (cw.signalStrength * 100).toInt()
-                    Text(
-                        text = "Signal: $strengthPct%",
-                        fontSize = 12.sp,
-                        color = if (cw.signalStrength > 0.5f) Color(0xFF4CAF50)
-                        else if (cw.signalStrength > 0.2f) Color(0xFFFFC107)
-                        else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Decoded text output
-                ElevatedCard(
+                AndroidView(
+                    factory = { rootView },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp)
-                    ) {
-                        Text(
-                            text = "Decoded:",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = cw.decodedText.ifEmpty { "Waiting for CW signal..." },
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
+                        .height(150.dp)
+                )
             }
         }
     }
@@ -752,6 +811,12 @@ private fun FrequencyText(frequency: Long?, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.primary,
         modifier = modifier
     )
+}
+
+private fun transceiverTitle(radio: SatRadio): String {
+    val title = if (radio.isInverted) "INV: ${radio.info}" else radio.info
+    val mode = "${radio.downlinkMode ?: "--"}/${radio.uplinkMode ?: "--"}"
+    return "$title ($mode)"
 }
 
 private val FREQ_ADJUSTMENTS =

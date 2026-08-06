@@ -61,6 +61,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
 import com.rtbishop.look4sat.core.domain.repository.IContainerProvider
 import com.rtbishop.look4sat.core.domain.repository.MutualPassData
+import com.rtbishop.look4sat.core.domain.wavelog.UploadOutcome
+import com.rtbishop.look4sat.core.domain.wavelog.WavelogQueue
+import com.rtbishop.look4sat.core.domain.utility.DopplerFrequencyCalculator
 import com.rtbishop.look4sat.core.domain.utility.toDegrees
 import com.rtbishop.look4sat.core.presentation.EmptyListCard
 import com.rtbishop.look4sat.core.presentation.IconCard
@@ -78,6 +81,8 @@ import kotlin.math.PI
 
 private enum class RadarPage(val title: String) {
     Transceivers("Transceivers"),
+    Log("Log"),
+    Calculator("Calculator"),
     Sstv("SSTV")
 }
 
@@ -119,9 +124,33 @@ fun RadarDestination(navigateUp: () -> Unit) {
         viewModel.onAction(RadarAction.SstvPermissionResult(granted))
         viewModel.onAction(RadarAction.CwPermissionResult(granted))
     }
-    RadarScreen(uiState, viewModel::onAction, navigateUpAndClearMutual, mutualData, requestMicPermission = {
-        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-    })
+    // WaveLog(4.5.2): 自动上传 — 每 10 分钟重试本地队列(开关开启时)
+    val wavelogUploader = remember { container.provideWavelogUploader() }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(10 * 60 * 1000L)
+            val s = container.settingsRepo.otherSettings.value
+            if (s.wavelogAutoUpload && s.wavelogUrl.isNotBlank()) {
+                // 网格不一致时静默跳过(留给手动上传确认), 其余失败自动下次重试
+                val outcome = wavelogUploader.uploadQueue()
+                if (outcome is UploadOutcome.NeedConfirm) {
+                    // 跳过本次; 用户可在设置页手动上传并确认
+                }
+            }
+        }
+    }
+    RadarScreen(
+        uiState,
+        viewModel::onAction,
+        navigateUpAndClearMutual,
+        mutualData,
+        { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+        wavelogQueue = container.wavelogQueue,
+        wavelogConfigured = container.settingsRepo.otherSettings.value.let {
+            it.wavelogUrl.isNotBlank() && it.wavelogApiKey.isNotBlank() && it.wavelogStationId.isNotBlank()
+        },
+        showToast = { msg -> container.provideShowToast()(msg) }
+    )
 }
 
 @Composable
@@ -130,7 +159,10 @@ private fun RadarScreen(
     onAction: (RadarAction) -> Unit,
     navigateUp: () -> Unit,
     mutualData: MutualPassData,
-    requestMicPermission: () -> Unit
+    requestMicPermission: () -> Unit,
+    wavelogQueue: WavelogQueue,
+    wavelogConfigured: Boolean,
+    showToast: (String) -> Unit
 ) {
     val upcomingPass = uiState.currentPass ?: getDefaultPass()
     val addToCalendar: () -> Unit = {
@@ -184,11 +216,11 @@ private fun RadarScreen(
         }
         if (isVertical) {
             RadarCard(uiState, trackB, trackBPosition, Modifier.weight(1f))
-            PagerCard(uiState, onAction, requestMicPermission, Modifier.weight(1f))
+            PagerCard(uiState, onAction, requestMicPermission, wavelogQueue, wavelogConfigured, showToast, Modifier.weight(1f))
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 RadarCard(uiState, trackB, trackBPosition, Modifier.weight(1f))
-                PagerCard(uiState, onAction, requestMicPermission, Modifier.weight(1f))
+                PagerCard(uiState, onAction, requestMicPermission, wavelogQueue, wavelogConfigured, showToast, Modifier.weight(1f))
             }
         }
     }
@@ -199,18 +231,37 @@ private fun PagerCard(
     uiState: RadarState,
     onAction: (RadarAction) -> Unit,
     requestMicPermission: () -> Unit,
+    wavelogQueue: WavelogQueue,
+    wavelogConfigured: Boolean,
+    showToast: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pages = RadarPage.entries
+    val hasCalculatorPage = remember(uiState.transceivers.transmitters) {
+        uiState.transceivers.transmitters.any(DopplerFrequencyCalculator::isNamedLinearTransponder)
+    }
+    val pages = remember(hasCalculatorPage) {
+        buildList {
+            add(RadarPage.Transceivers)
+            add(RadarPage.Log)
+            if (hasCalculatorPage) add(RadarPage.Calculator)
+            add(RadarPage.Sstv)
+        }
+    }
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val coroutineScope = rememberCoroutineScope()
 
+    LaunchedEffect(pages.size) {
+        val lastPage = pages.lastIndex
+        if (pagerState.currentPage > lastPage) pagerState.scrollToPage(lastPage)
+    }
+
     ElevatedCard(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
-            PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+            val selectedTabIndex = pagerState.currentPage.coerceIn(0, pages.lastIndex)
+            PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
                 pages.forEachIndexed { index, page ->
                     Tab(
-                        selected = pagerState.currentPage == index,
+                        selected = selectedTabIndex == index,
                         onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
                         text = { Text(text = page.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     )
@@ -222,19 +273,34 @@ private fun PagerCard(
             ) { pageIndex ->
                 when (pages[pageIndex]) {
                     RadarPage.Transceivers -> TransceiversPage(
-                                    transceivers = uiState.transceivers.transmitters,
-                                    selectedUuid = uiState.transceivers.selectedUuid,
-                                    orbitalPos = uiState.orbitalPos,
-                                    cw = uiState.cw,
-                                    radioControl = uiState.radioControl,
-                                    onAction = onAction,
-                                    requestMicPermission = requestMicPermission
-                                )
+                        transceivers = uiState.transceivers.transmitters,
+                        selectedUuid = uiState.transceivers.selectedUuid,
+                        radioControl = uiState.radioControl,
+                        onAction = onAction
+                    )
+                    RadarPage.Calculator -> CalculatorPage(
+                        transceivers = uiState.transceivers.transmitters,
+                        selectedUuid = uiState.transceivers.selectedUuid,
+                        orbitalPos = uiState.orbitalPos,
+                        cw = uiState.cw,
+                        onAction = onAction,
+                        requestMicPermission = requestMicPermission
+                    )
                     RadarPage.Sstv -> SstvPage(
                         sstv = uiState.sstv,
                         dopplerFrequency = uiState.transceivers.selectedFrequency?.let { formatFrequency(it) },
                         onAction = onAction,
                         requestMicPermission = requestMicPermission
+                    )
+                    RadarPage.Log -> LogTab(
+                        transceivers = uiState.transceivers.transmitters,
+                        orbitalPos = uiState.orbitalPos,
+                        satelliteName = uiState.currentPass?.name ?: "",
+                        queue = wavelogQueue,
+                        wavelogConfigured = wavelogConfigured,
+                        showToast = showToast,
+                        txBaseFrequencyHz = uiState.radioControl.txBaseFrequencyHz,
+                        aosTimeMs = uiState.currentPass?.aosTime ?: 0L
                     )
                 }
             }

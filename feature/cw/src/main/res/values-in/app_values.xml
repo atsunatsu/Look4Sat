@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_500">#ff6200ee</color>
+    <integer name="default_font_size">18</integer>
+    <string name="idle">Diam</string>
+    <string name="waterfall_display">Tampilan waterfall</string>
+    <string name="frequency_scale">Skala frekuensi</string>
+    <string name="decoded_text">Teks terdekode</string>
+    <string name="clear">Bersihkan</string>
+    <string name="pause">Jeda Dekode</string>
+    <string name="save_text">Simpan Teks</string>
+    <string name="record_signals">Rekam Sinyal</string>
+    <string name="settings">Pengaturan</string>
+    <string name="help">Bantuan Daring</string>
+    <string name="rate">Nilai Aplikasi Ini</string>
+    <string name="premium">Dapatkan Versi Premium</string>
+    <string name="tap_back_again_to_close">Ketuk Kembali lagi untuk menutup aplikasi</string>
+    <string name="message_type">Tipe Pesan</string>
+    <string name="cw_mic_permission">Izin mikrofon diperlukan untuk dekode CW</string>
+    <string name="cw_grant_permission">Beri izin</string>
+    <string name="cw_open_settings">Buka pengaturan aplikasi</string>
+</resources>

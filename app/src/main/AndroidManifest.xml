@@ -43,7 +43,7 @@
 
         <meta-data
             android:name="android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED"
-            android:value="com.rtbishop.look4sat" />
+            android:value="com.rtbishop.look4sat.bg7nta" />
 
     </application>
 </manifest>

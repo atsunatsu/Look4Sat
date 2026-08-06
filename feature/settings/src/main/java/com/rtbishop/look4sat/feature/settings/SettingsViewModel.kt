@@ -25,11 +25,18 @@ import com.rtbishop.look4sat.core.domain.repository.IDatabaseRepo
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.usecase.IShowToast
+import com.rtbishop.look4sat.core.domain.wavelog.UploadOutcome
+import com.rtbishop.look4sat.core.domain.wavelog.WaveLogApi
+import com.rtbishop.look4sat.core.domain.wavelog.WavelogResult
+import com.rtbishop.look4sat.core.domain.wavelog.WavelogUploader
 import com.rtbishop.look4sat.core.presentation.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 class SettingsViewModel(
     private val databaseRepo: IDatabaseRepo,
@@ -121,10 +128,34 @@ class SettingsViewModel(
             is SettingsAction.ToggleSensor -> settingsRepo.updateOtherSettings { it.copy(stateOfSensors = action.value) }
             is SettingsAction.ToggleLightTheme -> settingsRepo.updateOtherSettings { it.copy(stateOfLightTheme = action.value) }
             is SettingsAction.ToggleNightMode -> settingsRepo.updateOtherSettings { it.copy(stateOfNightMode = action.value) }
+            is SettingsAction.ToggleScreen -> settingsRepo.updateOtherSettings { current ->
+                val hidden = current.hiddenScreens.toMutableList()
+                if (action.screenName in hidden) hidden.remove(action.screenName) else hidden.add(action.screenName)
+                current.copy(hiddenScreens = hidden)
+            }
+            is SettingsAction.ReorderScreens -> settingsRepo.updateOtherSettings { it.copy(screenOrder = action.order) }
+            SettingsAction.ResetScreenOrder -> settingsRepo.updateOtherSettings { it.copy(screenOrder = emptyList()) }
+            is SettingsAction.UpdateMenuOrder -> settingsRepo.updateOtherSettings {
+                it.copy(screenOrder = action.mainOrder, subMenuOrder = action.subOrder)
+            }
+            SettingsAction.ResetMenuOrder -> settingsRepo.updateOtherSettings {
+                it.copy(screenOrder = emptyList(), subMenuOrder = emptyList())
+            }
             // Remote control & data sources
             is SettingsAction.UpdateRC -> settingsRepo.updateRCSettings(action.settings)
             is SettingsAction.UpdateRadioControl -> settingsRepo.updateRadioControlSettings(action.settings)
             is SettingsAction.UpdateDataSources -> settingsRepo.updateDataSourcesSettings(action.settings)
+            // WaveLog 日志(4.5.2)
+            is SettingsAction.UpdateWavelogSettings -> settingsRepo.updateOtherSettings {
+                it.copy(
+                    wavelogUrl = action.url,
+                    wavelogApiKey = action.apiKey,
+                    wavelogStationId = action.stationId,
+                    wavelogAutoUpload = action.autoUpload
+                )
+            }
+            SettingsAction.TestWavelogConnection -> testWavelogConnection()
+            SettingsAction.UploadWavelogQueue -> uploadWavelogQueue()
             // System
             is SettingsAction.ShowToast -> showToast(action.message)
         }
@@ -133,7 +164,16 @@ class SettingsViewModel(
     // region Position helpers — consolidated from 3 near-identical functions
 
     private fun setGpsPosition() {
-        updatePosition(R.string.prefs_loc_gps_error) { settingsRepo.setStationPosition() }
+        viewModelScope.launch {
+            _uiState.update { it.copy(positionSettings = it.positionSettings.copy(isUpdating = true)) }
+            val success = settingsRepo.setStationPosition()
+            _uiState.update {
+                it.copy(positionSettings = it.positionSettings.copy(
+                    isUpdating = false,
+                    messageResId = if (success) R.string.prefs_loc_success else R.string.prefs_loc_gps_error
+                ))
+            }
+        }
     }
 
     private fun setGeoPosition(latitude: Double, longitude: Double) {
@@ -181,6 +221,7 @@ class SettingsViewModel(
                 it.copy(dataSettings = it.dataSettings.copy(isUpdating = false))
             }
             println(exception)
+            showToast(R.string.prefs_data_update_failed)
         }
     }
 
@@ -199,6 +240,65 @@ class SettingsViewModel(
 
     // endregion
 
+    // region WaveLog(4.5.2)
+
+    // 由 SettingsScreen 注入的共享 uploader(容器级单例)
+    var pendingUploader: WavelogUploader? = null
+
+    // 网格不一致确认弹窗状态(UI 观察后弹 AlertDialog)
+    var gridConfirm by mutableStateOf<GridConfirmData?>(null)
+
+    // WaveLog 错误详情弹窗(UI 观察后弹 AlertDialog, 可一键复制)
+    var wavelogError by mutableStateOf<String?>(null)
+
+    data class GridConfirmData(val stationGrid: String, val userGrid: String)
+
+    private fun testWavelogConnection() {
+        viewModelScope.launch {
+            val s = settingsRepo.otherSettings.value
+            val result = WaveLogApi.testToken(s.wavelogUrl, s.wavelogApiKey, s.wavelogStationId)
+            when (result) {
+                is WavelogResult.Success -> showToast("WaveLog: ${result.message}")
+                is WavelogResult.Failure -> wavelogError = result.message
+            }
+        }
+    }
+
+    private fun uploadWavelogQueue() {
+        viewModelScope.launch {
+            val result = pendingUploader?.uploadQueue()
+            when (result) {
+                is UploadOutcome.Done -> {
+                    if (result.failedCount > 0 && result.firstError.isNotBlank()) {
+                        wavelogError = result.firstError
+                    } else {
+                        showToast("WaveLog: ${result.message}")
+                    }
+                }
+                is UploadOutcome.NeedConfirm -> {
+                    gridConfirm = GridConfirmData(result.stationGrid, result.userGrid)
+                }
+                null -> showToast("WaveLog: 上传失败")
+            }
+        }
+    }
+
+    /** 网格确认结果: 忽略并上传 / 取消 */
+    fun resolveGridConfirm(ignoreAndUpload: Boolean) {
+        val confirm = gridConfirm ?: return
+        gridConfirm = null
+        if (!ignoreAndUpload) return
+        viewModelScope.launch {
+            val result = pendingUploader?.uploadQueue(force = true)
+            when (result) {
+                is UploadOutcome.Done -> showToast("WaveLog: ${result.message}")
+                else -> showToast("WaveLog: 上传失败")
+            }
+        }
+    }
+
+    // endregion
+
     companion object {
 
         fun factory(container: IMainContainer) = viewModelFactory {
@@ -207,7 +307,7 @@ class SettingsViewModel(
                     databaseRepo = container.databaseRepo,
                     settingsRepo = container.settingsRepo,
                     showToast = container.provideShowToast()
-                )
+                ).apply { pendingUploader = container.provideWavelogUploader() }
             }
         }
     }

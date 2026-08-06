@@ -22,4 +22,7 @@ import java.io.InputStream
 interface IRemoteSource {
     suspend fun getFileStream(uri: String): InputStream?
     suspend fun getNetworkStream(url: String): InputStream?
+
+    /** 抓取 AMSAT 状态页 HTML(带 UA, 返回 null = 失败) */
+    suspend fun getStatusHtml(): String?
 }

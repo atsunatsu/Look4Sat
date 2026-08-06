@@ -94,14 +94,21 @@ fun RadarViewCompose(
         animationSpec = infiniteRepeatable(tween(1000)),
         label = "animScale"
     )
-    // Drive the sweep from the animation framework to eliminate state mutation inside the draw block
-    val sweepTransition = rememberInfiniteTransition(label = "sweep")
-    val sweepDegrees by sweepTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(SWEEP_DURATION_MS, easing = LinearEasing)),
-        label = "sweepDegrees"
-    )
+    // Drive the sweep from the animation framework to eliminate state mutation inside the draw block.
+    // Only create the infinite transition when the sweep is enabled — otherwise the canvas would
+    // be invalidated every frame for an effect that isn't visible, wasting GPU and battery.
+    val sweepDegrees = if (shouldShowSweep) {
+        val sweepTransition = rememberInfiniteTransition(label = "sweep")
+        val animatedSweep by sweepTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(SWEEP_DURATION_MS, easing = LinearEasing)),
+            label = "sweepDegrees"
+        )
+        animatedSweep
+    } else {
+        0f
+    }
     val measurer = rememberTextMeasurer()
     val sunPainter = painterResource(R.drawable.ic_sun)
     val moonPainter = painterResource(R.drawable.ic_moon)

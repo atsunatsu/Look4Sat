@@ -29,6 +29,7 @@ import com.rtbishop.look4sat.core.domain.model.OtherSettings
 import com.rtbishop.look4sat.core.domain.model.PassesSettings
 import com.rtbishop.look4sat.core.domain.model.RCSettings
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
+import com.rtbishop.look4sat.core.domain.source.Sources
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.utility.positionToQth
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
 class SettingsRepo(
+    private val context: android.content.Context,
     private val locationManager: LocationManager,
     private val preferences: SharedPreferences,
     override val appVersionName: String
@@ -76,6 +78,8 @@ class SettingsRepo(
     private val keyStateOfUtc = "stateOfUtc"
     private val keyStateOfLightTheme = "stateOfLightTheme"
     private val keyStateOfNightMode = "stateOfNightMode"
+    private val keyHiddenScreens = "hiddenScreens"
+    private val keyScreenOrder = "screenOrder"
     private val keyStationAltitude = "stationAltitude"
     private val keyStationLatitude = "stationLatitude"
     private val keyStationLongitude = "stationLongitude"
@@ -91,6 +95,11 @@ class SettingsRepo(
     private val keyUseCustomTransceivers = "useCustomTransceivers"
     private val keyTleUrl = "tleUrl"
     private val keyTransceiversUrl = "transceiversUrl"
+    private val keySubMenuOrder = "subMenuOrder"
+    private val keyWavelogUrl = "wavelogUrl"
+    private val keyWavelogApiKey = "wavelogApiKey"
+    private val keyWavelogStationId = "wavelogStationId"
+    private val keyWavelogAutoUpload = "wavelogAutoUpload"
     private val separatorComma = ","
 
     //region # Satellites selection settings
@@ -178,23 +187,41 @@ class SettingsRepo(
         return true
     }
 
-    override fun setStationPosition(): Boolean {
-        if (!LocationManagerCompat.isLocationEnabled(locationManager)) return false
-        try {
-            val hasGps = LocationManagerCompat.hasProvider(locationManager, providerGps)
-            val hasNet = LocationManagerCompat.hasProvider(locationManager, providerNet)
-            val provider = if (hasGps) providerGps else if (hasNet) providerNet else providerDef
-            val location = locationManager.getLastKnownLocation(providerDef)
-            if (location == null || System.currentTimeMillis() - location.time > 600_000L) {
-                println("Requesting location for $provider provider")
-                locationManager.requestLocationUpdates(provider, 0L, 0f, this)
-            } else {
-                setStationPosition(location.latitude, location.longitude, location.altitude)
-            }
-        } catch (exception: SecurityException) {
-            println("No permissions were given - $exception")
+    /** GPS 定位: 一次性 getCurrentLocation(GPS 优先, 15 秒超时), 拿到位置才返回 true */
+    override suspend fun setStationPosition(): Boolean {
+        // 权限前置: 无定位权限直接失败(不吞异常)
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            println("GPS: no fine location permission")
+            return false
         }
-        return true
+        if (!LocationManagerCompat.isLocationEnabled(locationManager)) return false
+        return kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+            val signal = android.os.CancellationSignal()
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            val executor = java.util.concurrent.Executor { handler.post(it) }
+            // 15 秒超时
+            val timeout = handler.postDelayed({
+                signal.cancel()
+                if (cont.isActive) cont.resume(false) { }
+            }, 15_000L)
+            val listener = androidx.core.util.Consumer<Location> { location ->
+                handler.removeCallbacksAndMessages(null)
+                setStationPosition(location.latitude, location.longitude, location.altitude)
+                if (cont.isActive) cont.resume(true) { }
+            }
+            val hasGps = LocationManagerCompat.hasProvider(locationManager, providerGps)
+            val provider = if (hasGps) providerGps else providerNet
+            try {
+                LocationManagerCompat.getCurrentLocation(locationManager, provider, signal, executor, listener)
+            } catch (exception: SecurityException) {
+                handler.removeCallbacksAndMessages(null)
+                if (cont.isActive) cont.resume(false) { }
+            }
+            cont.invokeOnCancellation { signal.cancel(); handler.removeCallbacksAndMessages(null) }
+        }
     }
 
     override fun setStationPosition(locator: String): Boolean {
@@ -213,8 +240,8 @@ class SettingsRepo(
     }
 
     private fun setStationPosition(latitude: Double, longitude: Double, altitude: Double, locator: String) {
-        val newLat = latitude.round(4)
-        val newLon = longitude.round(4)
+        val newLat = latitude.round(5)
+        val newLon = longitude.round(5)
         val newAlt = altitude.round(1)
         val timestamp = System.currentTimeMillis()
         println("Received new Position($newLat, $newLon, $newAlt) & Locator $locator")
@@ -356,6 +383,13 @@ class SettingsRepo(
                 putString(keySstvMode, new.sstvMode)
                 putLong(keyLowElevation, new.lowElevation.toRawBits())
                 putLong(keyHighElevation, new.highElevation.toRawBits())
+                putStringSet(keyHiddenScreens, new.hiddenScreens.toSet())
+                putString(keyScreenOrder, new.screenOrder.joinToString(","))
+                putString(keySubMenuOrder, new.subMenuOrder.joinToString(","))
+                putString(keyWavelogUrl, new.wavelogUrl)
+                putString(keyWavelogApiKey, new.wavelogApiKey)
+                putString(keyWavelogStationId, new.wavelogStationId)
+                putBoolean(keyWavelogAutoUpload, new.wavelogAutoUpload)
             }
             new
         }
@@ -371,8 +405,15 @@ class SettingsRepo(
         shouldSeeWarning = preferences.getBoolean(keyShouldSeeWarning, true),
         shouldSeeWhatsNew = preferences.getBoolean(keyShouldSeeWhatsNew, true),
         sstvMode = preferences.getString(keySstvMode, null) ?: "Auto",
+        hiddenScreens = preferences.getStringSet(keyHiddenScreens, emptySet())?.toList() ?: emptyList(),
+        screenOrder = preferences.getString(keyScreenOrder, null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+        subMenuOrder = preferences.getString(keySubMenuOrder, null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
         lowElevation = Double.fromBits(preferences.getLong(keyLowElevation, 15.0.toRawBits())),
-        highElevation = Double.fromBits(preferences.getLong(keyHighElevation, 45.0.toRawBits()))
+        highElevation = Double.fromBits(preferences.getLong(keyHighElevation, 45.0.toRawBits())),
+        wavelogUrl = preferences.getString(keyWavelogUrl, null) ?: "",
+        wavelogApiKey = preferences.getString(keyWavelogApiKey, null) ?: "",
+        wavelogStationId = preferences.getString(keyWavelogStationId, null) ?: "",
+        wavelogAutoUpload = preferences.getBoolean(keyWavelogAutoUpload, false)
     )
     //endregion
 
@@ -390,12 +431,20 @@ class SettingsRepo(
         _dataSourcesSettings.value = settings
     }
 
-    private fun getDataSourcesSettings(): DataSourcesSettings = DataSourcesSettings(
-        useCustomTLE = preferences.getBoolean(keyUseCustomTle, false),
-        useCustomTransceivers = preferences.getBoolean(keyUseCustomTransceivers, false),
-        tleUrl = preferences.getString(keyTleUrl, "https://example.com/tle.txt") ?: "",
-        transceiversUrl = preferences.getString(keyTransceiversUrl, "https://example.com/radio.json") ?: ""
-    )
+    private fun getDataSourcesSettings(): DataSourcesSettings {
+        // 4.4.8 修复: 旧版 example.com 占位 URL 视为未配置 -> 替换为真实默认 URL 且开关强制关闭,
+        // 否则在线更新的 All/SatNOGS 源会指向错误地址导致更新失败
+        val storedTleUrl = preferences.getString(keyTleUrl, Sources.defaultTleUrl) ?: Sources.defaultTleUrl
+        val storedTxUrl = preferences.getString(keyTransceiversUrl, Sources.defaultTransceiversUrl) ?: Sources.defaultTransceiversUrl
+        val tleUrl = if (storedTleUrl == "https://example.com/tle.txt") Sources.defaultTleUrl else storedTleUrl
+        val txUrl = if (storedTxUrl == "https://example.com/radio.json") Sources.defaultTransceiversUrl else storedTxUrl
+        return DataSourcesSettings(
+            useCustomTLE = preferences.getBoolean(keyUseCustomTle, false) && tleUrl != Sources.defaultTleUrl,
+            useCustomTransceivers = preferences.getBoolean(keyUseCustomTransceivers, false) && txUrl != Sources.defaultTransceiversUrl,
+            tleUrl = tleUrl,
+            transceiversUrl = txUrl
+        )
+    }
     //endregion
 
     //region # Radio control settings

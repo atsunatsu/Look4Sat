@@ -102,7 +102,8 @@ class DatabaseRepoTest {
         repository.updateFromRemote()
 
         assertTrue(localSource.insertedEntries.any { it.catnum == 25544 })
-        assertEquals(listOf(25544), settingsRepo.satelliteTypeIdsByType["Other"])
+        // 新语义: 开关开 + URL 非空 -> All 源用自定义 URL, 数据归入 All 类型
+        assertEquals(listOf(25544), settingsRepo.satelliteTypeIdsByType["All"])
     }
 
     private fun validCsvStream(): InputStream = """

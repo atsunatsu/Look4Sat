@@ -1,4 +1,4 @@
-/* 
+/*
  * Look4Sat. Amateur radio satellite tracker and pass predictor.
  * Copyright (C) 2019-2026 Arty Bishop and contributors.
  *
@@ -11,6 +11,7 @@ package com.rtbishop.look4sat.core.domain.utility
 
 import com.rtbishop.look4sat.core.domain.model.SatRadio
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
+import java.util.Locale
 
 /**
  * Computes Doppler-corrected reciprocal frequencies for linear transponders.
@@ -44,6 +45,9 @@ object DopplerFrequencyCalculator {
      * Given a downlink frequency, compute the Doppler-corrected uplink frequency
      * with an offset applied to the downlink (in Hz).
      * Returns null if the transponder is not a linear passband type.
+     *
+     * The user-entered downlink frequency already includes the offset, so subtract
+     * it before mapping the downlink passband position back to the uplink.
      */
     fun computeUplinkFromDownlinkWithOffset(
         downlinkHz: Long,
@@ -52,7 +56,7 @@ object DopplerFrequencyCalculator {
         offsetHz: Long
     ): Long? {
         if (!isLinearTransponder(transponder)) return null
-        val baseUplink = TransponderMapper.mapDownlinkToUplink(downlinkHz + offsetHz, transponder) ?: return null
+        val baseUplink = TransponderMapper.mapDownlinkToUplink(downlinkHz - offsetHz, transponder) ?: return null
         return orbitalPos.getUplinkFreq(baseUplink)
     }
 
@@ -94,5 +98,27 @@ object DopplerFrequencyCalculator {
         val downHigh = transponder.downlinkHigh
         return upLow != null && upHigh != null && downLow != null && downHigh != null
                 && upLow != upHigh && downLow != downHigh
+    }
+
+    /**
+     * True for the radio entry that should drive the standalone Calculator page.
+     *
+     * A frequency range alone is not enough: some non-user-facing or drifting data entries
+     * can also have low/high frequencies. The calculator is meant for the named linear
+     * transponder entry, e.g. "Linear Transponder", "Linear Transp.", "SSB Transponder".
+     */
+    fun isNamedLinearTransponder(transponder: SatRadio): Boolean {
+        if (!isLinearTransponder(transponder)) return false
+
+        val info = transponder.info.lowercase(Locale.ENGLISH)
+        val modes = listOfNotNull(transponder.downlinkMode, transponder.uplinkMode)
+            .joinToString(separator = " ")
+            .lowercase(Locale.ENGLISH)
+        val hasLinearName = info.contains("linear")
+        val hasTransponderName = info.contains("transponder") || info.contains("transp") ||
+                info.contains("xponder") || info.contains("xpdr")
+        val hasLinearMode = listOf("ssb", "usb", "lsb", "cw").any { modes.contains(it) }
+
+        return (hasLinearName && hasTransponderName) || (hasTransponderName && hasLinearMode)
     }
 }

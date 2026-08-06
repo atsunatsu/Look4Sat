@@ -25,4 +25,8 @@ class ShowToast(private val context: Context) : IShowToast {
     override fun invoke(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
+
+    override fun invoke(resId: Int) {
+        invoke(context.getString(resId))
+    }
 }

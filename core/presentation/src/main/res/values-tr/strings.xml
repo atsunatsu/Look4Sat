@@ -10,8 +10,22 @@
     <string name="nav_sat">Uydular</string>
     <string name="nav_pass">Geçişler</string>
     <string name="nav_radar">Radar</string>
+    <string name="nav_cw">CW Dekoder</string>
     <string name="nav_map">Harita</string>
     <string name="nav_prefs">Ayarlar</string>
+    <string name="nav_more">Daha Fazla</string>
+    <string name="nav_log">Günlük</string>
+    <string name="nav_amsat">AMSAT</string>
+    <string name="amsat_title">AMSAT Uydu Durumu</string>
+    <string name="amsat_updated">Güncellendi:</string>
+    <string name="amsat_active">Aktif</string>
+    <string name="amsat_tlm">TLM/işaret</string>
+    <string name="amsat_not_heard">Duyulmadı</string>
+    <string name="amsat_conflict">Çelişkili</string>
+    <string name="amsat_name">Name</string>
+    <string name="amsat_load_failed">Yükleme başarısız - ağı kontrol edip tekrar deneyin</string>
+    <string name="amsat_no_reports">Bu dönem için rapor yok</string>
+    <string name="amsat_close">Kapat</string>
 
     <!-- Satellites screen -->
     <string name="sat_type_hint">Uydu türü: %s</string>
@@ -50,13 +64,13 @@
         Ayarlar\'dan GPS, Enlem/Boylam veya QTH kullanarak konumunuzu belirlediğinizden emin olun.
         \n\nDoğru tahminler alabilmek için veritabanını en az haftada bir güncelleyin.</string>
     <string name="pass_whatsnew_title" translatable="false">What\'s new in Look4Sat</string>
-    <string name="pass_whatsnew_message" translatable="false">
-        * Switched to short-form commands in NetworkReporter, by theojalba
-        \n* Added CAT radio control for full-duplex SAT operation, by jcmerg
-        \n* Added normalized time for passes AOS/LOS, fixed refresh state bug
-        \n* Added multiple performance tweaks, improved passes calculation
-        \n* Fixed UTC pass time problem mentioned in issue #201
-    </string>
+        <string name="pass_whatsnew_message" translatable="false">
+        * YENİ: AMSAT uydu durum sayfası - canlı durum tablosu (resmi renkler), rapor sayıları, uydu/gün bazında detaylı raporlar
+        * Günlükler uydu geçişine göre gruplanır (oturum = uydu + AOS zamanı), oturumlar arasında ayırıcı çizgi
+        * GPS artık yalnızca gerçek konum alındığında başarı gösterir (15 sn zaman aşımı, izin kontrolü)
+        * Uydu veritabanı indirilemediğinde net hata mesajı gösterilir
+        * Günlük frekansları Doppler panelini gerçek zamanlı takip eder; kaydırarak silme görselleri düzeltildi
+        * Endonezya dili düzeltmesi (values-id)</string>
 
     <!-- Radar screen -->
     <string name="radar_back">Geri</string>
@@ -103,7 +117,7 @@
     <string name="map_visible">Görünür</string>
 
     <!-- Settings screen -->
-    <string name="prefs_app_title" translatable="false">Look4Sat v%s</string>
+    <string name="prefs_app_title" translatable="false">Look4Sat Pro v%s</string>
     <string name="prefs_app_url" translatable="false">https://play.google.com/store/apps/details?id=com.rtbishop.look4sat</string>
     <string name="prefs_donate_title">Bağış yap</string>
     <string name="prefs_donate_url" translatable="false">https://ko-fi.com/rt_bishop</string>
@@ -121,7 +135,7 @@
 
     <string name="prefs_loc_title">İstasyon konumu</string>
     <string name="prefs_loc_gps_title">GPS</string>
-    <string name="prefs_loc_gps_error">Konum izinlerinizi kontrol edin</string>
+    <string name="prefs_loc_gps_error">Konum alınamıyor - izinleri ve GPS/ağ sinyalini kontrol edin</string>
     <string name="prefs_loc_input_title">Manuel giriş</string>
     <string name="prefs_loc_input_error">Geçersiz konum girildi</string>
     <string name="prefs_loc_qth_title">QTH</string>
@@ -137,15 +151,17 @@
     <string name="prefs_data_entries">Uydular: %s</string>
     <string name="prefs_data_radios">Transceiver\'lar: %s</string>
     <string name="prefs_data_update">Güncelle</string>
-    <string name="prefs_data_import">İçe aktar</string>
+    <string name="prefs_data_import">Özel URL</string>
     <string name="prefs_data_clear">Temizle</string>
     <string name="prefs_data_clear_success">Veriler başarıyla temizlendi</string>
     <string name="prefs_data_update_success">Güncelleme başarıyla tamamlandı</string>
+    <string name="prefs_data_update_failed">Güncelleme başarısız - ağınızı kontrol edin</string>
 
     <string name="prefs_data_sources_title">Özel veri kaynakları</string>
     <string name="prefs_data_sources_tle_switch">Özel TLE URL</string>
     <string name="prefs_data_sources_transceivers_switch">Özel transceiver URL</string>
     <string name="prefs_data_sources_url_title" translatable="false">URL (HTTPS)</string>
+    <string name="prefs_data_reset_url">Varsayılan URL\'ye sıfırla</string>
 
     <string name="prefs_data_output_title">Veri aktarımı</string>
     <string name="prefs_net_output">Ağ</string>
@@ -180,7 +196,48 @@
     <string name="prefs_bt_perm_error">Bluetooth izninizi kontrol edin</string>
     <string name="prefs_net_perm_error">Ağ izninizi kontrol edin</string>
 
+    <string name="tracking_status">İzleniyor: %s</string>
+    <string name="loc_lat_text">Enlem: %s°</string>
+    <string name="loc_lon_text">Boylam: %s°</string>
+    <string name="loc_qth_text">QTH: %s</string>
+    <string name="connect_radio">Bağlan</string>
+    <string name="disconnect_radio">Bağlantıyı Kes</string>
+    <string name="track_radio">Takip</string>
+    <string name="stop_radio">Dur</string>
+    <string name="prefs_wavelog_title">WaveLog günlük sunucusu</string>
+    <string name="prefs_wavelog_url_hint">Sunucu adresi</string>
+    <string name="prefs_wavelog_key_hint">API anahtarı</string>
+    <string name="prefs_wavelog_station_hint">İstasyon kimliği</string>
+    <string name="prefs_wavelog_auto">Otomatik yükleme</string>
+    <string name="prefs_wavelog_test">Bağlantıyı test et</string>
+    <string name="prefs_wavelog_upload">Şimdi yükle</string>
+    <string name="wavelog_title">Günlük</string>
+    <string name="wavelog_select_transponder">Transponder seç</string>
+    <string name="wavelog_call_hint">Çağrı işareti</string>
+    <string name="wavelog_mode_hint">Mod</string>
+    <string name="wavelog_saved">Yerel günlüğe kaydedildi</string>
+    <string name="wavelog_need_config">Önce Ayarlar\'da WaveLog\'u yapılandırın</string>
+    <string name="wavelog_empty">Henüz günlük kaydı yok</string>
+    <string name="wavelog_grid_mismatch">QTH ızgarası (%1$s) istasyon ızgarasıyla (%2$s) eşleşmiyor. Yine de yüklensin mi?</string>
+    <string name="wavelog_ignore">Yoksay ve yükle</string>
+    <string name="wavelog_cancel">İptal</string>
+    <string name="wavelog_copy">Kopyala</string>
+    <string name="wavelog_delete_undo">Geri al</string>
+    <string name="wavelog_col_time">Zaman</string>
+    <string name="wavelog_col_freq">Frekans</string>
+    <string name="wavelog_col_sat">Uydu</string>
+    <string name="wavelog_col_call">Çağrı</string>
+    <string name="wavelog_col_uploaded">Gönderildi</string>
+    <string name="wavelog_ungrouped">Gruplanmamış</string>
     <string name="prefs_other_title">Diğer ayarlar</string>
+    <string name="prefs_ui_title">UI Ayarları</string>
+    <string name="prefs_ui_order_title">Sayfa sırası</string>
+    <string name="prefs_ui_main_title">Ana menü (alt çubuk)</string>
+    <string name="prefs_ui_sub_title">Daha fazla menü</string>
+    <string name="prefs_ui_move_out">Daha fazla menüye taşı</string>
+    <string name="prefs_ui_move_back">Ana menüye geri taşı</string>
+    <string name="prefs_ui_order_locked">Sabit (taşınamaz)</string>
+    <string name="prefs_ui_order_reset">Sıralamayı sıfırla</string>
     <string name="prefs_other_switch_utc">Geçiş saatini UTC olarak göster</string>
     <string name="prefs_other_switch_update">Otomatik veri güncellemeyi etkinleştir</string>
     <string name="prefs_other_switch_sweep">Radar taramasını etkinleştir</string>
@@ -192,14 +249,16 @@
     <string name="prefs_highlight_mid">Orta %1$d-%2$d°</string>
     <string name="prefs_highlight_high">Yüksek &gt; %1$d°</string>
 
-    <string name="prefs_outro_title">Teşekkürler</string>
+    <string name="prefs_outro_title">BG7NTA ve orijinal yazar teşekkür eder</string>
     <string name="prefs_outro_thanks" translatable="false">
         • Look4Sat users and contributors!
         \n• David A. B. Johnson (predict4java)
         \n• Dave Moten (predict4java)
         \n• Alexandru Csete (Gpredict)
         \n• Dr T.S. Kelso (Celestrak)
-        \n• Libre Space Foundation (SatNOGS)</string>
+        \n• Libre Space Foundation (SatNOGS)
+        \n• BA7OPF (pass matching feature)
+        \n• BG7NTA</string>
     <string name="prefs_outro_license">Bu uygulama herhangi bir garanti sunmaz</string>
 
 </resources>

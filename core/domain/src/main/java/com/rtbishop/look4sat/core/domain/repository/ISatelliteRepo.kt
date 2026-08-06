@@ -61,7 +61,7 @@ interface ISatelliteRepo {
     suspend fun getTrack(sat: OrbitalObject, pos: GeoPos, start: Long, end: Long): List<OrbitalPos>
 
     /** Get Doppler-shifted radio frequencies for a satellite at the given time. */
-    suspend fun getRadios(sat: OrbitalObject, pos: GeoPos, radios: List<SatRadio>, time: Long): List<SatRadio>
+    suspend fun getRadios(satPos: OrbitalPos, radios: List<SatRadio>): List<SatRadio>
 
     /** Fetch radio transceivers for a satellite by its catalog number. */
     suspend fun getRadiosWithId(id: Int): List<SatRadio>

@@ -181,7 +181,7 @@ class RadarViewModel(
                 orbitalPos = pos, sunPosition = cachedSunPos, moonPosition = cachedMoonPos
             )
         }
-        processRadios(allRadios, pass.orbitalObject, timeNow)
+        processRadios(allRadios, pos)
         sendPassData(pos)
     }
 
@@ -342,8 +342,8 @@ class RadarViewModel(
         }
     }
 
-    private suspend fun processRadios(radios: List<SatRadio>, orbitalObject: OrbitalObject, time: Long) {
-        val transmitters = satelliteRepo.getRadios(orbitalObject, stationPos, radios, time)
+    private suspend fun processRadios(radios: List<SatRadio>, satPos: OrbitalPos) {
+        val transmitters = satelliteRepo.getRadios(satPos, radios)
         _uiState.update { state ->
             val freq = if (state.transceivers.selectedUuid != null) {
                 val selectedRadio = transmitters.firstOrNull { it.uuid == state.transceivers.selectedUuid }

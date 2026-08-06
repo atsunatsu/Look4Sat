@@ -95,14 +95,8 @@ class SatelliteRepo(
         }
     }
 
-    override suspend fun getRadios(
-        sat: OrbitalObject,
-        pos: GeoPos,
-        radios: List<SatRadio>,
-        time: Long
-    ): List<SatRadio> {
+    override suspend fun getRadios(satPos: OrbitalPos, radios: List<SatRadio>): List<SatRadio> {
         return withContext(dispatcher) {
-            val satPos = sat.getPosition(pos, time)
             radios.map { transmitter ->
                 transmitter.copy(
                     downlinkLow = transmitter.downlinkLow?.let { satPos.getDownlinkFreq(it) },
@@ -242,13 +236,16 @@ class SatelliteRepo(
             if (elevation > maxElevation) maxElevation = elevation
         } while (elevation < 0.0)
 
-        // refine AOS to ~500ms precision
-        calendarTimeMillis -= 60L * 1000L
-        do {
-            calendarTimeMillis += 500L
-            elevation = sat.getElevation(pos, calendarTimeMillis)
-            if (elevation > maxElevation) maxElevation = elevation
-        } while (elevation < 0.0)
+        // refine AOS to ~500ms precision via binary search.
+        // Elevation is monotonic across the horizon crossing, so binary search
+        // finds the crossing in ~8 SGP4 calls instead of up to 120 linear steps.
+        var aosLo = calendarTimeMillis - 60L * 1000L // elevation < 0 (below horizon)
+        var aosHi = calendarTimeMillis // elevation >= 0 (above horizon)
+        while (aosHi - aosLo > 500L) {
+            val mid = (aosLo + aosHi) / 2
+            if (sat.getElevation(pos, mid) < 0.0) aosLo = mid else aosHi = mid
+        }
+        calendarTimeMillis = aosHi
 
         // Get full position for AOS data (azimuth, altitude)
         val aosPos = sat.getFullPosition(pos, calendarTimeMillis)
@@ -262,13 +259,14 @@ class SatelliteRepo(
             if (elevation > maxElevation) maxElevation = elevation
         } while (elevation > 0.0)
 
-        // refine LOS to ~500ms precision
-        calendarTimeMillis -= 30L * 1000L
-        do {
-            calendarTimeMillis += 500L
-            elevation = sat.getElevation(pos, calendarTimeMillis)
-            if (elevation > maxElevation) maxElevation = elevation
-        } while (elevation > 0.0)
+        // refine LOS to ~500ms precision via binary search (same monotonic argument)
+        var losLo = calendarTimeMillis - 30L * 1000L // elevation > 0 (above horizon)
+        var losHi = calendarTimeMillis // elevation <= 0 (below horizon)
+        while (losHi - losLo > 500L) {
+            val mid = (losLo + losHi) / 2
+            if (sat.getElevation(pos, mid) > 0.0) losLo = mid else losHi = mid
+        }
+        calendarTimeMillis = losHi
 
         // Get full position for LOS data (azimuth, altitude)
         val losPos = sat.getFullPosition(pos, calendarTimeMillis)

@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Look4Sat Pro</string>
+    <string name="btn_accept">Terima</string>
+    <string name="btn_cancel">Batal</string>
+    <string name="empty_list_message">Tidak ada data untuk ditampilkan</string>
+    <string name="nav_sat">Satelit</string>
+    <string name="nav_pass">Lintasan</string>
+    <string name="nav_radar">Radar</string>
+    <string name="nav_mutual">Pasangan</string>
+    <string name="nav_roaming">Jelajah</string>
+    <string name="nav_cw">Dekoder CW</string>
+    <string name="nav_map">Peta</string>
+    <string name="nav_prefs">Pengaturan</string>
+    <string name="nav_more">Lainnya</string>
+    <string name="nav_log">Log</string>
+    <string name="nav_amsat">AMSAT</string>
+    <string name="amsat_title">Status Satelit AMSAT</string>
+    <string name="amsat_updated">Diperbarui:</string>
+    <string name="amsat_active">Aktif</string>
+    <string name="amsat_tlm">TLM/beacon</string>
+    <string name="amsat_not_heard">Tidak terdengar</string>
+    <string name="amsat_conflict">Konflik</string>
+    <string name="amsat_name">Name</string>
+    <string name="amsat_load_failed">Gagal memuat - periksa jaringan dan coba lagi</string>
+    <string name="amsat_no_reports">Tidak ada laporan untuk periode ini</string>
+    <string name="amsat_close">Tutup</string>
+    <string name="sat_type_hint">Jenis: %s</string>
+    <string name="sat_type_title">Pilih jenis satelit</string>
+    <string name="sat_search_hint">Id - Nama</string>
+    <string name="sat_search_clear">Bersihkan</string>
+    <string name="sat_clear_all">Bersihkan semua</string>
+    <string name="sat_select_all">Pilih semua</string>
+    <string name="sat_empty_list_message">Pastikan kata kunci pencarian Anda benar dan DB sudah diperbarui</string>
+    <string name="sat_warning_title">Peringatan\!</string>
+    <string name="sat_warning_message">
+        Ada lebih dari 9000 satelit yang terdaftar di aplikasi ini.
+        Tidak masuk akal untuk melacak semuanya sekaligus.
+        \n\nSelalu coba persempit daftar hanya ke satelit yang
+        Anda minati melalui pencarian dan pemilih jenis.</string>
+    <string name="pass_filter_title">Filter lintasan</string>
+    <string name="pass_filter_elev">Elevasi minimal</string>
+    <string name="pass_filter_hours">Waktu ke depan</string>
+    <string name="pass_filter_aos_time">Jendela AOS</string>
+    <string name="pass_filter_invert_time">Balik jendela AOS</string>
+    <string name="pass_filter_deep_space">DeepSpace (periode >225 mnt)</string>
+    <string name="pass_time_placeholder" translatable="false"> -- : -- : -- </string>
+    <string name="pass_modes_title">Pilih jenis modulasi</string>
+    <string name="pass_satId" translatable="false">%05d</string>
+    <string name="pass_elevation">Elevasi: %.1f°</string>
+    <string name="pass_deep_space" translatable="false">DeepSpace</string>
+    <string name="pass_altitude">Ketinggian: %d km</string>
+    <string name="pass_aosLos" translatable="false">%03d° - %03d°</string>
+    <string name="pass_empty_list_message">
+        Pastikan filter Anda benar dan Anda sudah memilih satelit</string>
+    <string name="pass_error_message">Tidak ada lintasan satelit mendatang untuk ditampilkan</string>
+    <string name="pass_welcome_title">Selamat datang di Look4Sat\!</string>
+    <string name="pass_welcome_message">
+        Pastikan Anda mengatur posisi melalui GPS, Lat/Lon atau QTH di Pengaturan.
+        \n\nPerbarui database setidaknya seminggu sekali untuk prediksi yang akurat.</string>
+    <string name="pass_whatsnew_title" translatable="false">Apa yang baru di Look4Sat</string>
+    <string name="pass_whatsnew_message" translatable="false">
+        * BARU: Halaman status satelit AMSAT - tabel status langsung (warna resmi), jumlah laporan, laporan detail per satelit/hari
+        * Log dikelompokkan per lintasan satelit (sesi = satelit + waktu AOS), garis pemisah antar sesi
+        * GPS kini hanya menampilkan sukses saat posisi benar-benar didapat (timeout 15 dtk, cek izin)
+        * Pesan kegagalan jelas saat database satelit gagal diunduh
+        * Frekuensi log mengikuti panel Doppler secara real-time; visual hapus geser dipulihkan
+        * Perbaikan bahasa Indonesia (values-id)</string>
+    <string name="radar_back">Kembali</string>
+    <string name="radar_notify">Beri tahu</string>
+    <string name="radar_az_text">Azimuth</string>
+    <string name="radar_az_value" translatable="false">%.1f°</string>
+    <string name="radar_el_text">Elevasi</string>
+    <string name="radar_el_value" translatable="false">%.1f°</string>
+    <string name="radar_alt_text">Ketinggian</string>
+    <string name="radar_alt_value" translatable="false">%.0f km</string>
+    <string name="radar_dist_text">Jarak</string>
+    <string name="radar_dist_value" translatable="false">%.0f km</string>
+    <string name="radar_eclipsed">Gerhana</string>
+    <string name="radar_downlink">Downlink</string>
+    <string name="radar_uplink">Uplink</string>
+    <string name="radar_link_low" translatable="false">%.4f</string>
+    <string name="radar_link_lowHigh" translatable="false">%.4f - %.4f</string>
+    <string name="radar_no_link" translatable="false">- - . - -</string>
+    <string name="radar_no_data">Satelit ini tidak memiliki transceiver</string>
+    <string name="radar_add">Tambah</string>
+    <string name="radar_data">Transceiver satelit:</string>
+    <string name="radar_inverted">Terbalik: %s</string>
+    <string name="radar_mode">Mode: %s</string>
+    <string name="radar_string_no">Tidak</string>
+    <string name="radar_string_yes">Ya</string>
+    <string name="radar_visible">Terlihat</string>
+    <string name="radar_doppler_calc">Kalkulator Frekuensi Doppler</string>
+    <string name="radar_doppler_tx_hint">Masukkan frekuensi TX (MHz)</string>
+    <string name="radar_doppler_rx_hint">Masukkan frekuensi RX (MHz)</string>
+    <string name="radar_doppler_offset_hint">Offset (kHz)</string>
+    <string name="radar_doppler_info">Untuk transponder linier, ketik satu frekuensi untuk melihat frekuensi lainnya</string>
+    <string name="radar_cw_decoder">Dekoder CW</string>
+    <string name="radar_cw_start">Mulai</string>
+    <string name="radar_cw_stop">Berhenti</string>
+    <string name="radar_cw_reset">Bersihkan</string>
+    <string name="map_prev">Sebelumnya</string>
+    <string name="map_next">Berikutnya</string>
+    <string name="map_copyright" translatable="false">© Kontributor OpenStreetMap</string>
+    <string name="map_azimuth">Azimuth: %.1f°</string>
+    <string name="map_elevation">Elevasi: %.1f°</string>
+    <string name="map_altitude">Ketinggian: %.0f km</string>
+    <string name="map_distance">Jarak: %.0f km</string>
+    <string name="map_latitude">Lintang: %.1f°</string>
+    <string name="map_longitude">Bujur: %.1f°</string>
+    <string name="map_qth" translatable="false">QTH: %s</string>
+    <string name="map_phase">Fase: %.1f°</string>
+    <string name="map_eclipsed">Gerhana</string>
+    <string name="map_period">Periode: %.0f mnt</string>
+    <string name="map_velocity">Kecepatan: %.2f km/d</string>
+    <string name="map_visibility">Visibilitas: %s</string>
+    <string name="map_visible">Terlihat</string>
+    <string name="prefs_app_title" translatable="false">Look4Sat Pro v%s</string>
+    <string name="prefs_app_url" translatable="false">https://play.google.com/store/apps/details?id=com.rtbishop.look4sat</string>
+    <string name="prefs_donate_title">Donasi</string>
+    <string name="prefs_donate_url" translatable="false">https://ko-fi.com/rt_bishop</string>
+    <string name="prefs_fdroid_title" translatable="false">F-Droid</string>
+    <string name="prefs_fdroid_url" translatable="false">https://f-droid.org/en/packages/com.rtbishop.look4sat/</string>
+    <string name="prefs_github_title" translatable="false">GitHub</string>
+    <string name="prefs_github_url" translatable="false">https://github.com/rt-bishop/Look4Sat/</string>
+    <string name="prefs_license_title" translatable="false">GPLv3</string>
+    <string name="prefs_license_url" translatable="false">https://www.gnu.org/licenses/gpl-3.0.html</string>
+    <string name="prefs_privacy_title">Kebijakan Privasi</string>
+    <string name="prefs_privacy_url" translatable="false">https://sites.google.com/view/look4sat-privacy-policy/home</string>
+    <string name="prefs_updated_title">Diperbarui: %s</string>
+    <string name="prefs_updated_time">d MMM yyyy - HH:mm:ss</string>
+    <string name="prefs_loc_title">Posisi stasiun</string>
+    <string name="prefs_loc_gps_title">GPS</string>
+    <string name="prefs_loc_gps_error">Tidak dapat mengambil lokasi - periksa izin dan sinyal GPS/jaringan</string>
+    <string name="prefs_loc_input_title">Input</string>
+    <string name="prefs_loc_input_error">Lokasi yang dimasukkan tidak valid</string>
+    <string name="prefs_loc_qth_title">QTH</string>
+    <string name="prefs_loc_qth_error">Lokator QTH tidak valid</string>
+    <string name="prefs_loc_success">Posisi berhasil diperbarui</string>
+    <string name="prefs_station_title">Pengaturan posisi stasiun</string>
+    <string name="prefs_station_lat_text">Atur garis lintang stasiun Anda</string>
+    <string name="prefs_station_lon_text">Atur garis bujur stasiun Anda</string>
+    <string name="prefs_locator_title">Pengaturan lokator QTH</string>
+    <string name="prefs_locator_text">Atur posisi stasiun menggunakan lokator</string>
+    <string name="prefs_data_title">Data satelit</string>
+    <string name="prefs_data_entries">Satelit: %s</string>
+    <string name="prefs_data_radios">Transceiver: %s</string>
+    <string name="prefs_data_update">Perbarui</string>
+    <string name="prefs_data_import">URL Kustom</string>
+    <string name="prefs_data_clear">Bersihkan</string>
+    <string name="prefs_data_clear_success">Data berhasil dibersihkan</string>
+    <string name="prefs_data_update_success">Pembaruan berhasil diselesaikan</string>
+    <string name="prefs_data_update_failed">Pembaruan gagal - periksa jaringan Anda</string>
+    <string name="prefs_data_import_satellites_error">Tidak ada satelit yang diimpor. Pilih file TLE/3LE (.txt) atau OMM (.csv) yang valid.</string>
+    <string name="prefs_data_import_transceivers_error">Tidak ada transceiver yang diimpor. Pilih file SatNOGS (.json) yang valid.</string>
+    <string name="prefs_data_sources_title">Sumber data kustom</string>
+    <string name="prefs_data_sources_tle_switch">URL TLE Kustom</string>
+    <string name="prefs_data_sources_transceivers_switch">URL transceiver kustom</string>
+    <string name="prefs_data_sources_url_title" translatable="false">URL (HTTPS)</string>
+    <string name="prefs_data_reset_url">Setel ulang ke URL bawaan</string>
+    <string name="prefs_data_output_title">Keluaran data</string>
+    <string name="prefs_net_output">Jaringan</string>
+    <string name="prefs_bt_output">Bluetooth</string>
+    <string name="prefs_cat_output">CAT</string>
+    <string name="nav_radiocontrol">Kontrol Radio</string>
+    <string name="rc_settings_title">Kontrol Radio CAT</string>
+    <string name="rc_radio_model">Model Radio</string>
+    <string name="rc_tx_device_hint">Alamat BT Radio TX</string>
+    <string name="rc_rx_device_hint">Alamat BT Radio RX</string>
+    <string name="rc_tx_name_hint">Nama Radio TX</string>
+    <string name="rc_rx_name_hint">Nama Radio RX</string>
+    <string name="rc_enable_switch">Aktifkan Kontrol CAT</string>
+    <string name="prefs_net_title">Keluaran data jaringan</string>
+    <string name="prefs_net_rotator_switch">Aktifkan keluaran rotator</string>
+    <string name="prefs_net_rotator_address_hint">IP:Port</string>
+    <string name="prefs_net_rotator_format_hint">Format</string>
+    <string name="prefs_net_frequency_switch">Aktifkan keluaran frekuensi</string>
+    <string name="prefs_net_frequency_address_hint">IP:Port</string>
+    <string name="prefs_net_frequency_format_hint">Format</string>
+    <string name="prefs_bt_title">Keluaran data Bluetooth</string>
+    <string name="prefs_bt_rotator_switch">Aktifkan keluaran rotator</string>
+    <string name="prefs_bt_rotator_device_hint">Id perangkat</string>
+    <string name="prefs_bt_rotator_output_hint">Format data</string>
+    <string name="prefs_bt_frequency_switch">Aktifkan keluaran frekuensi</string>
+    <string name="prefs_bt_frequency_device_hint">Id perangkat</string>
+    <string name="prefs_bt_frequency_output_hint">Format data</string>
+    <string name="prefs_bt_perm_error">Periksa izin bluetooth Anda</string>
+    <string name="prefs_net_perm_error">Periksa izin jaringan Anda</string>
+    <string name="tracking_status">Melacak: %s</string>
+    <string name="loc_lat_text">Lintang: %s°</string>
+    <string name="loc_lon_text">Bujur: %s°</string>
+    <string name="loc_qth_text">QTH: %s</string>
+    <string name="connect_radio">Hubungkan</string>
+    <string name="disconnect_radio">Putuskan</string>
+    <string name="track_radio">Lacak</string>
+    <string name="stop_radio">Berhenti</string>
+    <string name="prefs_wavelog_title">Server log WaveLog</string>
+    <string name="prefs_wavelog_url_hint">Alamat server</string>
+    <string name="prefs_wavelog_key_hint">Kunci API</string>
+    <string name="prefs_wavelog_station_hint">ID stasiun</string>
+    <string name="prefs_wavelog_auto">Unggah otomatis</string>
+    <string name="prefs_wavelog_test">Uji koneksi</string>
+    <string name="prefs_wavelog_upload">Unggah sekarang</string>
+    <string name="wavelog_title">Log</string>
+    <string name="wavelog_select_transponder">Pilih transponder</string>
+    <string name="wavelog_call_hint">Tanda panggil</string>
+    <string name="wavelog_mode_hint">Mode</string>
+    <string name="wavelog_saved">Tersimpan ke log lokal</string>
+    <string name="wavelog_need_config">Konfigurasikan WaveLog di Pengaturan terlebih dahulu</string>
+    <string name="wavelog_empty">Belum ada entri log</string>
+    <string name="wavelog_grid_mismatch">Grid QTH (%1$s) tidak cocok dengan grid stasiun (%2$s). Tetap unggah?</string>
+    <string name="wavelog_ignore">Abaikan dan unggah</string>
+    <string name="wavelog_cancel">Batal</string>
+    <string name="wavelog_copy">Salin</string>
+    <string name="wavelog_delete_undo">Urungkan</string>
+    <string name="wavelog_col_time">Waktu</string>
+    <string name="wavelog_col_freq">Frek.</string>
+    <string name="wavelog_col_sat">Satelit</string>
+    <string name="wavelog_col_call">Panggilan</string>
+    <string name="wavelog_col_uploaded">Terkirim</string>
+    <string name="wavelog_ungrouped">Tidak dikelompokkan</string>
+    <string name="prefs_other_title">Pengaturan lainnya</string>
+    <string name="prefs_ui_title">Pengaturan UI</string>
+    <string name="prefs_ui_order_title">Urutan halaman</string>
+    <string name="prefs_ui_main_title">Menu utama (bilah bawah)</string>
+    <string name="prefs_ui_sub_title">Menu lainnya</string>
+    <string name="prefs_ui_move_out">Pindah ke menu lainnya</string>
+    <string name="prefs_ui_move_back">Kembalikan ke menu utama</string>
+    <string name="prefs_ui_order_locked">Tetap (tidak dapat dipindahkan)</string>
+    <string name="prefs_ui_order_reset">Setel ulang urutan</string>
+    <string name="prefs_other_switch_utc">Tampilkan waktu lintasan dalam UTC</string>
+    <string name="prefs_other_switch_update">Aktifkan pembaruan data otomatis</string>
+    <string name="prefs_other_switch_sweep">Aktifkan animasi sapuan radar</string>
+    <string name="prefs_other_switch_sensors">Gunakan sensor untuk memutar tampilan radar</string>
+    <string name="prefs_other_switch_night_mode">Aktifkan filter mode malam merah</string>
+    <string name="prefs_highlight_title">Sorotan elevasi</string>
+    <string name="prefs_highlight_low">Rendah &lt; %1$d°</string>
+    <string name="prefs_highlight_mid">Sedang %1$d–%2$d°</string>
+    <string name="prefs_highlight_high">Tinggi &gt; %1$d°</string>
+    <string name="prefs_outro_title">BG7NTA &amp; penulis asli mengucapkan terima kasih</string>
+    <string name="prefs_outro_thanks" translatable="false">
+        * Pengguna dan kontributor Look4Sat!
+        \n* David A. B. Johnson (predict4java)
+        \n* Dave Moten (predict4java)
+        \n* Alexandru Csete (Gpredict)
+        \n* Dr T.S. Kelso (Celestrak)
+        \n* Libre Space Foundation (SatNOGS)
+        \n* xdsopl dan kontributor Robot36!
+        \n* BA7OPF (fitur pencocokan lintasan)
+        \n* BG7NTA</string>
+    <string name="prefs_outro_license">Aplikasi ini hadir tanpa jaminan</string>
+</resources>

@@ -13,12 +13,15 @@ class DopplerFrequencyCalculatorTest {
         upHigh: Long = 145_500_000L,
         downLow: Long = 435_000_000L,
         downHigh: Long? = 435_500_000L,
-        inverted: Boolean = false
+        inverted: Boolean = false,
+        info: String = "Linear Transponder",
+        downlinkMode: String? = "USB",
+        uplinkMode: String? = "LSB"
     ) = SatRadio(
-        uuid = "linear", info = "Linear Transponder", isAlive = true,
+        uuid = "linear", info = info, isAlive = true,
         downlinkLow = downLow, downlinkHigh = downHigh,
-        downlinkMode = "USB", uplinkLow = upLow, uplinkHigh = upHigh,
-        uplinkMode = "LSB", isInverted = inverted, catnum = 12345
+        downlinkMode = downlinkMode, uplinkLow = upLow, uplinkHigh = upHigh,
+        uplinkMode = uplinkMode, isInverted = inverted, catnum = 12345
     )
 
     private fun fmTransponder() = SatRadio(
@@ -46,6 +49,28 @@ class DopplerFrequencyCalculatorTest {
     fun isLinearTransponder_returnsFalseForNullDownlinkHigh() {
         val xpdr = linearTransponder(downHigh = null)
         assertFalse(DopplerFrequencyCalculator.isLinearTransponder(xpdr))
+    }
+
+    @Test
+    fun isNamedLinearTransponder_returnsTrueForLinearTransponderName() {
+        assertTrue(DopplerFrequencyCalculator.isNamedLinearTransponder(linearTransponder()))
+    }
+
+    @Test
+    fun isNamedLinearTransponder_returnsTrueForSsbTransponderName() {
+        val xpdr = linearTransponder(info = "Mode V/U SSB Transponder", downlinkMode = "USB", uplinkMode = "LSB")
+        assertTrue(DopplerFrequencyCalculator.isNamedLinearTransponder(xpdr))
+    }
+
+    @Test
+    fun isNamedLinearTransponder_returnsFalseForRangeEntryWithoutTransponderName() {
+        val driftingRangeEntry = linearTransponder(info = "Upper side band (drifting)")
+        assertFalse(DopplerFrequencyCalculator.isNamedLinearTransponder(driftingRangeEntry))
+    }
+
+    @Test
+    fun isNamedLinearTransponder_returnsFalseForFmRepeater() {
+        assertFalse(DopplerFrequencyCalculator.isNamedLinearTransponder(fmTransponder()))
     }
 
     @Test
@@ -91,6 +116,53 @@ class DopplerFrequencyCalculatorTest {
         val orbitalPos = pos()
         val result = DopplerFrequencyCalculator.computeDownlinkFromUplink(145_900_000L, fmTransponder(), orbitalPos)
         assertNull(result)
+    }
+
+    @Test
+    fun computeDownlinkFromUplink_withPositiveOffset_addsOffsetToDownlink() {
+        val xpdr = linearTransponder()
+        val orbitalPos = pos(0.0)
+        val downlink = DopplerFrequencyCalculator.computeDownlinkFromUplinkWithOffset(
+            uplinkHz = 145_200_000L,
+            transponder = xpdr,
+            orbitalPos = orbitalPos,
+            offsetHz = 2_500L
+        )
+        assertEquals(435_202_500L, downlink)
+    }
+
+    @Test
+    fun computeUplinkFromDownlink_withPositiveOffset_subtractsOffsetBeforeMapping() {
+        val xpdr = linearTransponder()
+        val orbitalPos = pos(0.0)
+        val uplink = DopplerFrequencyCalculator.computeUplinkFromDownlinkWithOffset(
+            downlinkHz = 435_202_500L,
+            transponder = xpdr,
+            orbitalPos = orbitalPos,
+            offsetHz = 2_500L
+        )
+        assertEquals(145_200_000L, uplink)
+    }
+
+    @Test
+    fun computeOffsetRoundTrip_handlesNegativeOffset() {
+        val xpdr = linearTransponder()
+        val orbitalPos = pos(0.0)
+        val downlink = DopplerFrequencyCalculator.computeDownlinkFromUplinkWithOffset(
+            uplinkHz = 145_200_000L,
+            transponder = xpdr,
+            orbitalPos = orbitalPos,
+            offsetHz = -2_500L
+        )
+        assertEquals(435_197_500L, downlink)
+
+        val uplink = DopplerFrequencyCalculator.computeUplinkFromDownlinkWithOffset(
+            downlinkHz = downlink!!,
+            transponder = xpdr,
+            orbitalPos = orbitalPos,
+            offsetHz = -2_500L
+        )
+        assertEquals(145_200_000L, uplink)
     }
 
     @Test

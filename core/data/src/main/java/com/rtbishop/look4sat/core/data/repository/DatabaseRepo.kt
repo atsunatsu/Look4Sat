@@ -69,23 +69,33 @@ class DatabaseRepo(
         val dataSourcesSettings = settingsRepo.dataSourcesSettings.value
         val tleUrls = buildMap {
             putAll(Sources.satelliteDataUrls)
-            if (dataSourcesSettings.useCustomTLE) put(customSourceType, dataSourcesSettings.tleUrl)
+            // 开关开且 URL 非空 -> All 用自定义 URL;否则用默认 URL(在线更新默认源)
+            put("All", if (dataSourcesSettings.useCustomTLE && dataSourcesSettings.tleUrl.isNotBlank())
+                dataSourcesSettings.tleUrl else Sources.defaultTleUrl)
         }.filterValues { it.isNotBlank() }
         val radioUrls = buildMap {
             putAll(Sources.transceiversDataUrls)
-            if (dataSourcesSettings.useCustomTransceivers) put(customSourceType, dataSourcesSettings.transceiversUrl)
+            put("SatNOGS", if (dataSourcesSettings.useCustomTransceivers && dataSourcesSettings.transceiversUrl.isNotBlank())
+                dataSourcesSettings.transceiversUrl else Sources.defaultTransceiversUrl)
         }.filterValues { it.isNotBlank() }
         // launch all network requests concurrently
         val tleJobs = tleUrls.values.map { url -> async { url to remoteSource.getNetworkStream(url) } }
         val radioJobs = radioUrls.values.map { url -> async { url to remoteSource.getNetworkStream(url) } }
+        // 统计成功源数: 0 成功视为更新失败(不刷时间戳, 抛异常让 UI 提示)
+        val tleResults = tleJobs.awaitAll()
+        val radioResults = radioJobs.awaitAll()
+        val successCount = tleResults.count { it.second != null } + radioResults.count { it.second != null }
+        if (successCount == 0) {
+            throw java.io.IOException("All data sources failed to download")
+        }
         // parse fetched data concurrently and associate with types
-        val importedEntries = tleJobs.awaitAll().flatMap { (url, stream) ->
+        val importedEntries = tleResults.flatMap { (url, stream) ->
             val type = tleUrls.entries.find { it.value == url }?.key ?: customSourceType
             stream?.let { parseSatelliteStream(url, unwrapIfZipped(url, it)) }.orEmpty().also { entries ->
                 settingsRepo.setSatelliteTypeIds(type, entries.map { it.catnum })
             }
         }
-        val importedRadios = radioJobs.awaitAll().flatMap { (url, stream) ->
+        val importedRadios = radioResults.flatMap { (url, stream) ->
             stream?.let { dataParser.parseJSONStream(unwrapIfZipped(url, it)) }.orEmpty()
         }
         // insert parsed data into the database

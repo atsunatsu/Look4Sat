@@ -22,39 +22,70 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
+import android.content.Context
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import kotlin.math.roundToInt
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -72,6 +103,8 @@ import com.rtbishop.look4sat.core.presentation.R
 import com.rtbishop.look4sat.core.presentation.ScreenColumn
 import com.rtbishop.look4sat.core.presentation.TopBar
 import com.rtbishop.look4sat.core.presentation.infiniteMarquee
+import com.rtbishop.look4sat.core.presentation.defaultScreenOrder
+import com.rtbishop.look4sat.core.presentation.defaultSubMenuOrder
 import com.rtbishop.look4sat.core.presentation.isVerticalLayout
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -84,6 +117,63 @@ fun SettingsDestination() {
     val viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(container))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreen(uiState, viewModel::onAction)
+
+    // WaveLog 网格不一致确认弹窗(4.5.2)
+    val gridConfirm = viewModel.gridConfirm
+    if (gridConfirm != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.resolveGridConfirm(false) },
+            title = { Text(text = stringResource(id = R.string.wavelog_title)) },
+            text = {
+                Text(
+                    text = stringResource(
+                        id = R.string.wavelog_grid_mismatch,
+                        gridConfirm.userGrid.take(4),
+                        gridConfirm.stationGrid.take(4)
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.resolveGridConfirm(true) }) {
+                    Text(text = stringResource(id = R.string.wavelog_ignore))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.resolveGridConfirm(false) }) {
+                    Text(text = stringResource(id = R.string.wavelog_cancel))
+                }
+            }
+        )
+    }
+
+    // WaveLog 错误详情弹窗(可一键复制)
+    val wavelogError = viewModel.wavelogError
+    if (wavelogError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.wavelogError = null },
+            title = { Text(text = stringResource(id = R.string.wavelog_title)) },
+            text = {
+                Text(
+                    text = wavelogError,
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("WaveLog error", wavelogError))
+                    viewModel.wavelogError = null
+                }) {
+                    Text(text = stringResource(id = R.string.wavelog_copy))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.wavelogError = null }) {
+                    Text(text = stringResource(id = R.string.btn_cancel))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -299,6 +389,18 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
                 )
             }
             item { OtherCard(uiState.otherSettings, onAction) }
+            item { WavelogCard(uiState.otherSettings, onAction) }
+            item {
+                UiSettingsCard(
+                    hiddenScreens = uiState.otherSettings.hiddenScreens,
+                    screenOrder = uiState.otherSettings.screenOrder,
+                    subMenuOrder = uiState.otherSettings.subMenuOrder,
+                    onToggle = { name -> onAction(SettingsAction.ToggleScreen(name)) },
+                    onReorder = { order -> onAction(SettingsAction.ReorderScreens(order)) },
+                    onResetOrder = { onAction(SettingsAction.ResetMenuOrder) },
+                    onUpdateMenu = { main, sub -> onAction(SettingsAction.UpdateMenuOrder(main, sub)) }
+                )
+            }
             item { CardCredits() }
         }
     }
@@ -337,9 +439,11 @@ private fun LocationCard(
             Text(text = formatUpdateTime(updateTime = settings.stationPos.timestamp))
             Spacer(modifier = Modifier.height(2.dp))
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(text = "Lat: ${settings.stationPos.latitude}°")
-                Text(text = "Lon: ${settings.stationPos.longitude}°")
-                Text(text = "Qth: ${settings.stationPos.qthLocator}")
+                Text(text = stringResource(R.string.loc_lat_text, settings.stationPos.latitude))
+                Text(text = stringResource(R.string.loc_lon_text, settings.stationPos.longitude))
+            }
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(text = stringResource(R.string.loc_qth_text, settings.stationPos.qthLocator))
             }
             Spacer(modifier = Modifier.height(1.dp))
             Row(horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -484,11 +588,12 @@ private fun OtherCardPreview() = MainTheme {
 @Composable
 private fun OtherCard(settings: OtherSettings, onAction: (SettingsAction) -> Unit) {
     ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(268.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             Text(
                 text = stringResource(id = R.string.prefs_other_title),
                 color = MaterialTheme.colorScheme.primary
@@ -512,8 +617,295 @@ private fun OtherCard(settings: OtherSettings, onAction: (SettingsAction) -> Uni
     }
 }
 
+/**
+ * UI 设置卡片: 控制底部菜单栏各页面显示/隐藏。
+ * 顺序固定(卫星/过境/雷达/匹配/漫游/地图/设置), 关闭后其余自动靠拢;
+ * "设置"页固定显示(防止失去设置入口)。
+ */
+/** WaveLog 日志服务器设置卡片(4.5.2): 照用户截图布局(深色卡片/标签左输入右/按钮行) */
 @Composable
-private fun SwitchRow(labelResId: Int, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun WavelogCard(
+    settings: OtherSettings,
+    onAction: (SettingsAction) -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = stringResource(id = R.string.prefs_wavelog_title),
+                color = MaterialTheme.colorScheme.primary
+            )
+            OutlinedTextField(
+                value = settings.wavelogUrl,
+                onValueChange = {
+                    onAction(SettingsAction.UpdateWavelogSettings(it, settings.wavelogApiKey, settings.wavelogStationId, settings.wavelogAutoUpload))
+                },
+                label = { Text(stringResource(id = R.string.prefs_wavelog_url_hint)) },
+                singleLine = true,
+                textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = settings.wavelogApiKey,
+                onValueChange = {
+                    onAction(SettingsAction.UpdateWavelogSettings(settings.wavelogUrl, it, settings.wavelogStationId, settings.wavelogAutoUpload))
+                },
+                label = { Text(stringResource(id = R.string.prefs_wavelog_key_hint)) },
+                singleLine = true,
+                textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = settings.wavelogStationId,
+                onValueChange = {
+                    onAction(SettingsAction.UpdateWavelogSettings(settings.wavelogUrl, settings.wavelogApiKey, it, settings.wavelogAutoUpload))
+                },
+                label = { Text(stringResource(id = R.string.prefs_wavelog_station_hint)) },
+                singleLine = true,
+                textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+                modifier = Modifier.fillMaxWidth()
+            )
+            SwitchRow(R.string.prefs_wavelog_auto, settings.wavelogAutoUpload) {
+                onAction(SettingsAction.UpdateWavelogSettings(settings.wavelogUrl, settings.wavelogApiKey, settings.wavelogStationId, it))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CardButton(
+                    onClick = { onAction(SettingsAction.TestWavelogConnection) },
+                    text = stringResource(id = R.string.prefs_wavelog_test),
+                    modifier = Modifier.weight(1f)
+                )
+                CardButton(
+                    onClick = { onAction(SettingsAction.UploadWavelogQueue) },
+                    text = stringResource(id = R.string.prefs_wavelog_upload),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UiSettingsCard(
+    hiddenScreens: List<String>,
+    screenOrder: List<String>,
+    subMenuOrder: List<String>,
+    onToggle: (String) -> Unit,
+    onReorder: (List<String>) -> Unit,
+    onResetOrder: () -> Unit,
+    onUpdateMenu: (List<String>, List<String>) -> Unit
+) {
+    val screens = listOf(
+        R.string.nav_sat to "Satellites",
+        R.string.nav_pass to "Passes",
+        R.string.nav_radar to "Radar",
+        R.string.nav_mutual to "Mutual",
+        R.string.nav_roaming to "Roaming",
+        R.string.nav_cw to "CwDecode",
+        R.string.nav_log to "WavelogLog",
+        R.string.nav_amsat to "AMSAT",
+        R.string.nav_map to "Map",
+        R.string.nav_prefs to "Settings"
+    ) // name 必须与 Screen.screenId 一致 (R8 安全)
+    // 主菜单项: 排除更多菜单项, Settings 固定最后
+    val mainItems = remember(screens, screenOrder, subMenuOrder) {
+        val sub = subMenuOrder.ifEmpty { defaultSubMenuOrder }
+        screens.map { it.second }
+            .filter { it !in sub }
+            .sortedBy { name ->
+                screenOrder.indexOf(name).let { idx ->
+                    if (idx != -1) idx else defaultScreenOrder.indexOf(name).let {
+                        if (it != -1) it else Int.MAX_VALUE
+                    }
+                }
+            }
+            .sortedWith(compareBy { if (it == "Settings") 1 else 0 })
+    }
+    // 更多菜单项
+    val subItems = remember(screens, subMenuOrder) {
+        val sub = subMenuOrder.ifEmpty { defaultSubMenuOrder }
+        sub.filter { s -> screens.any { (_, name) -> name == s } }
+    }
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = stringResource(id = R.string.prefs_ui_title),
+                color = MaterialTheme.colorScheme.primary
+            )
+            screens.forEach { (labelRes, name) ->
+                if (name == "Settings") {
+                    // 设置页固定显示, 开关禁用
+                    SwitchRow(labelRes, true, null)
+                } else {
+                    SwitchRow(labelRes, name !in hiddenScreens) {
+                        onToggle(name)
+                    }
+                }
+            }
+            Text(
+                text = stringResource(id = R.string.prefs_ui_order_title),
+                color = MaterialTheme.colorScheme.primary
+            )
+            // 主菜单区(底部栏, 最多 5 项, 设置锁定最后)
+            Text(
+                text = stringResource(id = R.string.prefs_ui_main_title),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            DragOrderList(
+                items = mainItems,
+                labels = screens,
+                locked = setOf("Settings"),
+                moveLabel = stringResource(id = R.string.prefs_ui_move_out),
+                moveEnabled = { name -> name != "Settings" },
+                onMove = { name ->
+                    onUpdateMenu(
+                        mainItems.filter { it != name },
+                        (subMenuOrder.ifEmpty { defaultSubMenuOrder } + name).distinct()
+                    )
+                },
+                onReorder = { main -> onUpdateMenu(main, subMenuOrder) }
+            )
+            // 更多菜单区(进「更多」的页面)
+            Text(
+                text = stringResource(id = R.string.prefs_ui_sub_title),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            DragOrderList(
+                items = subItems,
+                labels = screens,
+                moveLabel = stringResource(id = R.string.prefs_ui_move_back),
+                // 按钮常显; 主菜单满 5 时自动让位(最后一个非"设置"项移入更多, 交换)
+                moveEnabled = { true },
+                onMove = { name ->
+                    val mainWithoutSettings = mainItems.filter { it != "Settings" }
+                    val needSwap = mainWithoutSettings.size >= 5
+                    val evicted = if (needSwap) mainWithoutSettings.last() else null
+                    val newMain = if (needSwap) {
+                        (mainWithoutSettings.dropLast(1) + name).distinct()
+                    } else {
+                        (mainWithoutSettings + name).distinct()
+                    }
+                    val newSub = (subItems.filter { it != name } +
+                        if (evicted != null) listOf(evicted) else emptyList()).distinct()
+                    onUpdateMenu(newMain, newSub)
+                },
+                onReorder = { sub -> onUpdateMenu(screenOrder, sub) }
+            )
+            TextButton(onClick = onResetOrder) {
+                Text(text = stringResource(id = R.string.prefs_ui_order_reset))
+            }
+        }
+    }
+}
+
+/** 页面顺序拖拽列表: 每行右侧抓手, 按住上下拖动实时换位, 松手持久化 */
+@Composable
+private fun DragOrderList(
+    items: List<String>,
+    labels: List<Pair<Int, String>>,
+    locked: Set<String> = emptySet(),
+    moveLabel: String? = null,
+    moveEnabled: (String) -> Boolean = { true },
+    onMove: ((String) -> Unit)? = null,
+    onReorder: (List<String>) -> Unit
+) {
+    val itemHeight = 48.dp
+    val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
+    val listState = rememberLazyListState()
+    val localItems = remember(items) { mutableStateListOf<String>().apply { addAll(items) } }
+    var draggingIndex by remember { mutableIntStateOf(-1) }
+    var dragOffset by remember { mutableStateOf(0f) }
+
+    // 固定高度: 嵌套在 LazyVerticalGrid 内必须给有界高度, 否则无限高度约束崩溃
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(itemHeight * localItems.size)
+    ) {
+        itemsIndexed(localItems, key = { _, name -> name }) { index, name ->
+            val isDragging = draggingIndex == index
+            val isLocked = name in locked
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(itemHeight)
+                    .zIndex(if (isDragging) 1f else 0f)
+                    .graphicsLayer { translationY = if (isDragging) dragOffset else 0f }
+                    .animateItem()
+            ) {
+                Text(
+                    text = stringResource(id = labels.first { it.second == name }.first),
+                    modifier = Modifier.weight(1f)
+                )
+                if (moveLabel != null && onMove != null && moveEnabled(name)) {
+                    TextButton(onClick = { onMove(name) }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                        Text(moveLabel, fontSize = 11.sp)
+                    }
+                }
+                if (isLocked) {
+                    // 锁定行(设置页): 无抓手, 固定最后
+                    Text(
+                        text = stringResource(id = R.string.prefs_ui_order_locked),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .padding(20.dp)
+                            .pointerInput(name) {
+                                detectDragGestures(
+                                    onDragStart = { draggingIndex = localItems.indexOf(name) },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragOffset += dragAmount.y
+                                        val currentIndex = draggingIndex
+                                        val target = (currentIndex + (dragOffset / itemHeightPx).roundToInt())
+                                            .coerceIn(0, localItems.size - 1)
+                                        if (target != currentIndex) {
+                                            localItems.add(target, localItems.removeAt(currentIndex))
+                                            dragOffset += (currentIndex - target) * itemHeightPx
+                                            draggingIndex = target
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        onReorder(localItems.toList())
+                                        draggingIndex = -1
+                                        dragOffset = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggingIndex = -1
+                                        dragOffset = 0f
+                                    }
+                                )
+                            }
+                    ) {
+                        // 小圆点手柄(触控区 padding 20dp 居中 -> 8dp 圆点)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(labelResId: Int, checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?) {
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -556,15 +948,11 @@ private fun CardCreditsPreview() = MainTheme { CardCredits() }
 @Composable
 private fun CardCredits(modifier: Modifier = Modifier) {
     ElevatedCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(268.dp)
+        modifier = modifier.fillMaxWidth()
     ) {
         Column(
-            verticalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-                .fillMaxHeight()
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
             Text(
                 text = stringResource(id = R.string.prefs_outro_title),
@@ -573,6 +961,8 @@ private fun CardCredits(modifier: Modifier = Modifier) {
             Text(
                 text = stringResource(id = R.string.prefs_outro_thanks)
             )
+            // 感谢列表与保修声明之间保留约两行间距 (用户要求)
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = stringResource(id = R.string.prefs_outro_license),
                 color = MaterialTheme.colorScheme.primary
@@ -588,7 +978,7 @@ private fun TopCard(onClick: () -> Unit, modifier: Modifier = Modifier, version:
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .height(48.dp)
+                .heightIn(min = 48.dp)
                 .clickable { onClick() }) {
             Spacer(Modifier)
             Icon(
@@ -603,7 +993,6 @@ private fun TopCard(onClick: () -> Unit, modifier: Modifier = Modifier, version:
                 modifier = Modifier
                     .weight(1f)
                     .padding(end = 6.dp)
-                    .infiniteMarquee()
             )
         }
     }

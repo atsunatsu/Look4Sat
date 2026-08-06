@@ -18,6 +18,10 @@
 package com.rtbishop.look4sat.core.domain.source
 
 object Sources {
+    // 在线更新的默认 URL(用户可通过"自定义URL"对话框修改/重置)
+    val defaultTleUrl = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=csv"
+    val defaultTransceiversUrl = "https://db.satnogs.org/api/transmitters/?format=json&status=active"
+
     val satelliteDataUrls = mapOf(
         "All" to "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=csv",
         "Amateur" to "https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=csv",

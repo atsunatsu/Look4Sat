@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:icon="@drawable/ic_baseline_pause_24"
+        android:id="@+id/pause_mnu"
+        android:title="@string/pause"
+        app:showAsAction="ifRoom"/>
+    <item
+        android:icon="@drawable/ic_baseline_delete_24"
+        android:id="@+id/clear_mnu"
+        android:title="@string/clear"
+        app:showAsAction="ifRoom"/>
+    <item
+        android:icon="@drawable/ic_baseline_save_24"
+        android:id="@+id/save_mnu"
+        android:title="@string/save_text"
+        app:showAsAction="ifRoom"/>
+    <item
+        android:id="@+id/record_signals_mnu"
+        android:title="@string/record_signals"/>
+    <item
+        android:id="@+id/settings_mnu"
+        android:title="@string/settings"/>
+    <item
+        android:id="@+id/help_mnu"
+        android:title="@string/help"/>
+    <item
+        android:id="@+id/rate_mnu"
+        android:title="@string/rate"/>
+    <item
+        android:id="@+id/premium_mnu"
+        android:title="@string/premium"/>
+</menu>

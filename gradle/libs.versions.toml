@@ -1,8 +1,8 @@
 [versions]
 #noinspection UnusedVersionCatalogEntry
-appVersionCode = "443"
+appVersionCode = "453"
 #noinspection UnusedVersionCatalogEntry
-appVersionName = "4.4.3"
+appVersionName = "4.5.3"
 #noinspection UnusedVersionCatalogEntry
 compileSdk = "37"
 #noinspection UnusedVersionCatalogEntry
@@ -11,6 +11,11 @@ minSdk = "24"
 jdkVersion = "21"
 #noinspection UnusedVersionCatalogEntry
 packageName = "com.rtbishop.look4sat"
+# Fork application ID: official app uses com.rtbishop.look4sat with a different
+# signing cert. Installing a fork with the same applicationId would conflict
+# with the official build (signature mismatch / cannot overwrite), so the fork
+# ships under its own applicationId suffix.
+applicationId = "com.rtbishop.look4sat.bg7nta"
 
 android-gradle-plugin = "9.3.1"
 

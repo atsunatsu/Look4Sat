@@ -518,6 +518,5 @@ fun formatFrequency(frequencyHz: Long): String {
     if (frequencyHz <= 0) return "---"
     val mhz = frequencyHz / 1_000_000
     val khz = (frequencyHz % 1_000_000) / 1_000
-    val hz = frequencyHz % 1_000
-    return String.format(Locale.ENGLISH, "%d.%03d.%03d", mhz, khz, hz)
+    return String.format(Locale.ENGLISH, "%d.%03d", mhz, khz)
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Commmon -->
-    <string name="app_name" translatable="false">Look4Sat</string>
+    <string name="app_name" translatable="false">Look4Sat Pro</string>
     <string name="btn_accept">Accept</string>
     <string name="btn_cancel">Cancel</string>
     <string name="empty_list_message">No data to show</string>
@@ -11,8 +11,23 @@
     <string name="nav_pass">Passes</string>
     <string name="nav_radar">Radar</string>
     <string name="nav_mutual">Match</string>
+    <string name="nav_roaming">Roaming</string>
+    <string name="nav_cw">CW Decoder</string>
     <string name="nav_map">Map</string>
     <string name="nav_prefs">Settings</string>
+    <string name="nav_more">More</string>
+    <string name="nav_log">Log</string>
+    <string name="nav_amsat">AMSAT</string>
+    <string name="amsat_title">AMSAT Satellite Status</string>
+    <string name="amsat_updated">Updated:</string>
+    <string name="amsat_active">Active</string>
+    <string name="amsat_tlm">TLM/Beacon</string>
+    <string name="amsat_not_heard">Not Heard</string>
+    <string name="amsat_conflict">Conflicting</string>
+    <string name="amsat_name">Name</string>
+    <string name="amsat_load_failed">Load failed - check network and retry</string>
+    <string name="amsat_no_reports">No reports for this period</string>
+    <string name="amsat_close">Close</string>
 
     <!-- Satellites screen -->
     <string name="sat_type_hint">Type: %s</string>
@@ -51,10 +66,13 @@
         Make sure to set your position via GPS, Lat/Lon or QTH in Settings.
         \n\nPlease update the database at least weekly to get accurate predictions.</string>
     <string name="pass_whatsnew_title" translatable="false">What\'s new in Look4Sat</string>
-    <string name="pass_whatsnew_message" translatable="false">
-        * Added required tweaks to support Android 17 (API 37)
-        \n\n* Added ACCESS_LOCAL_NETWORK permission check to support network data output
-    </string>
+        <string name="pass_whatsnew_message" translatable="false">
+        * NEW: AMSAT satellite status page - live status grid (official colors), report counts, detailed reports per satellite/day
+        * Log entries grouped by satellite pass (session ID = satellite + AOS time), divider lines between sessions
+        * GPS now only reports success when a real fix is acquired (15s timeout, permission check)
+        * Data update shows a clear failure message when the satellite database cannot be downloaded
+        * Log frequencies follow the Doppler panel in real time; swipe-to-delete visuals restored
+        * Indonesian locale fix (values-id)</string>
 
     <!-- Radar screen -->
     <string name="radar_back">Back</string>
@@ -111,7 +129,7 @@
     <string name="map_visible">Visible</string>
 
     <!-- Settings screen -->
-    <string name="prefs_app_title" translatable="false">Look4Sat v%s</string>
+    <string name="prefs_app_title" translatable="false">Look4Sat Pro v%s</string>
     <string name="prefs_app_url" translatable="false">https://play.google.com/store/apps/details?id=com.rtbishop.look4sat</string>
     <string name="prefs_donate_title">Donate</string>
     <string name="prefs_donate_url" translatable="false">https://ko-fi.com/rt_bishop</string>
@@ -129,7 +147,7 @@
 
     <string name="prefs_loc_title">Station position</string>
     <string name="prefs_loc_gps_title">GPS</string>
-    <string name="prefs_loc_gps_error">Check your location permissions</string>
+    <string name="prefs_loc_gps_error">Unable to get location - check permission and GPS/network signal</string>
     <string name="prefs_loc_input_title">Input</string>
     <string name="prefs_loc_input_error">Invalid location entered</string>
     <string name="prefs_loc_qth_title">QTH</string>
@@ -145,10 +163,11 @@
     <string name="prefs_data_entries">Satellites: %s</string>
     <string name="prefs_data_radios">Transceivers: %s</string>
     <string name="prefs_data_update">Update</string>
-    <string name="prefs_data_import">Import</string>
+    <string name="prefs_data_import">Custom URL</string>
     <string name="prefs_data_clear">Clear</string>
     <string name="prefs_data_clear_success">Data was cleared successfully</string>
     <string name="prefs_data_update_success">Update completed successfully</string>
+    <string name="prefs_data_update_failed">Update failed - check your network</string>
     <string name="prefs_data_import_satellites_error">No satellites imported. Select a valid TLE/3LE (.txt) or OMM (.csv) file.</string>
     <string name="prefs_data_import_transceivers_error">No transceivers imported. Select a valid SatNOGS (.json) file.</string>
 
@@ -156,6 +175,7 @@
     <string name="prefs_data_sources_tle_switch">Custom TLE URL</string>
     <string name="prefs_data_sources_transceivers_switch">Custom transceivers URL</string>
     <string name="prefs_data_sources_url_title" translatable="false">URL (HTTPS)</string>
+    <string name="prefs_data_reset_url">Reset to default URL</string>
 
     <string name="prefs_data_output_title">Data output</string>
     <string name="prefs_net_output">Network</string>
@@ -190,7 +210,48 @@
     <string name="prefs_bt_perm_error">Check your bluetooth permission</string>
     <string name="prefs_net_perm_error">Check your network permission</string>
 
+    <string name="tracking_status">Tracking: %s</string>
+    <string name="loc_lat_text">Lat: %s°</string>
+    <string name="loc_lon_text">Lon: %s°</string>
+    <string name="loc_qth_text">Qth: %s</string>
+    <string name="connect_radio">Connect</string>
+    <string name="disconnect_radio">Disconnect</string>
+    <string name="track_radio">Track</string>
+    <string name="stop_radio">Stop</string>
+    <string name="prefs_wavelog_title">WaveLog log server</string>
+    <string name="prefs_wavelog_url_hint">Server address</string>
+    <string name="prefs_wavelog_key_hint">API key</string>
+    <string name="prefs_wavelog_station_hint">Station ID</string>
+    <string name="prefs_wavelog_auto">Auto upload</string>
+    <string name="prefs_wavelog_test">Test connection</string>
+    <string name="prefs_wavelog_upload">Upload now</string>
+    <string name="wavelog_title">Log</string>
+    <string name="wavelog_select_transponder">Select transponder</string>
+    <string name="wavelog_call_hint">Callsign</string>
+    <string name="wavelog_mode_hint">Mode</string>
+    <string name="wavelog_saved">Saved to local log</string>
+    <string name="wavelog_need_config">Configure WaveLog in Settings first</string>
+    <string name="wavelog_empty">No log entries yet</string>
+    <string name="wavelog_grid_mismatch">QTH grid (%1$s) does not match station grid (%2$s). Upload anyway?</string>
+    <string name="wavelog_ignore">Ignore and upload</string>
+    <string name="wavelog_cancel">Cancel</string>
+    <string name="wavelog_copy">Copy</string>
+    <string name="wavelog_delete_undo">Undo</string>
+    <string name="wavelog_col_time">Time</string>
+    <string name="wavelog_col_freq">Freq</string>
+    <string name="wavelog_col_sat">Satellite</string>
+    <string name="wavelog_col_call">Call</string>
+    <string name="wavelog_col_uploaded">Sent</string>
+    <string name="wavelog_ungrouped">Ungrouped</string>
     <string name="prefs_other_title">Other settings</string>
+    <string name="prefs_ui_title">UI Settings</string>
+    <string name="prefs_ui_order_title">Page order</string>
+    <string name="prefs_ui_main_title">Main menu (bottom bar)</string>
+    <string name="prefs_ui_sub_title">More menu</string>
+    <string name="prefs_ui_move_out">Move to more menu</string>
+    <string name="prefs_ui_move_back">Move back to main menu</string>
+    <string name="prefs_ui_order_locked">Fixed (cannot be moved)</string>
+    <string name="prefs_ui_order_reset">Reset order</string>
     <string name="prefs_other_switch_utc">Show pass time in UTC</string>
     <string name="prefs_other_switch_update">Enable automatic data update</string>
     <string name="prefs_other_switch_sweep">Enable radar sweep animation</string>
@@ -202,7 +263,7 @@
     <string name="prefs_highlight_mid">Mid %1$d–%2$d°</string>
     <string name="prefs_highlight_high">High &gt; %1$d°</string>
 
-    <string name="prefs_outro_title">I would like to say thanks to</string>
+    <string name="prefs_outro_title">BG7NTA &amp; the original author would like to thank</string>
     <string name="prefs_outro_thanks" translatable="false">
         * Look4Sat users and contributors!
         \n* David A. B. Johnson (predict4java)
@@ -211,6 +272,8 @@
         \n* Dr T.S. Kelso (Celestrak)
         \n* Libre Space Foundation (SatNOGS)
         \n* xdsopl and Robot36 contributors!
+        \n* BA7OPF (pass matching feature)
+        \n* BG7NTA
     </string>
     <string name="prefs_outro_license">The app comes with no warranty</string>
 

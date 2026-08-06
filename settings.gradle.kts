@@ -21,10 +21,13 @@ include(
     ":core:presentation"
 )
 include(
+    ":feature:cw",
     ":feature:map",
     ":feature:mutual",
     ":feature:passes",
     ":feature:radar",
+    ":feature:roaming",
     ":feature:satellites",
-    ":feature:settings"
+    ":feature:settings",
+    ":feature:status"
 )

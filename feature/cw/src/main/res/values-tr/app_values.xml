@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_500">#ff6200ee</color>
+    <integer name="default_font_size">18</integer>
+    <string name="idle">Beklemede</string>
+    <string name="waterfall_display">Şelale görüntüsü</string>
+    <string name="frequency_scale">Frekans ölçeği</string>
+    <string name="decoded_text">Çözülen metin</string>
+    <string name="clear">Temizle</string>
+    <string name="pause">Çözmeyi Duraklat</string>
+    <string name="save_text">Metni Kaydet</string>
+    <string name="record_signals">Sinyalleri Kaydet</string>
+    <string name="settings">Ayarlar</string>
+    <string name="help">Çevrimiçi Yardım</string>
+    <string name="rate">Bu Uygulamayı Değerlendir</string>
+    <string name="premium">Premium Sürümü Al</string>
+    <string name="tap_back_again_to_close">Kapatmak için Geriye tekrar dokunun</string>
+    <string name="message_type">Mesaj Türü</string>
+    <string name="cw_mic_permission">CW çözme için mikrofon izni gereklidir</string>
+    <string name="cw_grant_permission">İzin ver</string>
+    <string name="cw_open_settings">Uygulama ayarlarını aç</string>
+</resources>

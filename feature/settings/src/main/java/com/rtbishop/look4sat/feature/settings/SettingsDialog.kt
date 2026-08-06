@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -41,11 +43,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rtbishop.look4sat.core.domain.model.RCSettings
+import com.rtbishop.look4sat.core.domain.source.Sources
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 import com.rtbishop.look4sat.core.presentation.CardButton
 import com.rtbishop.look4sat.core.presentation.LocalSpacing
@@ -203,6 +207,17 @@ fun DataSourcesDialog(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isEnabledCustomTle.value,
+                trailingIcon = {
+                    IconButton(
+                        onClick = { urlTle.value = Sources.defaultTleUrl },
+                        enabled = isEnabledCustomTle.value
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_reset),
+                            contentDescription = stringResource(id = R.string.prefs_data_reset_url)
+                        )
+                    }
+                },
             )
             Spacer(modifier = Modifier.height(6.dp))
             Row(
@@ -232,6 +247,17 @@ fun DataSourcesDialog(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isEnabledCustomTransceivers.value,
+                trailingIcon = {
+                    IconButton(
+                        onClick = { urlTransceivers.value = Sources.defaultTransceiversUrl },
+                        enabled = isEnabledCustomTransceivers.value
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_reset),
+                            contentDescription = stringResource(id = R.string.prefs_data_reset_url)
+                        )
+                    }
+                },
             )
             Spacer(modifier = Modifier.height(12.dp))
         }

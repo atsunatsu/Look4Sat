@@ -29,6 +29,7 @@ import com.rtbishop.look4sat.core.data.framework.Ft817Controller
 import com.rtbishop.look4sat.core.data.framework.Ic705Controller
 import com.rtbishop.look4sat.core.data.framework.NetworkReporter
 import com.rtbishop.look4sat.core.data.framework.RadioTrackingService
+import com.rtbishop.look4sat.core.data.repository.AmSatRepository
 import com.rtbishop.look4sat.core.data.repository.DatabaseRepo
 import com.rtbishop.look4sat.core.data.repository.SatelliteRepo
 import com.rtbishop.look4sat.core.data.repository.SelectionRepo
@@ -40,6 +41,9 @@ import com.rtbishop.look4sat.core.data.usecase.AddToCalendar
 import com.rtbishop.look4sat.core.data.usecase.AudioCapture
 import com.rtbishop.look4sat.core.data.usecase.SaveImage
 import com.rtbishop.look4sat.core.data.usecase.ShowToast
+import com.rtbishop.look4sat.core.domain.wavelog.IWavelogQueueStore
+import com.rtbishop.look4sat.core.domain.wavelog.WavelogQueue
+import com.rtbishop.look4sat.core.domain.wavelog.WavelogUploader
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 import com.rtbishop.look4sat.core.domain.repository.IDatabaseRepo
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
@@ -70,12 +74,14 @@ import okhttp3.OkHttpClient
 class MainContainer(private val context: Context) : IMainContainer {
 
     private val localSource = provideLocalSource()
+    private val remoteSource by lazy { provideRemoteSource() }
     private val mainHandler = CoroutineExceptionHandler { _, error -> println("MainHandler: $error") }
     override val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + mainHandler)
     override val settingsRepo = provideSettingsRepo()
     override val selectionRepo = provideSelectionRepo()
     override val satelliteRepo = provideSatelliteRepo()
     override val databaseRepo = provideDatabaseRepo()
+    override val amSatRepo = AmSatRepository(remoteSource)
     override val radioTrackingService: IRadioTrackingService by lazy {
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         RadioTrackingService(appScope, manager, satelliteRepo, settingsRepo)
@@ -95,6 +101,16 @@ class MainContainer(private val context: Context) : IMainContainer {
     override fun provideAudioCapture(): IAudioCapture = AudioCapture()
 
     override fun provideSaveImage(): ISaveImage = SaveImage(context)
+
+    // WaveLog 日志(4.5.2): 本地队列 + 上传器(共享实例)
+    override val wavelogQueue: WavelogQueue by lazy {
+        val prefs = context.getSharedPreferences("wavelog", Context.MODE_PRIVATE)
+        WavelogQueue(object : IWavelogQueueStore {
+            override fun load(): String = prefs.getString("wavelog_queue", "[]") ?: "[]"
+            override fun save(json: String) = prefs.edit().putString("wavelog_queue", json).apply()
+        })
+    }
+    override fun provideWavelogUploader(): WavelogUploader = WavelogUploader(settingsRepo, wavelogQueue)
 
     override fun provideBluetoothReporter(): IReporter {
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -149,7 +165,6 @@ class MainContainer(private val context: Context) : IMainContainer {
     private fun provideDatabaseRepo(): IDatabaseRepo {
         val dbDispatcher = Dispatchers.Default
         val dataParser = DataParser(dbDispatcher)
-        val remoteSource = provideRemoteSource()
         return DatabaseRepo(dbDispatcher, dataParser, localSource, remoteSource, settingsRepo)
     }
 
@@ -160,7 +175,14 @@ class MainContainer(private val context: Context) : IMainContainer {
     }
 
     private fun provideRemoteSource(): IRemoteSource {
-        return RemoteSource(Dispatchers.IO, context.contentResolver, OkHttpClient.Builder().build())
+        return RemoteSource(
+            Dispatchers.IO, context.contentResolver,
+            OkHttpClient.Builder()
+                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+        )
     }
 
     private fun provideSatelliteRepo(): ISatelliteRepo {
@@ -176,6 +198,6 @@ class MainContainer(private val context: Context) : IMainContainer {
         val appPrefsFileName = "${context.packageName}_preferences"
         val appPreferences = context.getSharedPreferences(appPrefsFileName, Context.MODE_PRIVATE)
         val appVersionName = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "4.0.4"
-        return SettingsRepo(manager, appPreferences, appVersionName)
+        return SettingsRepo(context, manager, appPreferences, appVersionName)
     }
 }

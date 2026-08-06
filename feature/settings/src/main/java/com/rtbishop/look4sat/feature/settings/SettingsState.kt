@@ -64,6 +64,24 @@ sealed interface SettingsAction {
     data class ToggleSensor(val value: Boolean) : SettingsAction
     data class ToggleLightTheme(val value: Boolean) : SettingsAction
     data class ToggleNightMode(val value: Boolean) : SettingsAction
+    // UI 设置: 切换底部导航栏页面的隐藏状态(Screen simpleName)
+    data class ToggleScreen(val screenName: String) : SettingsAction
+    // UI 设置: 更新页面顺序
+    data class ReorderScreens(val order: List<String>) : SettingsAction
+    // UI 设置: 重置为默认顺序
+    data object ResetScreenOrder : SettingsAction
+    // UI 设置: 更新主菜单 + 更多菜单顺序(4.5.1 折叠菜单)
+    data class UpdateMenuOrder(val mainOrder: List<String>, val subOrder: List<String>) : SettingsAction
+    // UI 设置: 重置主菜单 + 更多菜单顺序
+    data object ResetMenuOrder : SettingsAction
+    // WaveLog 日志(4.5.2): 更新服务器配置
+    data class UpdateWavelogSettings(
+        val url: String, val apiKey: String, val stationId: String, val autoUpload: Boolean
+    ) : SettingsAction
+    // WaveLog: 测试连接
+    data object TestWavelogConnection : SettingsAction
+    // WaveLog: 手动上传队列
+    data object UploadWavelogQueue : SettingsAction
 
     // Remote control
     data class UpdateRC(val settings: RCSettings) : SettingsAction

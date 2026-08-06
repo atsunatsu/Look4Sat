@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_500">#ff6200ee</color>
+    <integer name="default_font_size">18</integer>
+    <string name="idle">Idle</string>
+    <string name="waterfall_display">Waterfall display</string>
+    <string name="frequency_scale">Frequency scale</string>
+    <string name="decoded_text">Decoded text</string>
+    <string name="clear">Clear</string>
+    <string name="pause">Pause Decoding</string>
+    <string name="save_text">Save Text</string>
+    <string name="record_signals">Record Signals</string>
+    <string name="settings">Settings</string>
+    <string name="help">Online Help</string>
+    <string name="rate">Rate this App</string>
+    <string name="premium">Get Premium Version</string>
+    <string name="tap_back_again_to_close">Tap Back again to close the app</string>
+    <string name="message_type">Message Type</string>
+    <string name="cw_mic_permission">Microphone permission is required for CW decoding</string>
+    <string name="cw_grant_permission">Grant permission</string>
+    <string name="cw_open_settings">Open app settings</string>
+</resources>
