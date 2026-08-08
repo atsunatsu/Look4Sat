@@ -1,6 +1,6 @@
 # Look4Sat-BA7OPF
 
-[![Look4Sat CI](https://github.com/atsunatsu/Look4Sat/actions/workflows/release.yml/badge.svg)](https://github.com/atsunatsu/Look4Sat/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/atsunatsu/Look4Sat)](https://github.com/atsunatsu/Look4Sat/releases)
 
 **BA7OPF 定制版** — 基于 [rt-bishop/Look4Sat](https://github.com/rt-bishop/Look4Sat) 的业余无线电卫星追踪器，增加了线性卫星频率计算器等功能。
 
