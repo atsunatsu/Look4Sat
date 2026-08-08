@@ -39,6 +39,9 @@ sealed class Screen(val iconResId: Int, val titleResId: Int) : NavKey {
     data object Mutual : Screen(R.drawable.ic_match, R.string.nav_mutual)
 
     @Serializable
+    data object AMSAT : Screen(R.drawable.ic_satellite_alt, R.string.nav_amsat)
+
+    @Serializable
     data object Settings : Screen(R.drawable.ic_settings, R.string.nav_prefs)
 }
 

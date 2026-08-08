@@ -87,6 +87,7 @@ import com.rtbishop.look4sat.feature.passes.PassesDestination
 import com.rtbishop.look4sat.feature.radar.RadarDestination
 import com.rtbishop.look4sat.feature.satellites.SatellitesDestination
 import com.rtbishop.look4sat.feature.settings.SettingsDestination
+import com.rtbishop.look4sat.feature.status.SatStatusScreen
 
 @Composable
 fun NavRoot(deeplink: String? = null) {
@@ -130,7 +131,7 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
     val currentKey = backStack.lastOrNull()
     val navigateBack: () -> Unit = { backStack.removeLastOrNull() }
     val fadeTransition = fadeIn(animationSpec = tween(350)) togetherWith fadeOut(animationSpec = tween(350))
-    val navItems = listOf(Screen.Satellites, Screen.Passes, Screen.Radar, Screen.Mutual, Screen.Map, Screen.Settings)
+    val navItems = listOf(Screen.Satellites, Screen.Passes, Screen.Radar, Screen.Mutual, Screen.Map, Screen.AMSAT, Screen.Settings)
 
     val context = LocalContext.current
     val container = (context.applicationContext as IContainerProvider).getMainContainer()
@@ -157,6 +158,7 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                         is Screen.Radar -> screen is Screen.Radar
                         is Screen.Mutual -> screen is Screen.Mutual
                         is Screen.Map -> screen is Screen.Map
+                        is Screen.AMSAT -> screen is Screen.AMSAT
                         is Screen.Settings -> screen is Screen.Settings
                         else -> false
                     }
@@ -223,6 +225,9 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                                     backStack.add(Screen.Radar)
                                 }
                             )
+                        }
+                        entry<Screen.AMSAT> {
+                            SatStatusScreen(container = container)
                         }
                         entry<Screen.Settings> {
                             SettingsDestination()
