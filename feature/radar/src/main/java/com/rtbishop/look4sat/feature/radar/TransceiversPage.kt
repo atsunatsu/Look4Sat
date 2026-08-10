@@ -18,6 +18,7 @@
 package com.rtbishop.look4sat.feature.radar
 
 import android.app.Activity
+import android.content.Context
 import android.view.LayoutInflater
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -559,7 +560,17 @@ private fun DopplerFrequencyCalculator(
     var txFrequencyHz by remember { mutableStateOf(0L) }
     var rxFrequencyHz by remember { mutableStateOf(0L) }
     var passbandPosition by remember { mutableStateOf(0.5f) }
-    var offsetKHz by remember { mutableStateOf("") }
+    // 每个卫星独立记忆 offset：以 NORAD 编号为 key，存到应用 SharedPreferences
+    val context = LocalContext.current
+    val catnum = transponder.catnum
+    var offsetKHz by remember(catnum) {
+        mutableStateOf(
+            catnum?.let { cn ->
+                context.getSharedPreferences(context.packageName + "_preferences", Context.MODE_PRIVATE)
+                    .getString("offset_khz_$cn", "") ?: ""
+            } ?: ""
+        )
+    }
     var stepSizeKHz by remember { mutableIntStateOf(1) }
 
     val offsetHz = offsetKHz.toDoubleOrNull()?.let { it * 1000 }?.toLong() ?: 0L
@@ -742,7 +753,15 @@ private fun DopplerFrequencyCalculator(
                 ) {
                     BasicTextField(
                         value = offsetKHz,
-                        onValueChange = { offsetKHz = it },
+                        onValueChange = { newValue ->
+                            offsetKHz = newValue
+                            catnum?.let { cn ->
+                                context.getSharedPreferences(
+                                    context.packageName + "_preferences",
+                                    Context.MODE_PRIVATE
+                                ).edit().putString("offset_khz_$cn", newValue).apply()
+                            }
+                        },
                         singleLine = true,
                         textStyle = TextStyle(
                             fontSize = 16.sp,
