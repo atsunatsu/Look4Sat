@@ -67,6 +67,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -191,7 +192,7 @@ fun CalculatorPage(
             }
         }
 
-        item {
+        item(key = "calculator_${selectedTransceiver.uuid}") {
             DopplerFrequencyCalculator(
                 transponder = selectedTransceiver,
                 orbitalPos = orbitalPos,
@@ -556,10 +557,10 @@ private fun DopplerFrequencyCalculator(
 ) {
     if (orbitalPos == null || !DopplerFrequencyCalculator.isLinearTransponder(transponder)) return
 
-    var lastEditedField by remember { mutableStateOf(EditedField.TX) }
-    var txFrequencyHz by remember { mutableStateOf(0L) }
-    var rxFrequencyHz by remember { mutableStateOf(0L) }
-    var passbandPosition by remember { mutableStateOf(0.5f) }
+    var lastEditedField by rememberSaveable(transponder.uuid) { mutableStateOf(EditedField.TX) }
+    var txFrequencyHz by rememberSaveable(transponder.uuid) { mutableStateOf(0L) }
+    var rxFrequencyHz by rememberSaveable(transponder.uuid) { mutableStateOf(0L) }
+    var passbandPosition by rememberSaveable(transponder.uuid) { mutableStateOf(0.5f) }
     // 每个卫星独立记忆 offset：以 NORAD 编号为 key，存到应用 SharedPreferences
     val context = LocalContext.current
     val catnum = transponder.catnum
