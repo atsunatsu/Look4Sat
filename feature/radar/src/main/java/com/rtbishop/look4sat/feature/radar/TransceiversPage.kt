@@ -27,6 +27,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.text.BasicTextField
@@ -162,59 +164,53 @@ fun CalculatorPage(
         return
     }
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (calculatorTransceivers.size > 1) {
-            item {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    calculatorTransceivers.forEach { radio ->
-                        FilterChip(
-                            selected = radio.uuid == selectedTransceiver.uuid,
-                            onClick = {
-                                if (radio.uuid != selectedUuid) onAction(RadarAction.SelectTransmitter(radio.uuid))
-                            },
-                            label = {
-                                Text(
-                                    text = transceiverTitle(radio),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        )
-                    }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                calculatorTransceivers.forEach { radio ->
+                    FilterChip(
+                        selected = radio.uuid == selectedTransceiver.uuid,
+                        onClick = {
+                            if (radio.uuid != selectedUuid) onAction(RadarAction.SelectTransmitter(radio.uuid))
+                        },
+                        label = {
+                            Text(
+                                text = transceiverTitle(radio),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    )
                 }
             }
         }
 
-        item(key = "calculator_${selectedTransceiver.uuid}") {
-            DopplerFrequencyCalculator(
-                transponder = selectedTransceiver,
-                orbitalPos = orbitalPos,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        DopplerFrequencyCalculator(
+            transponder = selectedTransceiver,
+            orbitalPos = orbitalPos,
+            modifier = Modifier.fillMaxWidth()
+        )
 
-        item {
-            HorizontalDivider(
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-            )
-        }
+        HorizontalDivider(
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+        )
 
-        item {
-            CwDecoderPanel(
-                cw = cw,
-                onAction = onAction,
-                requestMicPermission = requestMicPermission,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        CwDecoderPanel(
+            cw = cw,
+            onAction = onAction,
+            requestMicPermission = requestMicPermission,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
