@@ -68,3 +68,4 @@ fastlane/readme.md
 /app/release/output-metadata.json
 /app/release/
 /.kotlin/sessions/
+dist/
