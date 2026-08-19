@@ -42,6 +42,7 @@ data class RCSettings(
     val frequencyAddress: String,
     val frequencyPort: String,
     val frequencyFormat: String,
+    val frequencyOffsetHz: Long = 0L,
     val bluetoothRotatorState: Boolean,
     val bluetoothRotatorFormat: String,
     val bluetoothRotatorName: String,
@@ -66,10 +67,8 @@ data class OtherSettings(
 )
 
 data class DataSourcesSettings(
-    val useCustomTLE: Boolean,
-    val useCustomTransceivers: Boolean,
-    val tleUrl: String,
-    val transceiversUrl: String
+    val satelliteUrls: List<String>,
+    val transceiversUrls: List<String>
 )
 
 data class RadioControlSettings(

@@ -171,6 +171,8 @@
     <string name="prefs_data_sources_tle_switch">Custom TLE URL</string>
     <string name="prefs_data_sources_transceivers_switch">Custom transceivers URL</string>
     <string name="prefs_data_sources_url_title" translatable="false">URL (HTTPS)</string>
+    <string name="prefs_data_sources_satellites_label">Satellites data</string>
+    <string name="prefs_data_sources_transceivers_label">Transceivers data</string>
 
     <string name="prefs_data_output_title">Data output</string>
     <string name="prefs_net_output">Network</string>
@@ -194,6 +196,8 @@
     <string name="prefs_net_frequency_switch">Enable frequency output</string>
     <string name="prefs_net_frequency_address_hint">IP:Port</string>
     <string name="prefs_net_frequency_format_hint">Format</string>
+    <string name="prefs_net_frequency_offset_hint" translatable="false">Frequency offset (Hz)</string>
+    <string name="prefs_net_frequency_offset_help" translatable="false">Range: -50000 to 50000 Hz. Positive values increase reported frequency; negative values decrease it.</string>
 
     <string name="prefs_bt_title">Bluetooth data output</string>
     <string name="prefs_bt_rotator_switch">Enable rotation output</string>

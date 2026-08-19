@@ -52,6 +52,21 @@ import com.rtbishop.look4sat.core.presentation.LocalSpacing
 import com.rtbishop.look4sat.core.presentation.MainTheme
 import com.rtbishop.look4sat.core.presentation.R
 import com.rtbishop.look4sat.core.presentation.SharedDialog
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.painterResource
+import com.rtbishop.look4sat.core.domain.model.Constants
+import com.rtbishop.look4sat.core.presentation.IconCard
 
 @Preview(showBackground = true)
 @Composable
@@ -116,125 +131,147 @@ fun LocatorDialog(qthLocator: String, dismiss: () -> Unit, save: (String) -> Uni
 private fun TransceiversDialogPreview() {
     MainTheme {
         DataSourcesDialog(
-            useCustomTle = true,
-            useCustomTransceivers = true,
-            tleUrl = "https://example.com/tle.txt",
-            transceiversUrl = "https://example.com/tx.json",
-            requestCustomSourcesPermission = { onGranted, _ -> onGranted() },
+            satelliteUrls = listOf(
+                "celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=csv",
+                "amsat.org/tle/current/nasabare.txt"
+            ),
+            transceiversUrls = listOf(
+                "db.satnogs.org/api/transmitters/?format=json&status=active"
+            ),
             onImportTle = {},
             onImportTransceivers = {},
             onDismiss = {},
-            onSave = { _, _, _, _ -> }
+            onSave = { _, _ -> }
         )
     }
 }
 
 @Composable
 fun DataSourcesDialog(
-    useCustomTle: Boolean,
-    useCustomTransceivers: Boolean,
-    tleUrl: String,
-    transceiversUrl: String,
-    requestCustomSourcesPermission: (onGranted: () -> Unit, onDenied: () -> Unit) -> Unit,
+    satelliteUrls: List<String>,
+    transceiversUrls: List<String>,
     onImportTle: () -> Unit,
     onImportTransceivers: () -> Unit,
     onDismiss: () -> Unit,
-    onSave: (Boolean, Boolean, String, String) -> Unit
+    onSave: (List<String>, List<String>) -> Unit
 ) {
     val padding = LocalSpacing.current.large
-    val isEnabledCustomTle = rememberSaveable { mutableStateOf(useCustomTle) }
-    val isEnabledCustomTransceivers = rememberSaveable { mutableStateOf(useCustomTransceivers) }
-    val urlTle = rememberSaveable { mutableStateOf(tleUrl) }
-    val urlTransceivers = rememberSaveable { mutableStateOf(transceiversUrl) }
+    // Stable Long IDs avoid key collisions when several entries are empty or duplicated.
+    val nextId = remember { mutableLongStateOf((satelliteUrls.size + transceiversUrls.size).toLong()) }
+    val satUrls = remember {
+        satelliteUrls.mapIndexed { i, url -> i.toLong() to url }.toMutableStateList()
+    }
+    val txUrls = remember {
+        transceiversUrls.mapIndexed { i, url -> (satelliteUrls.size + i).toLong() to url }.toMutableStateList()
+    }
     val onAccept = {
-        onSave(isEnabledCustomTle.value, isEnabledCustomTransceivers.value, urlTle.value, urlTransceivers.value)
+        onSave(
+            satUrls.map { it.second.trim() }.filter { it.isNotBlank() },
+            txUrls.map { it.second.trim() }.filter { it.isNotBlank() }
+        )
         onDismiss()
     }
-    val onCancel = { onDismiss() }
     SharedDialog(
         title = stringResource(id = R.string.prefs_data_sources_title),
-        onCancel = onCancel,
+        onCancel = onDismiss,
         onAccept = onAccept,
     ) {
-        Column(modifier = Modifier.padding(horizontal = padding)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CardButton(
-                    onClick = {
-                        onImportTle()
-                        onDismiss()
-                    },
-                    text = "TLE/3LE (.txt)\nOMM (.csv)",
-                    modifier = Modifier.weight(1f)
-                )
-                CardButton(
-                    onClick = {
-                        onImportTransceivers()
-                        onDismiss()
-                    },
-                    text = "Transceivers\nSatNOGS (.json)",
-                    modifier = Modifier.weight(1f)
-                )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxHeight(0.84f)
+                .padding(horizontal = padding),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            contentPadding = PaddingValues(vertical = 6.dp)
+        ) {
+            item {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    CardButton(
+                        onClick = { onImportTle(); onDismiss() },
+                        text = "TLE/3LE (.txt)\nOMM (.csv)",
+                        modifier = Modifier.weight(1f)
+                    )
+                    CardButton(
+                        onClick = { onImportTransceivers(); onDismiss() },
+                        text = "Transceivers\nSatNOGS (.json)",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(text = stringResource(id = R.string.prefs_data_sources_tle_switch))
-                Switch(
-                    checked = isEnabledCustomTle.value,
-                    onCheckedChange = { enabled ->
-                        if (!enabled) {
-                            isEnabledCustomTle.value = false
-                        } else {
-                            requestCustomSourcesPermission(
-                                { isEnabledCustomTle.value = true },
-                                { isEnabledCustomTle.value = false }
-                            )
-                        }
-                    }
-                )
-            }
-            OutlinedTextField(
-                value = urlTle.value,
-                onValueChange = { urlTle.value = it },
-                label = { Text(text = stringResource(id = R.string.prefs_data_sources_url_title)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = isEnabledCustomTle.value,
+            sourceSection(
+                sectionKey = "sat",
+                labelResId = R.string.prefs_data_sources_satellites_label,
+                urls = satUrls,
+                onAdd = { satUrls.add(nextId.longValue++ to "") },
+                onMoveUp = { i -> if (i > 0) satUrls.add(i - 1, satUrls.removeAt(i)) },
+                onRemove = { i -> satUrls.removeAt(i) },
+                onUrlChange = { i, v -> satUrls[i] = satUrls[i].first to v }
             )
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(text = stringResource(id = R.string.prefs_data_sources_transceivers_switch))
-                Switch(
-                    checked = isEnabledCustomTransceivers.value,
-                    onCheckedChange = { enabled ->
-                        if (!enabled) {
-                            isEnabledCustomTransceivers.value = false
-                        } else {
-                            requestCustomSourcesPermission(
-                                { isEnabledCustomTransceivers.value = true },
-                                { isEnabledCustomTransceivers.value = false }
-                            )
-                        }
-                    }
-                )
-            }
-            OutlinedTextField(
-                value = urlTransceivers.value,
-                onValueChange = { urlTransceivers.value = it },
-                label = { Text(text = stringResource(id = R.string.prefs_data_sources_url_title)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = isEnabledCustomTransceivers.value,
+            sourceSection(
+                sectionKey = "tx",
+                labelResId = R.string.prefs_data_sources_transceivers_label,
+                urls = txUrls,
+                onAdd = { txUrls.add(nextId.longValue++ to "") },
+                onMoveUp = { i -> if (i > 0) txUrls.add(i - 1, txUrls.removeAt(i)) },
+                onRemove = { i -> txUrls.removeAt(i) },
+                onUrlChange = { i, v -> txUrls[i] = txUrls[i].first to v }
             )
-            Spacer(modifier = Modifier.height(12.dp))
         }
+    }
+}
+
+private fun LazyListScope.sourceSection(
+    sectionKey: String,
+    labelResId: Int,
+    urls: List<Pair<Long, String>>,
+    onAdd: () -> Unit,
+    onMoveUp: (Int) -> Unit,
+    onRemove: (Int) -> Unit,
+    onUrlChange: (Int, String) -> Unit
+) {
+    item {
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(labelResId),
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
+            IconCard(action = onAdd, resId = R.drawable.ic_add)
+        }
+    }
+    itemsIndexed(urls, key = { _, entry -> "$sectionKey-${entry.first}" }) { index, (_, url) ->
+        val enabledTint = MaterialTheme.colorScheme.onSurfaceVariant
+        OutlinedTextField(
+            value = url,
+            onValueChange = { onUrlChange(index, it) },
+            label = { Text(stringResource(R.string.prefs_data_sources_url_title)) },
+            leadingIcon = {
+                IconButton(onClick = { onMoveUp(index) }, enabled = index > 0) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_arrow),
+                        contentDescription = null,
+                        tint = if (index > 0) enabledTint else enabledTint.copy(alpha = 0.32f),
+                        modifier = Modifier.rotate(270f)
+                    )
+                }
+            },
+            trailingIcon = {
+                IconButton(onClick = { onRemove(index) }) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_delete),
+                        contentDescription = null
+                    )
+                }
+            },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateItem(fadeInSpec = spring(), fadeOutSpec = spring())
+        )
     }
 }
 
@@ -252,6 +289,7 @@ fun PreviewNetworkOutputDialog() {
                 frequencyAddress = "127.0.0.1",
                 frequencyPort = "4532",
                 frequencyFormat = $$"F $FREQ",
+                frequencyOffsetHz = 0L,
                 bluetoothRotatorState = false,
                 bluetoothRotatorFormat = $$"P $AZ $EL",
                 bluetoothRotatorName = "Default",
@@ -261,7 +299,7 @@ fun PreviewNetworkOutputDialog() {
                 bluetoothFrequencyFormat = $$"F $FREQ"
             ),
             onDismiss = {},
-            onSave = { _, _, _, _, _, _, _, _ -> }
+            onSave = { _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
@@ -272,7 +310,7 @@ fun NetworkOutputDialog(
     onDismiss: () -> Unit,
     onSave: (
         Boolean, String, String, String,
-        Boolean, String, String, String
+        Boolean, String, String, String, Long
     ) -> Unit
 ) {
     val padding = LocalSpacing.current.large
@@ -286,12 +324,15 @@ fun NetworkOutputDialog(
         mutableStateOf("${initialSettings.frequencyAddress}:${initialSettings.frequencyPort}")
     }
     val frequencyFormat = rememberSaveable { mutableStateOf(initialSettings.frequencyFormat) }
+    val frequencyOffsetHz = rememberSaveable { mutableStateOf(initialSettings.frequencyOffsetHz.toString()) }
     val onAccept = {
         val (rotIp, rotPort) = splitAddress(rotatorAddress.value)
         val (freqIp, freqPort) = splitAddress(frequencyAddress.value)
+        val offsetHz = (frequencyOffsetHz.value.trim().toLongOrNull() ?: 0L)
+            .coerceIn(Constants.FREQ_OFFSET_MIN_HZ, Constants.FREQ_OFFSET_MAX_HZ)
         onSave(
             rotatorState.value, rotIp, rotPort, rotatorFormat.value,
-            frequencyState.value, freqIp, freqPort, frequencyFormat.value
+            frequencyState.value, freqIp, freqPort, frequencyFormat.value, offsetHz
         )
         onDismiss()
     }
@@ -324,6 +365,24 @@ fun NetworkOutputDialog(
                 onFormatChange = { frequencyFormat.value = it },
                 formatLabel = stringResource(R.string.prefs_net_frequency_format_hint)
             )
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedTextField(
+                value = frequencyOffsetHz.value,
+                onValueChange = { frequencyOffsetHz.value = it },
+                singleLine = true,
+                label = { Text(stringResource(R.string.prefs_net_frequency_offset_hint)) },
+                supportingText = { Text(stringResource(R.string.prefs_net_frequency_offset_help)) },
+                trailingIcon = {
+                    IconButton(
+                        onClick = { frequencyOffsetHz.value = "0" },
+                        enabled = frequencyState.value && frequencyOffsetHz.value != "0"
+                    ) {
+                        Icon(painter = painterResource(R.drawable.ic_close), contentDescription = null)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = frequencyState.value
+            )
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
@@ -352,6 +411,7 @@ fun PreviewBluetoothOutputDialog() {
                 frequencyAddress = "127.0.0.1",
                 frequencyPort = "4532",
                 frequencyFormat = $$"F $FREQ",
+                frequencyOffsetHz = 0L,
                 bluetoothRotatorState = false,
                 bluetoothRotatorFormat = $$"P $AZ $EL",
                 bluetoothRotatorName = "Default",

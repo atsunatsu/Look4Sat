@@ -25,8 +25,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -44,7 +42,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -87,38 +85,42 @@ import com.rtbishop.look4sat.feature.passes.PassesDestination
 import com.rtbishop.look4sat.feature.radar.RadarDestination
 import com.rtbishop.look4sat.feature.satellites.SatellitesDestination
 import com.rtbishop.look4sat.feature.settings.SettingsDestination
-import com.rtbishop.look4sat.feature.status.SatStatusScreen
+import com.rtbishop.look4sat.feature.status.SatStatusDestination
 
 @Composable
 fun NavRoot(deeplink: String? = null) {
     val rootBackStack = rememberNavBackStack(Screen.Passes)
     val deeplinkResolver = DeeplinkResolver()
     LaunchedEffect(deeplink) {
-        deeplink?.let {
-            val destination = deeplinkResolver.resolve(it) // rootBackStack.clear()
-            rootBackStack.add(destination)
-        }
+        deeplink?.let { rootBackStack.add(deeplinkResolver.resolve(it)) }
     }
     val navigateBack: () -> Unit = { rootBackStack.removeLastOrNull() }
-    val slideInTransition = slideInHorizontally(initialOffsetX = { it }) togetherWith scaleOut(targetScale = 0.9f)
-    val slideOutTransition = scaleIn(initialScale = 0.9f) togetherWith slideOutHorizontally(targetOffsetX = { it })
+    val navigateToRadar: () -> Unit = { rootBackStack.add(RadarDestination) }
+    // Incoming screen slides in from the right, outgoing drifts left at 1/3 speed (API35+ style)
+    val pushTransition = slideInHorizontally(tween(300)) { it } togetherWith
+        slideOutHorizontally(tween(300)) { -it / 3 }
+    // Reverse: outgoing slides out to the right, incoming drifts in from the left
+    val popTransition = slideInHorizontally(tween(300)) { -it / 3 } togetherWith
+        slideOutHorizontally(tween(300)) { it }
     NavDisplay(
         modifier = Modifier.fillMaxSize(),
         backStack = rootBackStack,
         onBack = navigateBack,
-        transitionSpec = { slideInTransition },
-        popTransitionSpec = { slideOutTransition },
-        predictivePopTransitionSpec = { slideOutTransition },
+        transitionSpec = { pushTransition },
+        popTransitionSpec = { popTransition },
+        predictivePopTransitionSpec = { popTransition },
         entryDecorators = listOf(
-            rememberSaveableStateHolderNavEntryDecorator(), // Required for saving Compose state per entry
-            rememberViewModelStoreNavEntryDecorator() // Required for ViewModel scoping per entry
+            rememberSaveableStateHolderNavEntryDecorator(),
+            rememberViewModelStoreNavEntryDecorator()
         ),
         entryProvider = entryProvider {
-            entry<Screen.Passes> { MainScreen(navigateToRadar = { rootBackStack.add(RadarDestination) }) }
+            entry<Screen.Passes> { MainScreen(navigateToRadar = navigateToRadar) }
             entry<RadarDestination> {
-                Scaffold { innerPadding ->
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     RadarDestination(navigateUp = navigateBack)
-                    innerPadding.calculateTopPadding()
                 }
             }
         }
@@ -131,7 +133,7 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
     val currentKey = backStack.lastOrNull()
     val navigateBack: () -> Unit = { backStack.removeLastOrNull() }
     val fadeTransition = fadeIn(animationSpec = tween(350)) togetherWith fadeOut(animationSpec = tween(350))
-    val navItems = listOf(Screen.Satellites, Screen.Passes, Screen.Radar, Screen.Mutual, Screen.Map, Screen.AMSAT, Screen.Settings)
+    val navItems = listOf(Screen.Satellites, Screen.Passes, Screen.Mutual, Screen.Map, Screen.AMSAT, Screen.Settings)
 
     val context = LocalContext.current
     val container = (context.applicationContext as IContainerProvider).getMainContainer()
@@ -155,7 +157,6 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                     val isSelected = when (currentKey) {
                         is Screen.Satellites -> screen is Screen.Satellites
                         is Screen.Passes -> screen is Screen.Passes
-                        is Screen.Radar -> screen is Screen.Radar
                         is Screen.Mutual -> screen is Screen.Mutual
                         is Screen.Map -> screen is Screen.Map
                         is Screen.AMSAT -> screen is Screen.AMSAT
@@ -205,12 +206,8 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                             PassesDestination { catNum, aosTime ->
                                 container.setMutualPassData(MutualPassData())
                                 container.satelliteRepo.selectPass(catNum, aosTime)
-                                backStack.add(Screen.Radar)
-//                            navigateToRadar()
+                                navigateToRadar()
                             }
-                        }
-                        entry<Screen.Radar> {
-                            RadarDestination(navigateUp = navigateBack)
                         }
                         entry<Screen.Map> {
                             MapDestination()
@@ -222,13 +219,11 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                                 navigateToRadar = { catNum, aosTime, pass ->
                                     container.setMutualPassData(pass ?: MutualPassData())
                                     container.satelliteRepo.selectPass(catNum, aosTime)
-                                    backStack.add(Screen.Radar)
+                                    navigateToRadar()
                                 }
                             )
                         }
-                        entry<Screen.AMSAT> {
-                            SatStatusScreen(container = container)
-                        }
+                        entry<Screen.AMSAT> { SatStatusDestination() }
                         entry<Screen.Settings> {
                             SettingsDestination()
                         }
@@ -254,7 +249,7 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                                 if (pass != null) {
                                     container.setMutualPassData(MutualPassData())
                                     container.satelliteRepo.selectPass(pass.catNum, pass.aosTime)
-                                    backStack.add(Screen.Radar)
+                                    navigateToRadar()
                                 }
                             }
                             .padding(horizontal = 12.dp, vertical = 6.dp)

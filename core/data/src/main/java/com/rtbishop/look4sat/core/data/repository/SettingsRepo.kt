@@ -37,6 +37,8 @@ import com.rtbishop.look4sat.core.domain.utility.round
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import com.rtbishop.look4sat.core.domain.model.Constants
+import com.rtbishop.look4sat.core.domain.source.Sources
 
 class SettingsRepo(
     private val locationManager: LocationManager,
@@ -67,6 +69,7 @@ class SettingsRepo(
     private val keyFrequencyAddress = "frequencyAddress"
     private val keyFrequencyPort = "frequencyPort"
     private val keyFrequencyFormat = "frequencyFormat"
+    private val keyFrequencyOffsetHz = "frequencyOffsetHz"
     private val keySelectedIds = "selectedIds"
     private val keySelectedTypes = "selectedTypes"
     private val keySelectedModes = "selectedModes"
@@ -91,7 +94,10 @@ class SettingsRepo(
     private val keyUseCustomTransceivers = "useCustomTransceivers"
     private val keyTleUrl = "tleUrl"
     private val keyTransceiversUrl = "transceiversUrl"
+    private val keySatelliteUrls = "satelliteUrls"
+    private val keyTransceiversUrls = "transceiversUrls"
     private val separatorComma = ","
+    private val separatorUrl = "\n"
 
     //region # Satellites selection settings
     private val _satelliteSelection = MutableStateFlow(getSelectedIds())
@@ -298,6 +304,10 @@ class SettingsRepo(
     override val rcSettings: StateFlow<RCSettings> = _rcSettings
 
     override fun updateRCSettings(settings: RCSettings) {
+        val clampedFreqOffsetHz = settings.frequencyOffsetHz.coerceIn(
+            Constants.FREQ_OFFSET_MIN_HZ,
+            Constants.FREQ_OFFSET_MAX_HZ
+        )
         preferences.edit {
             putBoolean(keyRotatorState, settings.rotatorState)
             putString(keyRotatorAddress, settings.rotatorAddress)
@@ -307,6 +317,7 @@ class SettingsRepo(
             putString(keyFrequencyAddress, settings.frequencyAddress)
             putString(keyFrequencyPort, settings.frequencyPort)
             putString(keyFrequencyFormat, settings.frequencyFormat)
+            putLong(keyFrequencyOffsetHz, clampedFreqOffsetHz)
             putBoolean(keyBluetoothRotatorState, settings.bluetoothRotatorState)
             putString(keyBluetoothRotatorFormat, settings.bluetoothRotatorFormat)
             putString(keyBluetoothRotatorName, settings.bluetoothRotatorName)
@@ -315,7 +326,7 @@ class SettingsRepo(
             putString(keyBluetoothFrequencyFormat, settings.bluetoothFrequencyFormat)
             putString(keyBluetoothFrequencyAddress, settings.bluetoothFrequencyAddress)
         }
-        _rcSettings.value = settings
+        _rcSettings.value = settings.copy(frequencyOffsetHz = clampedFreqOffsetHz)
     }
 
     private fun getRCSettings(): RCSettings = RCSettings(
@@ -327,6 +338,8 @@ class SettingsRepo(
         frequencyAddress = preferences.getString(keyFrequencyAddress, null) ?: "127.0.0.1",
         frequencyPort = preferences.getString(keyFrequencyPort, null) ?: "4532",
         frequencyFormat = preferences.getString(keyFrequencyFormat, null) ?: $$"F $FREQ",
+        frequencyOffsetHz = preferences.getLong(keyFrequencyOffsetHz, 0L)
+            .coerceIn(Constants.FREQ_OFFSET_MIN_HZ, Constants.FREQ_OFFSET_MAX_HZ),
         bluetoothRotatorState = preferences.getBoolean(keyBluetoothRotatorState, false),
         bluetoothRotatorFormat = preferences.getString(keyBluetoothRotatorFormat, null) ?: $$"P $AZ $EL",
         bluetoothRotatorName = preferences.getString(keyBluetoothRotatorName, null) ?: "Default",
@@ -382,20 +395,45 @@ class SettingsRepo(
 
     override fun updateDataSourcesSettings(settings: DataSourcesSettings) {
         preferences.edit {
-            putBoolean(keyUseCustomTle, settings.useCustomTLE)
-            putBoolean(keyUseCustomTransceivers, settings.useCustomTransceivers)
-            putString(keyTleUrl, settings.tleUrl)
-            putString(keyTransceiversUrl, settings.transceiversUrl)
+            putString(keySatelliteUrls, settings.satelliteUrls.joinToString(separatorUrl))
+            putString(keyTransceiversUrls, settings.transceiversUrls.joinToString(separatorUrl))
         }
         _dataSourcesSettings.value = settings
     }
 
     private fun getDataSourcesSettings(): DataSourcesSettings = DataSourcesSettings(
-        useCustomTLE = preferences.getBoolean(keyUseCustomTle, false),
-        useCustomTransceivers = preferences.getBoolean(keyUseCustomTransceivers, false),
-        tleUrl = preferences.getString(keyTleUrl, "https://example.com/tle.txt") ?: "",
-        transceiversUrl = preferences.getString(keyTransceiversUrl, "https://example.com/radio.json") ?: ""
+        satelliteUrls = getDataSourceUrls(
+            key = keySatelliteUrls,
+            defaultUrls = Sources.satelliteDataUrls.values.filter { it.isNotBlank() },
+            legacyEnabledKey = keyUseCustomTle,
+            legacyUrlKey = keyTleUrl
+        ),
+        transceiversUrls = getDataSourceUrls(
+            key = keyTransceiversUrls,
+            defaultUrls = Sources.transceiversDataUrls.values.filter { it.isNotBlank() },
+            legacyEnabledKey = keyUseCustomTransceivers,
+            legacyUrlKey = keyTransceiversUrl
+        )
     )
+
+    private fun getDataSourceUrls(
+        key: String,
+        defaultUrls: List<String>,
+        legacyEnabledKey: String,
+        legacyUrlKey: String
+    ): List<String> {
+        val stored = preferences.getString(key, null)
+            ?.split(separatorUrl)
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+        if (stored != null) return stored
+        val legacyCustomUrl = preferences.getString(legacyUrlKey, null)?.trim().orEmpty()
+        return if (preferences.getBoolean(legacyEnabledKey, false) && legacyCustomUrl.isNotBlank()) {
+            (defaultUrls + legacyCustomUrl).distinct()
+        } else {
+            defaultUrls
+        }
+    }
     //endregion
 
     //region # Radio control settings

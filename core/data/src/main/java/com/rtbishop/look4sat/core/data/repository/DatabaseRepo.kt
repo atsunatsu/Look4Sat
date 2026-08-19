@@ -66,25 +66,26 @@ class DatabaseRepo(
     }
 
     override suspend fun updateFromRemote() = withContext(dispatcher) {
-        val dataSourcesSettings = settingsRepo.dataSourcesSettings.value
-        val tleUrls = buildMap {
-            putAll(Sources.satelliteDataUrls)
-            if (dataSourcesSettings.useCustomTLE) put(customSourceType, dataSourcesSettings.tleUrl)
-        }.filterValues { it.isNotBlank() }
-        val radioUrls = buildMap {
-            putAll(Sources.transceiversDataUrls)
-            if (dataSourcesSettings.useCustomTransceivers) put(customSourceType, dataSourcesSettings.transceiversUrl)
-        }.filterValues { it.isNotBlank() }
+        val settings = settingsRepo.dataSourcesSettings.value
+        val tleUrls = settings.satelliteUrls.filter { it.isNotBlank() }.map(::normalizeUrl).distinct()
+        val radioUrls = settings.transceiversUrls.filter { it.isNotBlank() }.map(::normalizeUrl).distinct()
+        val builtinTypesByUrl = Sources.satelliteDataUrls
+            .filterValues { it.isNotBlank() }
+            .mapValues { normalizeUrl(it.value) }
+            .entries
+            .associate { (type, url) -> url to type }
+        val importedTypeIds = mutableMapOf<String, MutableList<Int>>()
         // launch all network requests concurrently
-        val tleJobs = tleUrls.values.map { url -> async { url to remoteSource.getNetworkStream(url) } }
-        val radioJobs = radioUrls.values.map { url -> async { url to remoteSource.getNetworkStream(url) } }
-        // parse fetched data concurrently and associate with types
+        val tleJobs = tleUrls.map { url -> async { url to remoteSource.getNetworkStream(url) } }
+        val radioJobs = radioUrls.map { url -> async { url to remoteSource.getNetworkStream(url) } }
+        // parse fetched data concurrently and associate known built-in URLs with existing type filters.
         val importedEntries = tleJobs.awaitAll().flatMap { (url, stream) ->
-            val type = tleUrls.entries.find { it.value == url }?.key ?: customSourceType
-            stream?.let { parseSatelliteStream(url, unwrapIfZipped(url, it)) }.orEmpty().also { entries ->
-                settingsRepo.setSatelliteTypeIds(type, entries.map { it.catnum })
-            }
+            val entries = stream?.let { parseSatelliteStream(url, unwrapIfZipped(url, it)) }.orEmpty()
+            val type = builtinTypesByUrl[url] ?: customSourceType
+            importedTypeIds.getOrPut(type) { mutableListOf() }.addAll(entries.map { it.catnum })
+            entries
         }
+        importedTypeIds.forEach { (type, ids) -> settingsRepo.setSatelliteTypeIds(type, ids.distinct()) }
         val importedRadios = radioJobs.awaitAll().flatMap { (url, stream) ->
             stream?.let { dataParser.parseJSONStream(unwrapIfZipped(url, it)) }.orEmpty()
         }
@@ -99,6 +100,9 @@ class DatabaseRepo(
         localSource.deleteRadios()
         setUpdateSuccessful(0L)
     }
+
+    private fun normalizeUrl(url: String): String =
+        if (url.startsWith("http", ignoreCase = true)) url else "https://$url"
 
     private suspend fun parseSatelliteStream(url: String, stream: InputStream): List<OrbitalData> {
         val bufferedStream = stream.buffered()

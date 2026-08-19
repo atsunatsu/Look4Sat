@@ -93,7 +93,6 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import com.rtbishop.look4sat.core.domain.model.SatRadio
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
 import com.rtbishop.look4sat.core.domain.utility.DopplerFrequencyCalculator
-import com.rtbishop.look4sat.core.domain.utility.TransponderMapper
 import com.rtbishop.look4sat.core.presentation.CardButton
 import com.rtbishop.look4sat.core.presentation.R
 import com.rtbishop.look4sat.core.presentation.formatFrequency
@@ -657,12 +656,15 @@ private fun DopplerFrequencyCalculator(
     fun updateRx(newRxHz: Long) {
         when (lastEditedField) {
             EditedField.PASSBAND -> {
-                // Passband 模式：从 RX 反推 TX 位置，TX 用地面频率
-                val pos = ((newRxHz - rxLow).toFloat() / rxRange).coerceIn(0f, 1f)
-                val txFromRx = TransponderMapper.mapDownlinkToUplink(newRxHz, rawTransponder)
+                // Passband 模式：从 RX 经完整往返路径（含多普勒补偿）反推 TX 位置
+                val txFromRx = DopplerFrequencyCalculator.computeUplinkFromDownlinkWithOffset(
+                    newRxHz, rawTransponder, orbitalPos, offsetHz
+                )
                 passbandPosition = if (txFromRx != null) {
-                    ((txFromRx - rawTxLow).toFloat() / rawTxRange).coerceIn(0f, 1f)
-                } else pos
+                    ((txFromRx - txLow).toFloat() / txRange).coerceIn(0f, 1f)
+                } else {
+                    ((rxFrequencyHz - rxLow).toFloat() / rxRange).coerceIn(0f, 1f)
+                }
                 txFrequencyHz = txLow + (passbandPosition * txRange).toLong()
                 rxFrequencyHz = DopplerFrequencyCalculator.computeDownlinkFromUplinkWithOffset(
                     txFrequencyHz, rawTransponder, orbitalPos, offsetHz

@@ -281,6 +281,35 @@ fun getDefaultPass(): OrbitalPass = OrbitalPass(
 )
 
 @Composable
+fun InfoDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    onAccept: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    DialogShell(onDismissRequest = onDismiss) { padding ->
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = padding, top = padding, end = padding)
+        ) {
+            Text(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            CardButton(onClick = onAccept, text = stringResource(R.string.btn_accept))
+        }
+        content()
+    }
+}
+
+@Composable
 fun SharedDialog(
     title: String, onCancel: () -> Unit, onAccept: () -> Unit, content: @Composable () -> Unit
 ) {

@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rtbishop.look4sat.core.domain.model.DataSourcesSettings
 import com.rtbishop.look4sat.core.domain.model.OtherSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.repository.IContainerProvider
@@ -125,30 +126,15 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
     }
     if (dialogs.dataSources) {
         DataSourcesDialog(
-            useCustomTle = uiState.dataSourcesSettings.useCustomTLE,
-            useCustomTransceivers = uiState.dataSourcesSettings.useCustomTransceivers,
-            tleUrl = uiState.dataSourcesSettings.tleUrl,
-            transceiversUrl = uiState.dataSourcesSettings.transceiversUrl,
-            requestCustomSourcesPermission = { onGranted, onDenied ->
-                pendingCustomSourcesGrant.value = onGranted
-                pendingCustomSourcesDeny.value = onDenied
-                permissions.launchCustomSourcesPermission()
-            },
+            satelliteUrls = uiState.dataSourcesSettings.satelliteUrls,
+            transceiversUrls = uiState.dataSourcesSettings.transceiversUrls,
             onImportTle = { permissions.launchTleImport(); dialogs.dataSources = false },
             onImportTransceivers = { permissions.launchTransceiverImport(); dialogs.dataSources = false },
             onDismiss = { dialogs.dataSources = false },
-            onSave = { useCustomTle, useCustomTransceivers, tleUrl, transceiversUrl ->
-                val current = uiState.dataSourcesSettings
-                val newSettings = current.copy(
-                    useCustomTLE = if (!useCustomTle || tleUrl.isNotBlank()) useCustomTle else current.useCustomTLE,
-                    tleUrl = if (!useCustomTle || tleUrl.isNotBlank()) tleUrl else current.tleUrl,
-                    useCustomTransceivers = if (!useCustomTransceivers || transceiversUrl.isNotBlank()) useCustomTransceivers else current.useCustomTransceivers,
-                    transceiversUrl = if (!useCustomTransceivers || transceiversUrl.isNotBlank()) transceiversUrl else current.transceiversUrl
-                )
-                if (newSettings != current) onAction(SettingsAction.UpdateDataSources(newSettings))
-                if (newSettings.useCustomTLE || newSettings.useCustomTransceivers) {
-                    onAction(SettingsAction.UpdateFromWeb)
-                }
+            onSave = { satUrls, txUrls ->
+                val newSettings = DataSourcesSettings(satelliteUrls = satUrls, transceiversUrls = txUrls)
+                if (newSettings != uiState.dataSourcesSettings) onAction(SettingsAction.UpdateDataSources(newSettings))
+                onAction(SettingsAction.UpdateFromWeb)
             }
         )
     }
@@ -156,14 +142,15 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
         NetworkOutputDialog(
             initialSettings = uiState.rcSettings,
             onDismiss = { dialogs.network = false },
-            onSave = { rotState, rotAddr, rotPort, rotFmt, freqState, freqAddr, freqPort, freqFmt ->
+            onSave = { rotState, rotAddr, rotPort, rotFmt, freqState, freqAddr, freqPort, freqFmt, freqOffsetHz ->
                 onAction(
                     SettingsAction.UpdateRC(
                         uiState.rcSettings.copy(
                             rotatorState = rotState, rotatorAddress = rotAddr,
                             rotatorPort = rotPort, rotatorFormat = rotFmt,
                             frequencyState = freqState, frequencyAddress = freqAddr,
-                            frequencyPort = freqPort, frequencyFormat = freqFmt
+                            frequencyPort = freqPort, frequencyFormat = freqFmt,
+                            frequencyOffsetHz = freqOffsetHz
                         )
                     )
                 )

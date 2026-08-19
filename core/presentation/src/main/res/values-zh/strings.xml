@@ -136,6 +136,9 @@
     <string name="prefs_data_sources_title">自定义数据源</string>
     <string name="prefs_data_sources_tle_switch">自定义TLE URL</string>
     <string name="prefs_data_sources_transceivers_switch">自定义收发器URL</string>
+    <string name="prefs_data_sources_url_title" translatable="false">URL</string>
+    <string name="prefs_data_sources_satellites_label">卫星数据</string>
+    <string name="prefs_data_sources_transceivers_label">收发器数据</string>
 
     <string name="prefs_data_output_title">数据输出</string>
     <string name="prefs_net_output">网络</string>
@@ -149,6 +152,8 @@
     <string name="prefs_net_frequency_switch">启用多普勒频率输出</string>
     <string name="prefs_net_frequency_address_hint">IP:端口</string>
     <string name="prefs_net_frequency_format_hint">数据格式</string>
+    <string name="prefs_net_frequency_offset_hint" translatable="false">频率偏移 (Hz)</string>
+    <string name="prefs_net_frequency_offset_help" translatable="false">范围：-50000 到 50000 Hz。正值提高上报频率，负值降低上报频率。</string>
 
     <string name="prefs_bt_title">蓝牙数据输出</string>
     <string name="prefs_bt_rotator_switch">启用方位俯仰角输出</string>

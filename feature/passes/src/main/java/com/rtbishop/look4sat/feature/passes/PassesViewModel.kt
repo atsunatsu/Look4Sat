@@ -23,6 +23,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rtbishop.look4sat.core.domain.model.PassesSettings
 import com.rtbishop.look4sat.core.domain.predict.CelestialComputer
+import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
 import com.rtbishop.look4sat.core.domain.repository.ISatelliteRepo
@@ -167,6 +168,7 @@ class PassesViewModel(
     // CelestialComputer.findSunRiseSet() returns the next rise/set after the supplied time, so pass
     // the calendar day's 00:00 in the same timezone used by the visible date group. Passing a pass's
     // AOS time can jump to the following day's sunrise/sunset when that AOS is after the local event.
+    // For white nights / polar day edge cases, we fall back to searching from the previous day.
     private fun computeSunTimes(passes: List<OrbitalPass>, isUtc: Boolean): Map<String, Pair<String, String>> {
         val stationPos = settingsRepo.stationPosition.value
         val tz = if (isUtc) TimeZone.getTimeZone("UTC") else TimeZone.getDefault()
@@ -175,7 +177,7 @@ class PassesViewModel(
         val result = LinkedHashMap<String, Pair<String, String>>()
         // DeepSpace group always shows today's sun times
         if (passes.any { it.isDeepSpace }) {
-            val riseSet = CelestialComputer.findSunRiseSet(stationPos, startOfDayMillis(System.currentTimeMillis(), tz))
+            val riseSet = findTodaySunRiseSet(stationPos, startOfDayMillis(System.currentTimeMillis(), tz))
             val rise = if (riseSet.riseTimeMillis > 0) sdfTime.format(Date(riseSet.riseTimeMillis)) else "--:--"
             val set = if (riseSet.setTimeMillis > 0) sdfTime.format(Date(riseSet.setTimeMillis)) else "--:--"
             result["DeepSpace (period >225min)"] = rise to set
@@ -184,12 +186,39 @@ class PassesViewModel(
             if (pass.isDeepSpace) continue
             val label = sdfDate.format(Date(pass.aosTime))
             if (label in result) continue
-            val riseSet = CelestialComputer.findSunRiseSet(stationPos, startOfDayMillis(pass.aosTime, tz))
+            val riseSet = findTodaySunRiseSet(stationPos, startOfDayMillis(pass.aosTime, tz))
             val rise = if (riseSet.riseTimeMillis > 0) sdfTime.format(Date(riseSet.riseTimeMillis)) else "--:--"
             val set = if (riseSet.setTimeMillis > 0) sdfTime.format(Date(riseSet.setTimeMillis)) else "--:--"
             result[label] = rise to set
         }
         return result
+    }
+
+    /**
+     * Find today's sunrise and sunset by starting from local midnight.
+     * Handles the white nights / polar day edge case where the sun is still above
+     * the -0.8333° threshold at midnight: in that case we search from the previous
+     * day's midnight to find a valid sunrise/sunset pair within the target day.
+     */
+    private fun findTodaySunRiseSet(observer: GeoPos, localMidnightMillis: Long): CelestialComputer.RiseSetTimes {
+        val threshold = 0.8333
+        val sunPos = CelestialComputer.getSunPosition(observer, localMidnightMillis)
+        if (sunPos.elevation > -threshold) {
+            // White nights / polar day: the sun is too high at midnight.
+            // Search from earlier days so the algorithm goes through a full
+            // sunset → sunrise → sunset cycle, landing in the target day.
+            val dayEnd = localMidnightMillis + 86400000L
+            for (offset in 1..3) {
+                val result = CelestialComputer.findSunRiseSet(observer, localMidnightMillis - offset * 86400000L)
+                if (result.riseTimeMillis in localMidnightMillis..dayEnd &&
+                    result.setTimeMillis in localMidnightMillis..dayEnd) {
+                    return result
+                }
+            }
+            // No valid pair found (midnight sun / polar day)
+            return CelestialComputer.RiseSetTimes(0L, 0L)
+        }
+        return CelestialComputer.findSunRiseSet(observer, localMidnightMillis)
     }
 
     private fun startOfDayMillis(timeMillis: Long, tz: TimeZone): Long {
