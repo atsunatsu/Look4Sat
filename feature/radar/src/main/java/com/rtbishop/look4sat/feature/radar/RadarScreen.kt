@@ -249,6 +249,7 @@ private fun PagerCard(
                         selectedUuid = uiState.transceivers.selectedUuid,
                         orbitalPos = uiState.orbitalPos,
                         cw = uiState.cw,
+                        calculatorOffsetKHz = uiState.calculatorOffsetKHz,
                         onAction = onAction,
                         requestMicPermission = requestMicPermission
                     )

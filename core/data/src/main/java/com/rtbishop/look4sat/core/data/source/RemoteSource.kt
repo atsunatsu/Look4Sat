@@ -22,8 +22,10 @@ import androidx.core.net.toUri
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.InputStream
 
 class RemoteSource(
@@ -87,6 +89,23 @@ class RemoteSource(
             }
         } catch (exception: Exception) {
             println("RemoteSource getAmSatReports exception: $exception")
+            null
+        }
+    }
+
+    override suspend fun submitAmSatReport(payloadJson: String): Pair<Int, String>? = withContext(dispatcher) {
+        try {
+            val body = payloadJson.toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder()
+                .url("https://www.amsat.org/status/api/v1/reports.php")
+                .header("User-Agent", "Look4Sat")
+                .post(body)
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                response.code to response.body.string()
+            }
+        } catch (exception: Exception) {
+            println("RemoteSource submitAmSatReport exception: $exception")
             null
         }
     }

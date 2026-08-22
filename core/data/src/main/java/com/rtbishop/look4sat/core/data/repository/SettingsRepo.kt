@@ -37,6 +37,8 @@ import com.rtbishop.look4sat.core.domain.utility.round
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import org.json.JSONObject
+import java.util.Locale
 import com.rtbishop.look4sat.core.domain.model.Constants
 import com.rtbishop.look4sat.core.domain.source.Sources
 
@@ -473,5 +475,56 @@ class SettingsRepo(
         baudRate = preferences.getInt(keyRadioBaudRate, 4800),
         splitMode = preferences.getBoolean(keyRadioSplitMode, false)
     )
+    //endregion
+
+    //region # Per-satellite calculator offset settings
+    private val keySatelliteOffsets = "satelliteOffsets"
+    private val keyLegacySatelliteOffsetPrefix = "offset_khz_"
+
+    override fun getSatelliteOffset(catnum: Int): String {
+        val json = preferences.getString(keySatelliteOffsets, "{}") ?: "{}"
+        val stored = try {
+            JSONObject(json).optString(catnum.toString(), "")
+        } catch (_: Exception) {
+            ""
+        }
+        if (stored.isNotEmpty()) return stored
+
+        // Lazy migration from the fork's old UI-layer implementation, which stored
+        // one SharedPreferences entry per satellite directly from TransceiversPage.
+        val legacyKey = "$keyLegacySatelliteOffsetPrefix$catnum"
+        val legacy = preferences.getString(legacyKey, "").orEmpty()
+        if (legacy.isNotEmpty()) {
+            setSatelliteOffset(catnum, legacy)
+        }
+        return legacy
+    }
+
+    override fun setSatelliteOffset(catnum: Int, offset: String) {
+        val json = preferences.getString(keySatelliteOffsets, "{}") ?: "{}"
+        val updated = try {
+            val obj = JSONObject(json)
+            if (offset.isEmpty()) obj.remove(catnum.toString()) else obj.put(catnum.toString(), offset)
+            obj.toString()
+        } catch (_: Exception) {
+            if (offset.isEmpty()) "{}" else """{"$catnum": "$offset"}"""
+        }
+        preferences.edit {
+            putString(keySatelliteOffsets, updated)
+            remove("$keyLegacySatelliteOffsetPrefix$catnum")
+        }
+    }
+    //endregion
+
+    //region # AMSAT status report settings
+    private val keyAmSatCallsign = "amSatCallsign"
+
+    override fun getAmSatCallsign(): String {
+        return preferences.getString(keyAmSatCallsign, "").orEmpty()
+    }
+
+    override fun setAmSatCallsign(callsign: String) {
+        preferences.edit { putString(keyAmSatCallsign, callsign.trim().uppercase(Locale.US)) }
+    }
     //endregion
 }

@@ -53,6 +53,21 @@
     <string name="amsat_load_failed">加载失败 - 检查网络后重试</string>
     <string name="amsat_no_reports">此时间段无报告</string>
     <string name="amsat_close">关闭</string>
+    <string name="amsat_upload">上传</string>
+    <string name="amsat_upload_report">上传报告到 AMSAT</string>
+    <string name="amsat_upload_status">状态</string>
+    <string name="amsat_upload_callsign">呼号</string>
+    <string name="amsat_upload_grid">网格</string>
+    <string name="amsat_upload_time_now">时间：当前 UTC %s</string>
+    <string name="amsat_upload_submit">提交到 AMSAT</string>
+    <string name="amsat_upload_success">报告已上传</string>
+    <string name="amsat_upload_failed">上传失败：%s</string>
+    <string name="amsat_upload_callsign_required">请填写呼号</string>
+    <string name="amsat_upload_grid_invalid">网格应为 4 或 6 位 Maidenhead 定位符</string>
+    <string name="amsat_upload_active">活跃</string>
+    <string name="amsat_upload_tlm">遥测/信标</string>
+    <string name="amsat_upload_not_heard">未听到</string>
+    <string name="amsat_upload_crew_active">ISS 语音</string>
 
     <!-- Radar screen -->
     <string name="radar_back">后退</string>

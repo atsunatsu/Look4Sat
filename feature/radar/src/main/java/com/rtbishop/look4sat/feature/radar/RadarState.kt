@@ -69,7 +69,8 @@ data class RadarState(
     val mutualEndTime: Long = 0L,
     val mutualMaxElev: Double = 10.0,
     val mutualLabelA: String = "你",
-    val mutualLabelB: String = "友台"
+    val mutualLabelB: String = "友台",
+    val calculatorOffsetKHz: String = ""
 )
 
 enum class SstvStatus { Idle, Recording }
@@ -124,4 +125,7 @@ sealed interface RadarAction {
     data class CwSetToneFreq(val freq: Float) : RadarAction
     data class CwToggleExpanded(val expanded: Boolean) : RadarAction
     data class CwPermissionResult(val granted: Boolean) : RadarAction
+
+    // Calculator actions
+    data class ChangeCalculatorOffset(val offsetKHz: String) : RadarAction
 }

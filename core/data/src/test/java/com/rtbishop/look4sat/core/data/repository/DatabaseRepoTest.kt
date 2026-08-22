@@ -126,6 +126,8 @@ private class FakeRemoteSource : IRemoteSource {
     override suspend fun getAmSatCatalog(): String? = null
 
     override suspend fun getAmSatReports(hours: Int, limit: Int): String? = null
+
+    override suspend fun submitAmSatReport(payloadJson: String): Pair<Int, String>? = null
 }
 
 private class FakeLocalSource : ILocalSource {
@@ -224,6 +226,14 @@ private class FakeSettingsRepo(dataSources: DataSourcesSettings = defaultDataSou
     }
 
     override fun updateRadioControlSettings(settings: RadioControlSettings) = Unit
+
+    override fun getSatelliteOffset(catnum: Int): String = ""
+
+    override fun setSatelliteOffset(catnum: Int, offset: String) = Unit
+
+    override fun getAmSatCallsign(): String = ""
+
+    override fun setAmSatCallsign(callsign: String) = Unit
 }
 
 private fun defaultDataSourcesSettings(): DataSourcesSettings {

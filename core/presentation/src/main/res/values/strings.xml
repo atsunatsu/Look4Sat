@@ -70,6 +70,21 @@
     <string name="amsat_load_failed">Load failed - check network and retry</string>
     <string name="amsat_no_reports">No reports for this period</string>
     <string name="amsat_close">Close</string>
+    <string name="amsat_upload">Upload</string>
+    <string name="amsat_upload_report">Upload report to AMSAT</string>
+    <string name="amsat_upload_status">Status</string>
+    <string name="amsat_upload_callsign">Callsign</string>
+    <string name="amsat_upload_grid">Grid</string>
+    <string name="amsat_upload_time_now">Time: current UTC %s</string>
+    <string name="amsat_upload_submit">Submit to AMSAT</string>
+    <string name="amsat_upload_success">Report uploaded</string>
+    <string name="amsat_upload_failed">Upload failed: %s</string>
+    <string name="amsat_upload_callsign_required">Callsign is required</string>
+    <string name="amsat_upload_grid_invalid">Grid must be a 4 or 6 character Maidenhead locator</string>
+    <string name="amsat_upload_active">Active</string>
+    <string name="amsat_upload_tlm">TLM/Beacon</string>
+    <string name="amsat_upload_not_heard">Not Heard</string>
+    <string name="amsat_upload_crew_active">Crew Active</string>
 
     <!-- Radar screen -->
     <string name="radar_back">Back</string>
