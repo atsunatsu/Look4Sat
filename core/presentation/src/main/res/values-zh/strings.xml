@@ -54,12 +54,17 @@
     <string name="amsat_no_reports">此时间段无报告</string>
     <string name="amsat_close">关闭</string>
     <string name="amsat_upload">上传</string>
+    <string name="amsat_upload_back">返回</string>
     <string name="amsat_upload_report">上传报告到 AMSAT</string>
     <string name="amsat_upload_status">状态</string>
     <string name="amsat_upload_callsign">呼号</string>
     <string name="amsat_upload_grid">网格</string>
     <string name="amsat_upload_time_now">时间：当前 UTC %s</string>
     <string name="amsat_upload_submit">提交到 AMSAT</string>
+    <string name="amsat_upload_confirm">确认上传</string>
+    <string name="amsat_upload_confirm_title">确认上传到 AMSAT</string>
+    <string name="amsat_upload_confirm_message">这条公开报告将上传到 AMSAT。\n卫星：%1$s\n状态：%2$s\n呼号：%3$s\n网格：%4$s</string>
+    <string name="amsat_upload_grid_none">未填写</string>
     <string name="amsat_upload_success">报告已上传</string>
     <string name="amsat_upload_failed">上传失败：%s</string>
     <string name="amsat_upload_callsign_required">请填写呼号</string>

@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -113,7 +114,9 @@ fun SatStatusDestination() {
         onUploadReportChange = viewModel::setUploadReport,
         onUploadCallsignChange = viewModel::setUploadCallsign,
         onUploadGridChange = viewModel::setUploadGrid,
-        onSubmitUpload = viewModel::submitReport,
+        onRequestSubmitUpload = viewModel::requestSubmitConfirmation,
+        onConfirmSubmitUpload = viewModel::confirmSubmitReport,
+        onDismissSubmitConfirmation = viewModel::dismissSubmitConfirmation,
         onDismissUpload = viewModel::collapseUploadPanel
     )
 }
@@ -126,7 +129,9 @@ private fun SatStatusScreen(
     onUploadReportChange: (String) -> Unit,
     onUploadCallsignChange: (String) -> Unit,
     onUploadGridChange: (String) -> Unit,
-    onSubmitUpload: (String) -> Unit,
+    onRequestSubmitUpload: () -> Unit,
+    onConfirmSubmitUpload: (String) -> Unit,
+    onDismissSubmitConfirmation: () -> Unit,
     onDismissUpload: () -> Unit
 ) {
     var selectedDay by remember { mutableStateOf<Pair<SatStatus, SatDay>?>(null) }
@@ -172,7 +177,9 @@ private fun SatStatusScreen(
             onReportChange = onUploadReportChange,
             onCallsignChange = onUploadCallsignChange,
             onGridChange = onUploadGridChange,
-            onSubmitReport = { onSubmitUpload(status.name) },
+            onRequestSubmitReport = onRequestSubmitUpload,
+            onConfirmSubmitReport = { onConfirmSubmitUpload(status.name) },
+            onDismissSubmitConfirmation = onDismissSubmitConfirmation,
             onDismiss = {
                 selectedDay = null
                 onDismissUpload()
@@ -342,7 +349,9 @@ private fun ReportDialog(
     onReportChange: (String) -> Unit,
     onCallsignChange: (String) -> Unit,
     onGridChange: (String) -> Unit,
-    onSubmitReport: () -> Unit,
+    onRequestSubmitReport: () -> Unit,
+    onConfirmSubmitReport: () -> Unit,
+    onDismissSubmitConfirmation: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val dayReports = day.slots.flatMap { it.reportIds }.mapNotNull { reports[it] }
@@ -351,7 +360,10 @@ private fun ReportDialog(
         onDismiss = onDismiss,
         onAccept = onDismiss,
         extraAction = {
-            CardButton(onClick = onToggleUpload, text = stringResource(R.string.amsat_upload))
+            CardButton(
+                onClick = onToggleUpload,
+                text = stringResource(if (upload.isExpanded) R.string.amsat_upload_back else R.string.amsat_upload)
+            )
         }
     ) {
         AnimatedVisibility(visible = upload.isExpanded) {
@@ -361,7 +373,15 @@ private fun ReportDialog(
                 onReportChange = onReportChange,
                 onCallsignChange = onCallsignChange,
                 onGridChange = onGridChange,
-                onSubmitReport = onSubmitReport
+                onRequestSubmitReport = onRequestSubmitReport
+            )
+        }
+        if (upload.isConfirmingSubmit) {
+            AmSatUploadConfirmDialog(
+                statusName = statusName,
+                upload = upload,
+                onConfirm = onConfirmSubmitReport,
+                onDismiss = onDismissSubmitConfirmation
             )
         }
         if (dayReports.isEmpty()) {
@@ -405,7 +425,7 @@ private fun AmSatUploadPanel(
     onReportChange: (String) -> Unit,
     onCallsignChange: (String) -> Unit,
     onGridChange: (String) -> Unit,
-    onSubmitReport: () -> Unit
+    onRequestSubmitReport: () -> Unit
 ) {
     val options = remember(statusName) {
         if (statusName.startsWith("ISS")) UPLOAD_OPTIONS else UPLOAD_OPTIONS.filter { it.apiValue != AMSAT_REPORT_CREW_ACTIVE }
@@ -488,7 +508,7 @@ private fun AmSatUploadPanel(
             )
         }
         Button(
-            onClick = onSubmitReport,
+            onClick = onRequestSubmitReport,
             enabled = !upload.isSubmitting && upload.callsign.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -515,6 +535,43 @@ private fun AmSatUploadPanel(
             )
         }
     }
+}
+
+@Composable
+private fun AmSatUploadConfirmDialog(
+    statusName: String,
+    upload: AmSatUploadUiState,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val option = UPLOAD_OPTIONS.firstOrNull { it.apiValue == upload.selectedReport } ?: UPLOAD_OPTIONS.first()
+    val statusLabel = stringResource(option.labelResId)
+    val grid = upload.gridSquare.ifBlank { stringResource(R.string.amsat_upload_grid_none) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.amsat_upload_confirm_title)) },
+        text = {
+            Text(
+                text = stringResource(
+                    R.string.amsat_upload_confirm_message,
+                    statusName,
+                    statusLabel,
+                    upload.callsign,
+                    grid
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = !upload.isSubmitting) {
+                Text(stringResource(R.string.amsat_upload_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !upload.isSubmitting) {
+                Text(stringResource(R.string.btn_cancel))
+            }
+        }
+    )
 }
 
 @Composable

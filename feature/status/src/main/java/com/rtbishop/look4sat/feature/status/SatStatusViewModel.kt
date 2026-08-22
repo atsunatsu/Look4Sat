@@ -31,6 +31,7 @@ data class AmSatUploadUiState(
     val callsign: String = "",
     val gridSquare: String = "",
     val isSubmitting: Boolean = false,
+    val isConfirmingSubmit: Boolean = false,
     val message: String? = null,
     val error: String? = null
 )
@@ -125,56 +126,75 @@ class SatStatusViewModel(
                         error = null
                     )
                 } else {
-                    upload.copy(isExpanded = false, message = null, error = null)
+                    upload.copy(isExpanded = false, isConfirmingSubmit = false, message = null, error = null)
                 }
             )
         }
     }
 
     fun collapseUploadPanel() {
-        _uiState.update { it.copy(upload = it.upload.copy(isExpanded = false, message = null, error = null)) }
+        _uiState.update { it.copy(upload = it.upload.copy(isExpanded = false, isConfirmingSubmit = false, message = null, error = null)) }
     }
 
     fun setUploadReport(report: String) {
-        _uiState.update { it.copy(upload = it.upload.copy(selectedReport = report, message = null, error = null)) }
+        _uiState.update { it.copy(upload = it.upload.copy(selectedReport = report, isConfirmingSubmit = false, message = null, error = null)) }
     }
 
     fun setUploadCallsign(callsign: String) {
         val normalized = callsign.trim().uppercase(Locale.US)
         settingsRepo.setAmSatCallsign(normalized)
-        _uiState.update { it.copy(upload = it.upload.copy(callsign = normalized, message = null, error = null)) }
+        _uiState.update { it.copy(upload = it.upload.copy(callsign = normalized, isConfirmingSubmit = false, message = null, error = null)) }
     }
 
     fun setUploadGrid(grid: String) {
         val normalized = grid.trim().uppercase(Locale.US)
-        _uiState.update { it.copy(upload = it.upload.copy(gridSquare = normalized, message = null, error = null)) }
+        _uiState.update { it.copy(upload = it.upload.copy(gridSquare = normalized, isConfirmingSubmit = false, message = null, error = null)) }
     }
 
-    fun submitReport(satelliteName: String) {
+    fun requestSubmitConfirmation() {
+        val prepared = validateUpload(_uiState.value.upload) ?: return
+        _uiState.update {
+            it.copy(
+                upload = it.upload.copy(
+                    callsign = prepared.callsign,
+                    gridSquare = prepared.grid,
+                    isConfirmingSubmit = true,
+                    message = null,
+                    error = null
+                )
+            )
+        }
+    }
+
+    fun dismissSubmitConfirmation() {
+        _uiState.update { it.copy(upload = it.upload.copy(isConfirmingSubmit = false)) }
+    }
+
+    fun confirmSubmitReport(satelliteName: String) {
         val upload = _uiState.value.upload
         if (upload.isSubmitting) return
-        val callsign = upload.callsign.trim().uppercase(Locale.US)
-        val grid = upload.gridSquare.trim().uppercase(Locale.US)
-        when {
-            callsign.isBlank() -> {
-                _uiState.update { it.copy(upload = it.upload.copy(error = UPLOAD_ERROR_CALLSIGN_REQUIRED, message = null)) }
-                return
-            }
-            grid.isNotBlank() && !MAIDENHEAD_GRID.matches(grid) -> {
-                _uiState.update { it.copy(upload = it.upload.copy(error = UPLOAD_ERROR_GRID_INVALID, message = null)) }
-                return
-            }
-        }
+        val prepared = validateUpload(upload) ?: return
 
-        settingsRepo.setAmSatCallsign(callsign)
-        _uiState.update { it.copy(upload = it.upload.copy(isSubmitting = true, error = null, message = null)) }
+        settingsRepo.setAmSatCallsign(prepared.callsign)
+        _uiState.update {
+            it.copy(
+                upload = it.upload.copy(
+                    callsign = prepared.callsign,
+                    gridSquare = prepared.grid,
+                    isSubmitting = true,
+                    isConfirmingSubmit = false,
+                    error = null,
+                    message = null
+                )
+            )
+        }
         viewModelScope.launch {
             val result = amSatRepo.submitReport(
                 AmSatReportSubmission(
                     name = satelliteName,
-                    report = upload.selectedReport,
-                    callsign = callsign,
-                    gridSquare = grid,
+                    report = prepared.report,
+                    callsign = prepared.callsign,
+                    gridSquare = prepared.grid,
                     reportedAtUtcMillis = System.currentTimeMillis()
                 )
             )
@@ -183,8 +203,8 @@ class SatStatusViewModel(
                     it.copy(
                         upload = it.upload.copy(
                             isSubmitting = false,
-                            callsign = callsign,
-                            gridSquare = grid,
+                            callsign = prepared.callsign,
+                            gridSquare = prepared.grid,
                             message = UPLOAD_MESSAGE_SUCCESS,
                             error = null
                         )
@@ -205,6 +225,42 @@ class SatStatusViewModel(
         }
     }
 
+    private fun validateUpload(upload: AmSatUploadUiState): PreparedUpload? {
+        val callsign = upload.callsign.trim().uppercase(Locale.US)
+        val grid = upload.gridSquare.trim().uppercase(Locale.US)
+        return when {
+            callsign.isBlank() -> {
+                _uiState.update {
+                    it.copy(
+                        upload = it.upload.copy(
+                            isConfirmingSubmit = false,
+                            error = UPLOAD_ERROR_CALLSIGN_REQUIRED,
+                            message = null
+                        )
+                    )
+                }
+                null
+            }
+            grid.isNotBlank() && !MAIDENHEAD_GRID.matches(grid) -> {
+                _uiState.update {
+                    it.copy(
+                        upload = it.upload.copy(
+                            isConfirmingSubmit = false,
+                            error = UPLOAD_ERROR_GRID_INVALID,
+                            message = null
+                        )
+                    )
+                }
+                null
+            }
+            else -> PreparedUpload(
+                report = upload.selectedReport,
+                callsign = callsign,
+                grid = grid
+            )
+        }
+    }
+
     private fun defaultGridSquare(): String {
         val grid = settingsRepo.stationPosition.value.qthLocator.trim().uppercase(Locale.US)
         return grid.takeUnless { it == "JJ00AA" }.orEmpty()
@@ -218,5 +274,11 @@ class SatStatusViewModel(
         }
     }
 }
+
+private data class PreparedUpload(
+    val report: String,
+    val callsign: String,
+    val grid: String
+)
 
 private val MAIDENHEAD_GRID = Regex("^[A-R]{2}[0-9]{2}([A-X]{2})?$")

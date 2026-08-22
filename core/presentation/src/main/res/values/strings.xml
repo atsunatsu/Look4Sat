@@ -71,12 +71,17 @@
     <string name="amsat_no_reports">No reports for this period</string>
     <string name="amsat_close">Close</string>
     <string name="amsat_upload">Upload</string>
+    <string name="amsat_upload_back">Back</string>
     <string name="amsat_upload_report">Upload report to AMSAT</string>
     <string name="amsat_upload_status">Status</string>
     <string name="amsat_upload_callsign">Callsign</string>
     <string name="amsat_upload_grid">Grid</string>
     <string name="amsat_upload_time_now">Time: current UTC %s</string>
     <string name="amsat_upload_submit">Submit to AMSAT</string>
+    <string name="amsat_upload_confirm">Upload</string>
+    <string name="amsat_upload_confirm_title">Confirm AMSAT upload</string>
+    <string name="amsat_upload_confirm_message">This public report will be uploaded to AMSAT.\nSatellite: %1$s\nStatus: %2$s\nCallsign: %3$s\nGrid: %4$s</string>
+    <string name="amsat_upload_grid_none">Not provided</string>
     <string name="amsat_upload_success">Report uploaded</string>
     <string name="amsat_upload_failed">Upload failed: %s</string>
     <string name="amsat_upload_callsign_required">Callsign is required</string>
