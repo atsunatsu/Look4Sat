@@ -84,19 +84,23 @@ import java.util.Locale
 import java.util.TimeZone
 
 @Composable
-fun PassesDestination(navigateToRadar: (Int, Long) -> Unit) {
+fun PassesDestination(
+    navigateToRadar: (Int, Long) -> Unit,
+    navigateToMap: () -> Unit
+) {
     val context = LocalContext.current
     val container = (context.applicationContext as IContainerProvider).getMainContainer()
     val viewModel: PassesViewModel = viewModel(factory = PassesViewModel.factory(container))
     val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
-    PassesScreen(uiState, viewModel::onAction, navigateToRadar)
+    PassesScreen(uiState, viewModel::onAction, navigateToRadar, navigateToMap)
 }
 
 @Composable
 private fun PassesScreen(
     uiState: PassesState,
     onAction: (PassesAction) -> Unit,
-    navigateToRadar: (Int, Long) -> Unit
+    navigateToRadar: (Int, Long) -> Unit,
+    navigateToMap: () -> Unit
 ) {
     if (uiState.isPassesDialogShown) {
         PassesFilterDialog(
@@ -163,7 +167,7 @@ private fun PassesScreen(
                     NextPassRow(pass = uiState.nextPass, isUtc = uiState.isUtc)
                 },
                 endAction = {
-                    IconCard(action = { onAction(PassesAction.ToggleRadiosDialog) }, resId = R.drawable.ic_radios)
+                    IconCard(action = navigateToMap, resId = R.drawable.ic_map)
                 }
             )
         }

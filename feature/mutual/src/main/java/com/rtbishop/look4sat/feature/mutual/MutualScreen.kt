@@ -63,7 +63,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rtbishop.look4sat.core.domain.repository.MutualPassData
 import com.rtbishop.look4sat.core.domain.repository.TrackSampleData
-import com.rtbishop.look4sat.core.presentation.IconCard
 import com.rtbishop.look4sat.core.presentation.R
 import com.rtbishop.look4sat.core.presentation.ScreenColumn
 import com.rtbishop.look4sat.core.presentation.TopBar
@@ -75,7 +74,6 @@ import java.util.Locale
 @Composable
 fun MutualScreen(
     viewModel: MutualViewModel,
-    navigateUp: () -> Unit = {},
     navigateToRadar: (Int, Long, MutualPassData?) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
@@ -85,9 +83,7 @@ fun MutualScreen(
         topBar = { isVertical ->
             TopBar(
                 isVerticalLayout = isVertical,
-                startAction = {
-                    IconCard(action = navigateUp, resId = R.drawable.ic_back)
-                },
+                startAction = {},
                 topInfo = {
                     Text(
                         text = stringResource(R.string.mutual_title),

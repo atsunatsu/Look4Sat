@@ -132,8 +132,12 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
     val backStack = rememberNavBackStack(Screen.Passes)
     val currentKey = backStack.lastOrNull()
     val navigateBack: () -> Unit = { backStack.removeLastOrNull() }
+    val navigateToMap: () -> Unit = {
+        while (backStack.size > 1) backStack.removeAt(backStack.size - 1)
+        backStack.add(Screen.Map)
+    }
     val fadeTransition = fadeIn(animationSpec = tween(350)) togetherWith fadeOut(animationSpec = tween(350))
-    val navItems = listOf(Screen.Satellites, Screen.Passes, Screen.Mutual, Screen.Map, Screen.AMSAT, Screen.Settings)
+    val navItems = listOf(Screen.Satellites, Screen.Passes, Screen.AMSAT, Screen.Mutual, Screen.Settings)
 
     val context = LocalContext.current
     val container = (context.applicationContext as IContainerProvider).getMainContainer()
@@ -157,9 +161,9 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                     val isSelected = when (currentKey) {
                         is Screen.Satellites -> screen is Screen.Satellites
                         is Screen.Passes -> screen is Screen.Passes
-                        is Screen.Mutual -> screen is Screen.Mutual
-                        is Screen.Map -> screen is Screen.Map
+                        is Screen.Map -> screen is Screen.Passes
                         is Screen.AMSAT -> screen is Screen.AMSAT
+                        is Screen.Mutual -> screen is Screen.Mutual
                         is Screen.Settings -> screen is Screen.Settings
                         else -> false
                     }
@@ -168,7 +172,7 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                         label = { Text(stringResource(screen.titleResId)) },
                         selected = isSelected,
                         onClick = {
-                            if (isSelected) return@item
+                            if (isSelected && !(currentKey is Screen.Map && screen is Screen.Passes)) return@item
                             while (backStack.size > 1) backStack.removeAt(backStack.size - 1)
                             if (screen !is Screen.Passes) backStack.add(screen)
                         }
@@ -203,11 +207,14 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                             SatellitesDestination(navigateUp = navigateBack)
                         }
                         entry<Screen.Passes> {
-                            PassesDestination { catNum, aosTime ->
-                                container.setMutualPassData(MutualPassData())
-                                container.satelliteRepo.selectPass(catNum, aosTime)
-                                navigateToRadar()
-                            }
+                            PassesDestination(
+                                navigateToRadar = { catNum, aosTime ->
+                                    container.setMutualPassData(MutualPassData())
+                                    container.satelliteRepo.selectPass(catNum, aosTime)
+                                    navigateToRadar()
+                                },
+                                navigateToMap = navigateToMap
+                            )
                         }
                         entry<Screen.Map> {
                             MapDestination()
@@ -215,7 +222,6 @@ fun MainScreen(navigateToRadar: () -> Unit = {}) {
                         entry<Screen.Mutual> {
                             MutualScreen(
                                 viewModel = mutualViewModel,
-                                navigateUp = navigateBack,
                                 navigateToRadar = { catNum, aosTime, pass ->
                                     container.setMutualPassData(pass ?: MutualPassData())
                                     container.satelliteRepo.selectPass(catNum, aosTime)
