@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -68,13 +69,17 @@ import java.util.TimeZone
 /** Fixed width per day tile — tablet-safe; name column absorbs remaining space. */
 private val TILE_WIDTH: Dp = 64.dp
 
-private data class UploadOption(val apiValue: String, val labelResId: Int)
+private data class UploadOption(
+    val apiValue: String,
+    val labelResId: Int,
+    val color: Color
+)
 
 private val UPLOAD_OPTIONS = listOf(
-    UploadOption(AMSAT_REPORT_HEARD, R.string.amsat_upload_active),
-    UploadOption(AMSAT_REPORT_TELEMETRY_ONLY, R.string.amsat_upload_tlm),
-    UploadOption(AMSAT_REPORT_NOT_HEARD, R.string.amsat_upload_not_heard),
-    UploadOption(AMSAT_REPORT_CREW_ACTIVE, R.string.amsat_upload_crew_active)
+    UploadOption(AMSAT_REPORT_HEARD, R.string.amsat_upload_active, Color(0xFF648FFF)),
+    UploadOption(AMSAT_REPORT_TELEMETRY_ONLY, R.string.amsat_upload_tlm, Color(0xFFFFB000)),
+    UploadOption(AMSAT_REPORT_NOT_HEARD, R.string.amsat_upload_not_heard, Color(0xFFDC267F)),
+    UploadOption(AMSAT_REPORT_CREW_ACTIVE, R.string.amsat_upload_crew_active, Color(0xFFFE6100))
 )
 
 /**
@@ -435,10 +440,34 @@ private fun AmSatUploadPanel(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             options.forEach { option ->
+                val selected = upload.selectedReport == option.apiValue
                 FilterChip(
-                    selected = upload.selectedReport == option.apiValue,
+                    selected = selected,
                     onClick = { onReportChange(option.apiValue) },
-                    label = { Text(stringResource(option.labelResId), maxLines = 1) }
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(if (selected) Color.White else option.color)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(option.labelResId), maxLines = 1)
+                        }
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = option.color.copy(alpha = 0.10f),
+                        labelColor = MaterialTheme.colorScheme.onSurface,
+                        selectedContainerColor = option.color,
+                        selectedLabelColor = Color.White
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selected,
+                        borderColor = option.color.copy(alpha = 0.60f),
+                        selectedBorderColor = option.color
+                    )
                 )
             }
         }
