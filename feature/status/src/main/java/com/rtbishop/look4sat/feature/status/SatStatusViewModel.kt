@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rtbishop.look4sat.core.domain.model.AmSatReportSubmission
 import com.rtbishop.look4sat.core.domain.model.SatReport
 import com.rtbishop.look4sat.core.domain.model.SatStatus
+import com.rtbishop.look4sat.core.domain.model.SatStatusPage
 import com.rtbishop.look4sat.core.domain.repository.IAmSatRepository
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
@@ -51,28 +52,25 @@ class SatStatusViewModel(
     private val settingsRepo: ISettingsRepo
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SatStatusUiState(isLoading = true))
+    private val cachedStatusPage = amSatRepo.getCachedStatus()
+    private val _uiState = MutableStateFlow(cachedStatusPage?.toUiState() ?: SatStatusUiState(isLoading = true))
     val uiState: StateFlow<SatStatusUiState> = _uiState
 
     init {
-        fetch()
+        if (cachedStatusPage == null) fetch()
     }
 
     fun fetch() {
+        amSatRepo.getCachedStatus()?.let { page ->
+            applyStatusPage(page)
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 val page = amSatRepo.fetchStatus()
                 if (page != null && page.statuses.isNotEmpty()) {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isRefreshing = false,
-                            statuses = page.statuses,
-                            reports = page.reports,
-                            fetchedAtUtcMs = page.fetchedAtUtcMs
-                        )
-                    }
+                    applyStatusPage(page)
                 } else {
                     _uiState.update {
                         it.copy(isLoading = false, isRefreshing = false, error = "fetch_failed")
@@ -91,22 +89,28 @@ class SatStatusViewModel(
         _uiState.update { it.copy(isRefreshing = true, error = null) }
         viewModelScope.launch {
             try {
-                val page = amSatRepo.fetchStatus()
+                val page = amSatRepo.fetchStatus(forceRefresh = true)
                 if (page != null && page.statuses.isNotEmpty()) {
-                    _uiState.update {
-                        it.copy(
-                            isRefreshing = false,
-                            statuses = page.statuses,
-                            reports = page.reports,
-                            fetchedAtUtcMs = page.fetchedAtUtcMs
-                        )
-                    }
+                    applyStatusPage(page)
                 } else {
                     _uiState.update { it.copy(isRefreshing = false, error = "fetch_failed") }
                 }
             } catch (exception: Exception) {
                 _uiState.update { it.copy(isRefreshing = false, error = exception.message ?: "fetch_failed") }
             }
+        }
+    }
+
+    private fun applyStatusPage(page: SatStatusPage) {
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                isRefreshing = false,
+                statuses = page.statuses,
+                reports = page.reports,
+                fetchedAtUtcMs = page.fetchedAtUtcMs,
+                error = null
+            )
         }
     }
 
@@ -274,6 +278,12 @@ class SatStatusViewModel(
         }
     }
 }
+
+private fun SatStatusPage.toUiState() = SatStatusUiState(
+    statuses = statuses,
+    reports = reports,
+    fetchedAtUtcMs = fetchedAtUtcMs
+)
 
 private data class PreparedUpload(
     val report: String,

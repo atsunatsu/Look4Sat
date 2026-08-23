@@ -17,7 +17,10 @@
  */
 package com.rtbishop.look4sat
 
+import android.app.Activity
 import android.app.Application
+import android.app.Application.ActivityLifecycleCallbacks
+import android.os.Bundle
 import com.rtbishop.look4sat.core.data.injection.MainContainer
 import com.rtbishop.look4sat.core.domain.repository.IContainerProvider
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
@@ -35,10 +38,32 @@ class MainApplication : Application(), IContainerProvider {
     override fun onCreate() {
         super.onCreate()
         container = MainContainer(this)
+        clearAmSatCacheOnAppBackground()
         // trigger automatic update every 48 hours
         container.appScope.launch { checkAutoUpdate() }
         // load satellite data on every app start
         container.appScope.launch { container.satelliteRepo.initRepository() }
+    }
+
+    private fun clearAmSatCacheOnAppBackground() {
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            private var startedActivityCount = 0
+
+            override fun onActivityStarted(activity: Activity) {
+                startedActivityCount += 1
+            }
+
+            override fun onActivityStopped(activity: Activity) {
+                startedActivityCount = (startedActivityCount - 1).coerceAtLeast(0)
+                if (startedActivityCount == 0) container.amSatRepo.clearStatusCache()
+            }
+
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+            override fun onActivityResumed(activity: Activity) = Unit
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
     }
 
     private suspend fun checkAutoUpdate(timeNow: Long = System.currentTimeMillis()) {
