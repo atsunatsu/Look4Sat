@@ -51,6 +51,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,11 +94,16 @@ import com.rtbishop.look4sat.feature.status.SatStatusDestination
 fun NavRoot(deeplink: String? = null) {
     val rootBackStack = rememberNavBackStack(Screen.Passes)
     val deeplinkResolver = DeeplinkResolver()
+    var openMapRequest by remember { mutableIntStateOf(0) }
     LaunchedEffect(deeplink) {
         deeplink?.let { rootBackStack.add(deeplinkResolver.resolve(it)) }
     }
     val navigateBack: () -> Unit = { rootBackStack.removeLastOrNull() }
     val navigateToRadar: () -> Unit = { rootBackStack.add(RadarDestination) }
+    val navigateToMap: () -> Unit = {
+        while (rootBackStack.size > 1) rootBackStack.removeAt(rootBackStack.size - 1)
+        openMapRequest += 1
+    }
     // Incoming screen slides in from the right, outgoing drifts left at 1/3 speed (API35+ style)
     val pushTransition = slideInHorizontally(tween(300)) { it } togetherWith
         slideOutHorizontally(tween(300)) { -it / 3 }
@@ -114,13 +122,19 @@ fun NavRoot(deeplink: String? = null) {
             rememberViewModelStoreNavEntryDecorator()
         ),
         entryProvider = entryProvider {
-            entry<Screen.Passes> { MainScreen(navigateToRadar = navigateToRadar) }
+            entry<Screen.Passes> {
+                MainScreen(
+                    navigateToRadar = navigateToRadar,
+                    openMapRequest = openMapRequest,
+                    onOpenMapRequestHandled = { openMapRequest = 0 }
+                )
+            }
             entry<RadarDestination> {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    RadarDestination(navigateUp = navigateBack)
+                    RadarDestination(navigateUp = navigateBack, navigateToMap = navigateToMap)
                 }
             }
         }
@@ -128,13 +142,23 @@ fun NavRoot(deeplink: String? = null) {
 }
 
 @Composable
-fun MainScreen(navigateToRadar: () -> Unit = {}) {
+fun MainScreen(
+    navigateToRadar: () -> Unit = {},
+    openMapRequest: Int = 0,
+    onOpenMapRequestHandled: () -> Unit = {}
+) {
     val backStack = rememberNavBackStack(Screen.Passes)
     val currentKey = backStack.lastOrNull()
     val navigateBack: () -> Unit = { backStack.removeLastOrNull() }
     val navigateToMap: () -> Unit = {
         while (backStack.size > 1) backStack.removeAt(backStack.size - 1)
         backStack.add(Screen.Map)
+    }
+    LaunchedEffect(openMapRequest) {
+        if (openMapRequest > 0) {
+            navigateToMap()
+            onOpenMapRequestHandled()
+        }
     }
     val fadeTransition = fadeIn(animationSpec = tween(350)) togetherWith fadeOut(animationSpec = tween(350))
     val navItems = listOf(Screen.Satellites, Screen.Passes, Screen.AMSAT, Screen.Mutual, Screen.Settings)
