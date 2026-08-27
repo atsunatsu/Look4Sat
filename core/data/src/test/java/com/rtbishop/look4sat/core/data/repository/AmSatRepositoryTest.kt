@@ -3,6 +3,8 @@ package com.rtbishop.look4sat.core.data.repository
 import com.rtbishop.look4sat.core.domain.model.SatStatus
 import com.rtbishop.look4sat.core.domain.model.SatStatusPage
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -57,6 +59,21 @@ class AmSatRepositoryTest {
         assertEquals(1, remoteSource.catalogRequests)
         assertEquals(1, remoteSource.reportRequests)
     }
+
+    @Test
+    fun fetchStatusSharesStartupPrefetchRequest() = runTest {
+        val remoteSource = FakeAmSatRemoteSource(responseDelayMillis = 50)
+        val repository = AmSatRepository(remoteSource)
+
+        val prefetch = async { repository.prefetchStatus() }
+        val pageFetch = async { repository.fetchStatus() }
+        prefetch.await()
+        val page = pageFetch.await()
+
+        assertSame(page, repository.getCachedStatus())
+        assertEquals(1, remoteSource.catalogRequests)
+        assertEquals(1, remoteSource.reportRequests)
+    }
 }
 
 private fun AmSatRepository.seedStatusCache(page: SatStatusPage) {
@@ -65,7 +82,7 @@ private fun AmSatRepository.seedStatusCache(page: SatStatusPage) {
     cacheField.set(this, page)
 }
 
-private class FakeAmSatRemoteSource : IRemoteSource {
+private class FakeAmSatRemoteSource(private val responseDelayMillis: Long = 0L) : IRemoteSource {
     var catalogRequests = 0
     var reportRequests = 0
 
@@ -74,11 +91,13 @@ private class FakeAmSatRemoteSource : IRemoteSource {
     override suspend fun getNetworkStream(url: String): InputStream? = null
 
     override suspend fun getAmSatCatalog(): String? {
+        if (responseDelayMillis > 0L) delay(responseDelayMillis)
         catalogRequests += 1
         return """{"data":[{"name":"AO-7"}]}"""
     }
 
     override suspend fun getAmSatReports(hours: Int, limit: Int): String? {
+        if (responseDelayMillis > 0L) delay(responseDelayMillis)
         reportRequests += 1
         return """{"data":[]}"""
     }

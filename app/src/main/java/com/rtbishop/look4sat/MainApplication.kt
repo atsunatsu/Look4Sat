@@ -50,6 +50,9 @@ class MainApplication : Application(), IContainerProvider {
             private var startedActivityCount = 0
 
             override fun onActivityStarted(activity: Activity) {
+                if (startedActivityCount == 0) {
+                    container.appScope.launch { container.amSatRepo.prefetchStatus() }
+                }
                 startedActivityCount += 1
             }
 

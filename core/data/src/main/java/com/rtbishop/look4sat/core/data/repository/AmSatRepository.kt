@@ -9,8 +9,13 @@ import com.rtbishop.look4sat.core.domain.model.SatStatus
 import com.rtbishop.look4sat.core.domain.model.SatStatusPage
 import com.rtbishop.look4sat.core.domain.repository.IAmSatRepository
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -30,12 +35,18 @@ private data class ApiReport(
 )
 
 /** AMSAT status repository using RemoteSource (Clean Architecture: data layer handles HTTP). */
-class AmSatRepository(private val remoteSource: IRemoteSource) : IAmSatRepository {
+class AmSatRepository(
+    private val remoteSource: IRemoteSource,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+) : IAmSatRepository {
 
     private val statusCacheMutex = Mutex()
 
     @Volatile
     private var statusCache: SatStatusPage? = null
+
+    @Volatile
+    private var statusFetchInFlight: Deferred<SatStatusPage?>? = null
 
     @Volatile
     private var cacheGeneration = 0
@@ -46,36 +57,63 @@ class AmSatRepository(private val remoteSource: IRemoteSource) : IAmSatRepositor
 
     override fun getCachedStatus(): SatStatusPage? = statusCache
 
-    override suspend fun fetchStatus(forceRefresh: Boolean): SatStatusPage? = withContext(Dispatchers.IO) {
-        statusCacheMutex.lock()
-        try {
-            if (!forceRefresh) statusCache?.let { return@withContext it }
-            val generation = cacheGeneration
-            val nowSec = System.currentTimeMillis() / 1000
-            val catalogJson = remoteSource.getAmSatCatalog() ?: return@withContext null
-            // 72h = 3 days; API hard cap is limit=500 regardless of what we send.
-            // 500 records across ~100 catalog satellites ≈ ~1-5 reports/satellite/day — enough for 3 days.
-            // Upgrade path: paginate or request AMSAT to raise the cap if catalog grows beyond ~200 sats.
-            val reportsJson = remoteSource.getAmSatReports(hours = 72, limit = 500) ?: return@withContext null
+    override suspend fun fetchStatus(forceRefresh: Boolean): SatStatusPage? {
+        if (!forceRefresh) statusCache?.let { return it }
 
-            val names = parseCatalog(catalogJson)
-            val reports = parseReports(reportsJson)
-
-            if (names.isEmpty() && reports.isEmpty()) return@withContext null
-
-            val statuses = buildStatuses(names, reports, nowSec)
-            val reportMap = reports.associate { it.id to toSatReport(it) }
-            SatStatusPage(System.currentTimeMillis(), statuses, reportMap).also { page ->
-                if (generation == cacheGeneration) statusCache = page
+        var cachedPage: SatStatusPage? = null
+        val inFlightFetch = statusCacheMutex.withLock {
+            if (!forceRefresh) {
+                val cached = statusCache
+                if (cached != null) {
+                    cachedPage = cached
+                    return@withLock null
+                }
             }
+
+            statusFetchInFlight ?: scope.async(Dispatchers.IO) {
+                fetchStatusFromRemote(cacheGeneration)
+            }.also { statusFetchInFlight = it }
+        }
+
+        cachedPage?.let { return it }
+        val fetch = inFlightFetch ?: return null
+        return try {
+            fetch.await()
         } finally {
-            statusCacheMutex.unlock()
+            statusCacheMutex.withLock {
+                if (statusFetchInFlight === fetch && fetch.isCompleted) statusFetchInFlight = null
+            }
         }
     }
 
+    private suspend fun fetchStatusFromRemote(generation: Int): SatStatusPage? {
+        val nowSec = System.currentTimeMillis() / 1000
+        val catalogJson = remoteSource.getAmSatCatalog() ?: return null
+        // 72h = 3 days; API hard cap is limit=500 regardless of what we send.
+        // 500 records across ~100 catalog satellites ≈ ~1-5 reports/satellite/day — enough for 3 days.
+        // Upgrade path: paginate or request AMSAT to raise the cap if catalog grows beyond ~200 sats.
+        val reportsJson = remoteSource.getAmSatReports(hours = 72, limit = 500) ?: return null
+
+        val names = parseCatalog(catalogJson)
+        val reports = parseReports(reportsJson)
+
+        if (names.isEmpty() && reports.isEmpty()) return null
+
+        val statuses = buildStatuses(names, reports, nowSec)
+        val reportMap = reports.associate { it.id to toSatReport(it) }
+        return SatStatusPage(System.currentTimeMillis(), statuses, reportMap).also { page ->
+            if (generation == cacheGeneration) statusCache = page
+        }
+    }
+
+    override suspend fun prefetchStatus() {
+        fetchStatus(forceRefresh = false)
+    }
+
     override fun clearStatusCache() {
-        statusCache = null
         cacheGeneration += 1
+        statusCache = null
+        statusFetchInFlight = null
     }
 
     override suspend fun submitReport(submission: AmSatReportSubmission): AmSatReportSubmitResult = withContext(Dispatchers.IO) {

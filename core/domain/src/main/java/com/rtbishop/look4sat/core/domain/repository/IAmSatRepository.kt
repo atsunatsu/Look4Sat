@@ -12,6 +12,9 @@ interface IAmSatRepository {
     /** Fetch and parse the AMSAT status page; null on failure. */
     suspend fun fetchStatus(forceRefresh: Boolean = false): SatStatusPage?
 
+    /** Warm the foreground-session cache without forcing a network reload. */
+    suspend fun prefetchStatus()
+
     /** Clear the foreground-session status cache. */
     fun clearStatusCache()
 

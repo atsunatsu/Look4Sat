@@ -78,7 +78,7 @@ class MainContainer(private val context: Context) : IMainContainer {
     override val selectionRepo = provideSelectionRepo()
     override val satelliteRepo = provideSatelliteRepo()
     override val databaseRepo = provideDatabaseRepo()
-    override val amSatRepo by lazy { AmSatRepository(remoteSource) }
+    override val amSatRepo by lazy { AmSatRepository(remoteSource, appScope) }
     override val radioTrackingService: IRadioTrackingService by lazy {
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         RadioTrackingService(appScope, manager, satelliteRepo, settingsRepo)
