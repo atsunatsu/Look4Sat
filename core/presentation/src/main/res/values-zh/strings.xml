@@ -99,11 +99,6 @@
     <string name="radar_doppler_offset_hint">偏移 (kHz)</string>
     <string name="radar_doppler_info">线性转发器：输入一个频率即可算出另一个</string>
 
-    <string name="radar_cw_decoder">CW 解码器</string>
-    <string name="radar_cw_start">开始</string>
-    <string name="radar_cw_stop">停止</string>
-    <string name="radar_cw_reset">清空</string>
-
     <!-- Map screen -->
     <string name="map_prev">上一个</string>
     <string name="map_next">下一个</string>

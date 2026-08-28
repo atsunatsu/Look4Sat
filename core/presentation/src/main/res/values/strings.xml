@@ -122,11 +122,6 @@
     <string name="radar_doppler_offset_hint">Offset (kHz)</string>
     <string name="radar_doppler_info">For linear transponders, type one frequency to see the other</string>
 
-    <string name="radar_cw_decoder">CW Decoder</string>
-    <string name="radar_cw_start">Start</string>
-    <string name="radar_cw_stop">Stop</string>
-    <string name="radar_cw_reset">Clear</string>
-
     <!-- Map screen -->
     <string name="map_prev">Prev</string>
     <string name="map_next">Next</string>

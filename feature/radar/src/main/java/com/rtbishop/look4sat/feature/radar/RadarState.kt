@@ -63,7 +63,6 @@ data class RadarState(
     val transceivers: TransceiverSubState = TransceiverSubState(),
     val radioControl: RadioControlSubState = RadioControlSubState(),
     val sstv: SstvSubState = SstvSubState(),
-    val cw: CwSubState = CwSubState(),
     val mutualSamples: List<Pair<Long, Pair<Double, Double>>> = emptyList(),
     val mutualStartTime: Long = 0L,
     val mutualEndTime: Long = 0L,
@@ -85,19 +84,6 @@ data class SstvSubState(
     val diagnosticsMetrics: SstvQualityMetrics? = null
 )
 
-// --- CW Decoder ---
-
-enum class CwStatus { Idle, Listening }
-
-data class CwSubState(
-    val status: CwStatus = CwStatus.Idle,
-    val hasPermission: Boolean = false,
-    val decodedText: String = "",
-    val cwToneFreq: Float = 700f,
-    val isExpanded: Boolean = false,
-    val signalStrength: Float = 0f
-)
-
 sealed interface RadarAction {
     data class AddToCalendar(val name: String, val aosTime: Long, val losTime: Long) : RadarAction
     data class SelectTransmitter(val uuid: String) : RadarAction
@@ -117,14 +103,6 @@ sealed interface RadarAction {
     data object SstvReset : RadarAction
     data class SstvSelectMode(val modeName: String) : RadarAction
     data class SstvPermissionResult(val granted: Boolean) : RadarAction
-
-    // CW actions
-    data object CwStartListening : RadarAction
-    data object CwStopListening : RadarAction
-    data object CwReset : RadarAction
-    data class CwSetToneFreq(val freq: Float) : RadarAction
-    data class CwToggleExpanded(val expanded: Boolean) : RadarAction
-    data class CwPermissionResult(val granted: Boolean) : RadarAction
 
     // Calculator actions
     data class ChangeCalculatorOffset(val offsetKHz: String) : RadarAction
