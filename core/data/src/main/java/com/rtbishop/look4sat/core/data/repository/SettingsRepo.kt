@@ -98,8 +98,11 @@ class SettingsRepo(
     private val keyTransceiversUrl = "transceiversUrl"
     private val keySatelliteUrls = "satelliteUrls"
     private val keyTransceiversUrls = "transceiversUrls"
+    private val keySatnogsTleSourceMigration = "satnogsTleSourceMigration"
     private val separatorComma = ","
     private val separatorUrl = "\n"
+    private val legacyCelestrakSatnogsUrl =
+        "https://celestrak.org/NORAD/elements/gp.php?GROUP=satnogs&FORMAT=csv"
 
     //region # Satellites selection settings
     private val _satelliteSelection = MutableStateFlow(getSelectedIds())
@@ -399,6 +402,7 @@ class SettingsRepo(
         preferences.edit {
             putString(keySatelliteUrls, settings.satelliteUrls.joinToString(separatorUrl))
             putString(keyTransceiversUrls, settings.transceiversUrls.joinToString(separatorUrl))
+            putBoolean(keySatnogsTleSourceMigration, true)
         }
         _dataSourcesSettings.value = settings
     }
@@ -409,7 +413,7 @@ class SettingsRepo(
             defaultUrls = Sources.satelliteDataUrls.values.filter { it.isNotBlank() },
             legacyEnabledKey = keyUseCustomTle,
             legacyUrlKey = keyTleUrl
-        ),
+        ).migrateSatnogsTleSource(),
         transceiversUrls = getDataSourceUrls(
             key = keyTransceiversUrls,
             defaultUrls = Sources.transceiversDataUrls.values.filter { it.isNotBlank() },
@@ -435,6 +439,31 @@ class SettingsRepo(
         } else {
             defaultUrls
         }
+    }
+
+    private fun List<String>.migrateSatnogsTleSource(): List<String> {
+        if (preferences.getBoolean(keySatnogsTleSourceMigration, false)) return this
+        val satnogsTleUrl = Sources.satelliteDataUrls["SatNOGS"].orEmpty()
+        if (satnogsTleUrl.isBlank() || containsSourceUrl(satnogsTleUrl)) return this
+        val celestrakSatnogsIndex = indexOfFirst { isSameSourceUrl(it, legacyCelestrakSatnogsUrl) }
+        if (celestrakSatnogsIndex < 0) return this
+
+        val migrated = toMutableList().apply { add(celestrakSatnogsIndex + 1, satnogsTleUrl) }
+        preferences.edit {
+            putString(keySatelliteUrls, migrated.joinToString(separatorUrl))
+            putBoolean(keySatnogsTleSourceMigration, true)
+        }
+        return migrated
+    }
+
+    private fun List<String>.containsSourceUrl(url: String): Boolean = any { isSameSourceUrl(it, url) }
+
+    private fun isSameSourceUrl(first: String, second: String): Boolean =
+        normalizeSourceUrl(first).equals(normalizeSourceUrl(second), ignoreCase = true)
+
+    private fun normalizeSourceUrl(url: String): String {
+        val trimmed = url.trim()
+        return if (trimmed.startsWith("http", ignoreCase = true)) trimmed else "https://$trimmed"
     }
     //endregion
 

@@ -84,11 +84,11 @@ class DatabaseRepo(
             val type = builtinTypesByUrl[url] ?: customSourceType
             importedTypeIds.getOrPut(type) { mutableListOf() }.addAll(entries.map { it.catnum })
             entries
-        }
+        }.distinctBy { it.catnum }
         importedTypeIds.forEach { (type, ids) -> settingsRepo.setSatelliteTypeIds(type, ids.distinct()) }
         val importedRadios = radioJobs.awaitAll().flatMap { (url, stream) ->
             stream?.let { dataParser.parseJSONStream(unwrapIfZipped(url, it)) }.orEmpty()
-        }
+        }.filter { it.uuid.isNotBlank() }.distinctBy { it.uuid }
         // insert parsed data into the database
         localSource.insertEntries(importedEntries)
         localSource.insertRadios(importedRadios)

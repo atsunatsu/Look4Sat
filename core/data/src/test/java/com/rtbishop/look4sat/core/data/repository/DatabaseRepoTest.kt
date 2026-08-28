@@ -31,6 +31,7 @@ import com.rtbishop.look4sat.core.domain.predict.OrbitalObject
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.source.ILocalSource
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
+import com.rtbishop.look4sat.core.domain.source.Sources
 import com.rtbishop.look4sat.core.domain.utility.DataParser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,6 +104,27 @@ class DatabaseRepoTest {
         assertEquals(listOf(25544), settingsRepo.satelliteTypeIdsByType["Other"])
     }
 
+    @Test
+    fun `remote update imports satellites from real SatNOGS TLE source`() = runTest(dispatcher) {
+        val satnogsUrl = Sources.satelliteDataUrls.getValue("SatNOGS")
+        val localSource = FakeLocalSource()
+        val remoteSource = FakeRemoteSource().apply {
+            networkStreams[satnogsUrl] = { jamxTleStream() }
+        }
+        val settingsRepo = FakeSettingsRepo(
+            dataSources = DataSourcesSettings(
+                satelliteUrls = listOf(satnogsUrl),
+                transceiversUrls = emptyList()
+            )
+        )
+        val repository = DatabaseRepo(dispatcher, dataParser, localSource, remoteSource, settingsRepo)
+
+        repository.updateFromRemote()
+
+        assertTrue(localSource.insertedEntries.any { it.name == "JAMX-0825b" && it.catnum == 98248 })
+        assertEquals(listOf(98248), settingsRepo.satelliteTypeIdsByType["SatNOGS"])
+    }
+
     private fun validCsvStream(): InputStream = """
         OBJECT_NAME,OBJECT_ID,EPOCH,MEAN_MOTION,ECCENTRICITY,INCLINATION,RA_OF_ASC_NODE,ARG_OF_PERICENTER,MEAN_ANOMALY,EPHEMERIS_TYPE,CLASSIFICATION_TYPE,NORAD_CAT_ID,ELEMENT_SET_NO,REV_AT_EPOCH,BSTAR,MEAN_MOTION_DOT,MEAN_MOTION_DDOT
         ISS (ZARYA),1998-067A,2021-11-16T12:28:09.322176,15.48582035,.0004694,51.6447,309.4881,203.6966,299.8876,0,U,25544,999,31220,.31985E-4,.1288E-4,0
@@ -112,6 +134,12 @@ class DatabaseRepoTest {
         ISS (ZARYA)
         1 25544U 98067A   21320.51955234  .00001288  00000+0  31985-4 0  9990
         2 25544  51.6447 309.4881 0004694 203.6966 299.8876 15.48582035312205
+    """.trimIndent().byteInputStream()
+
+    private fun jamxTleStream(): InputStream = """
+        JAMX-0825b
+        1 98248U          26237.16675926  .00015724  00000-0  97477-3 0 00013
+        2 98248 097.5373 310.9694 0011309 278.1232 340.7230 15.09766181000012
     """.trimIndent().byteInputStream()
 }
 
