@@ -6,7 +6,6 @@ android {
     namespace = libs.versions.packageName.get()
     defaultConfig {
         applicationId = "cn.ba7opf.look4sat"
-        ndk { abiFilters.add("armeabi-v7a") }
     }
     signingConfigs {
         create("release") {
