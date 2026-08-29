@@ -98,6 +98,8 @@ class SettingsRepo(
     private val keyTransceiversUrl = "transceiversUrl"
     private val keySatelliteUrls = "satelliteUrls"
     private val keyTransceiversUrls = "transceiversUrls"
+    private val keySatelliteEnabled = "satelliteEnabled"
+    private val keyTransceiversEnabled = "transceiversEnabled"
     private val keySatnogsTleSourceMigration = "satnogsTleSourceMigration"
     private val separatorComma = ","
     private val separatorUrl = "\n"
@@ -399,12 +401,21 @@ class SettingsRepo(
     override val dataSourcesSettings: StateFlow<DataSourcesSettings> = _dataSourcesSettings
 
     override fun updateDataSourcesSettings(settings: DataSourcesSettings) {
+        // Normalize the enabled lists so they are positionally aligned with the URL lists.
+        // Missing entries default to enabled (true), keeping the persisted "one flag per URL"
+        // invariant intact even when a default empty list is used to construct the model.
+        val normalized = settings.copy(
+            satelliteEnabled = alignFlags(settings.satelliteUrls, settings.satelliteEnabled),
+            transceiversEnabled = alignFlags(settings.transceiversUrls, settings.transceiversEnabled)
+        )
         preferences.edit {
-            putString(keySatelliteUrls, settings.satelliteUrls.joinToString(separatorUrl))
-            putString(keyTransceiversUrls, settings.transceiversUrls.joinToString(separatorUrl))
+            putString(keySatelliteUrls, normalized.satelliteUrls.joinToString(separatorUrl))
+            putString(keyTransceiversUrls, normalized.transceiversUrls.joinToString(separatorUrl))
+            putString(keySatelliteEnabled, normalized.satelliteEnabled.joinToString(separatorComma))
+            putString(keyTransceiversEnabled, normalized.transceiversEnabled.joinToString(separatorComma))
             putBoolean(keySatnogsTleSourceMigration, true)
         }
-        _dataSourcesSettings.value = settings
+        _dataSourcesSettings.value = normalized
     }
 
     private fun getDataSourcesSettings(): DataSourcesSettings = DataSourcesSettings(
@@ -419,8 +430,26 @@ class SettingsRepo(
             defaultUrls = Sources.transceiversDataUrls.values.filter { it.isNotBlank() },
             legacyEnabledKey = keyUseCustomTransceivers,
             legacyUrlKey = keyTransceiversUrl
-        )
+        ),
+        satelliteEnabled = readEnabledFlags(keySatelliteEnabled),
+        transceiversEnabled = readEnabledFlags(keyTransceiversEnabled)
     )
+
+    /** Read the persisted per-source enabled flags (empty when never stored). */
+    private fun readEnabledFlags(key: String): List<Boolean> {
+        return preferences.getString(key, null)
+            ?.split(separatorComma)
+            ?.mapNotNull { it.trim() }
+            ?.filter { it == "true" || it == "false" }
+            ?.map { it == "true" }
+            ?: emptyList()
+    }
+
+    /** Keep the flags positionally aligned with the URL list, defaulting to enabled. */
+    private fun alignFlags(urls: List<String>, flags: List<Boolean>): List<Boolean> {
+        if (flags.size >= urls.size) return flags.take(urls.size)
+        return flags + List(urls.size - flags.size) { true }
+    }
 
     private fun getDataSourceUrls(
         key: String,
@@ -464,6 +493,15 @@ class SettingsRepo(
     private fun normalizeSourceUrl(url: String): String {
         val trimmed = url.trim()
         return if (trimmed.startsWith("http", ignoreCase = true)) trimmed else "https://$trimmed"
+    }
+    //endregion
+
+    //region # Data sources status
+    private val _dataSourcesStatus = MutableStateFlow<Map<String, Int>>(emptyMap())
+    override val dataSourcesStatus: StateFlow<Map<String, Int>> = _dataSourcesStatus
+
+    override fun updateDataSourcesStatus(status: Map<String, Int>) {
+        _dataSourcesStatus.value = status
     }
     //endregion
 

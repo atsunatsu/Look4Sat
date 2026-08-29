@@ -31,6 +31,7 @@ import com.rtbishop.look4sat.core.domain.predict.OrbitalObject
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.source.ILocalSource
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
+import com.rtbishop.look4sat.core.domain.source.NetworkResult
 import com.rtbishop.look4sat.core.domain.source.Sources
 import com.rtbishop.look4sat.core.domain.utility.DataParser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -149,7 +150,8 @@ private class FakeRemoteSource : IRemoteSource {
 
     override suspend fun getFileStream(uri: String): InputStream? = fileStreams[uri]?.invoke()
 
-    override suspend fun getNetworkStream(url: String): InputStream? = networkStreams[url]?.invoke()
+    override suspend fun getNetworkStream(url: String): NetworkResult =
+        networkStreams[url]?.let { NetworkResult(200, it()) } ?: NetworkResult(404, null)
 
     override suspend fun getAmSatCatalog(): String? = null
 
@@ -251,6 +253,12 @@ private class FakeSettingsRepo(dataSources: DataSourcesSettings = defaultDataSou
 
     override fun updateDataSourcesSettings(settings: DataSourcesSettings) {
         dataSourcesSettings.value = settings
+    }
+
+    override val dataSourcesStatus: StateFlow<Map<String, Int>> = MutableStateFlow(emptyMap())
+
+    override fun updateDataSourcesStatus(status: Map<String, Int>) {
+        (dataSourcesStatus as? MutableStateFlow)?.value = status
     }
 
     override fun updateRadioControlSettings(settings: RadioControlSettings) = Unit

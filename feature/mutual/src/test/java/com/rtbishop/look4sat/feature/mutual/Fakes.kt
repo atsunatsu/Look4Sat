@@ -83,6 +83,11 @@ class FakeSettingsRepo(initialPosition: GeoPos = GeoPos(23.13, 113.26)) : ISetti
     override fun updateRCSettings(settings: RCSettings) = TODO()
     override fun updateOtherSettings(transform: (OtherSettings) -> OtherSettings) = TODO()
     override fun updateDataSourcesSettings(settings: DataSourcesSettings) = TODO()
+
+    override val dataSourcesStatus: StateFlow<Map<String, Int>> = MutableStateFlow(emptyMap())
+
+    override fun updateDataSourcesStatus(status: Map<String, Int>) = TODO()
+
     override fun updateRadioControlSettings(settings: RadioControlSettings) = TODO()
     override fun getSatelliteOffset(catnum: Int): String = ""
     override fun setSatelliteOffset(catnum: Int, offset: String) = TODO()

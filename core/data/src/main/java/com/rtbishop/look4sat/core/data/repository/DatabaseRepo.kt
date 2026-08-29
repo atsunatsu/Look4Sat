@@ -67,27 +67,43 @@ class DatabaseRepo(
 
     override suspend fun updateFromRemote() = withContext(dispatcher) {
         val settings = settingsRepo.dataSourcesSettings.value
-        val tleUrls = settings.satelliteUrls.filter { it.isNotBlank() }.map(::normalizeUrl).distinct()
-        val radioUrls = settings.transceiversUrls.filter { it.isNotBlank() }.map(::normalizeUrl).distinct()
+        // Keep the raw URL as the status key (matches what the settings UI
+        // displays) while requesting with the normalized URL.
+        val tleUrls = settings.satelliteUrls
+            .filterIndexed { i, url -> url.isNotBlank() && settings.isSatelliteEnabled(i) }
+            .map { it to normalizeUrl(it) }
+            .distinctBy { it.second }
+        val radioUrls = settings.transceiversUrls
+            .filterIndexed { i, url -> url.isNotBlank() && settings.isTransceiverEnabled(i) }
+            .map { it to normalizeUrl(it) }
+            .distinctBy { it.second }
         val builtinTypesByUrl = Sources.satelliteDataUrls
             .filterValues { it.isNotBlank() }
             .mapValues { normalizeUrl(it.value) }
             .entries
             .associate { (type, url) -> url to type }
         val importedTypeIds = mutableMapOf<String, MutableList<Int>>()
-        // launch all network requests concurrently
-        val tleJobs = tleUrls.map { url -> async { url to remoteSource.getNetworkStream(url) } }
-        val radioJobs = radioUrls.map { url -> async { url to remoteSource.getNetworkStream(url) } }
+        // launch all network requests concurrently, keeping the raw url as key for status reporting
+        val tleJobs = tleUrls.map { (raw, norm) -> async { raw to remoteSource.getNetworkStream(norm) } }
+        val radioJobs = radioUrls.map { (raw, norm) -> async { raw to remoteSource.getNetworkStream(norm) } }
+        val tleResults = tleJobs.awaitAll()
+        val radioResults = radioJobs.awaitAll()
+        // report the HTTP status code of every source (200, 404, ...)
+        settingsRepo.updateDataSourcesStatus(
+            (tleResults + radioResults).associate { (url, result) -> url to result.code }
+        )
         // parse fetched data concurrently and associate known built-in URLs with existing type filters.
-        val importedEntries = tleJobs.awaitAll().flatMap { (url, stream) ->
-            val entries = stream?.let { parseSatelliteStream(url, unwrapIfZipped(url, it)) }.orEmpty()
-            val type = builtinTypesByUrl[url] ?: customSourceType
+        val importedEntries = tleResults.flatMap { (rawUrl, result) ->
+            val normUrl = normalizeUrl(rawUrl)
+            val entries = result.stream?.let { parseSatelliteStream(normUrl, unwrapIfZipped(normUrl, it)) }.orEmpty()
+            val type = builtinTypesByUrl[normUrl] ?: customSourceType
             importedTypeIds.getOrPut(type) { mutableListOf() }.addAll(entries.map { it.catnum })
             entries
         }.distinctBy { it.catnum }
         importedTypeIds.forEach { (type, ids) -> settingsRepo.setSatelliteTypeIds(type, ids.distinct()) }
-        val importedRadios = radioJobs.awaitAll().flatMap { (url, stream) ->
-            stream?.let { dataParser.parseJSONStream(unwrapIfZipped(url, it)) }.orEmpty()
+        val importedRadios = radioResults.flatMap { (rawUrl, result) ->
+            val normUrl = normalizeUrl(rawUrl)
+            result.stream?.let { dataParser.parseJSONStream(unwrapIfZipped(normUrl, it)) }.orEmpty()
         }.filter { it.uuid.isNotBlank() }.distinctBy { it.uuid }
         // insert parsed data into the database
         localSource.insertEntries(importedEntries)

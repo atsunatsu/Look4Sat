@@ -3,6 +3,7 @@ package com.rtbishop.look4sat.core.data.repository
 import com.rtbishop.look4sat.core.domain.model.SatStatus
 import com.rtbishop.look4sat.core.domain.model.SatStatusPage
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
+import com.rtbishop.look4sat.core.domain.source.NetworkResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -88,7 +89,7 @@ private class FakeAmSatRemoteSource(private val responseDelayMillis: Long = 0L) 
 
     override suspend fun getFileStream(uri: String): InputStream? = null
 
-    override suspend fun getNetworkStream(url: String): InputStream? = null
+    override suspend fun getNetworkStream(url: String): NetworkResult = NetworkResult(404, null)
 
     override suspend fun getAmSatCatalog(): String? {
         if (responseDelayMillis > 0L) delay(responseDelayMillis)
