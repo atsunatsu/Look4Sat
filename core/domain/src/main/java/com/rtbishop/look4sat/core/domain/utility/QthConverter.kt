@@ -19,20 +19,43 @@ package com.rtbishop.look4sat.core.domain.utility
 
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 
+/**
+ * Convert a Maidenhead locator (4, 6 or 8 chars) to the position of its
+ * square / subsquare / extended-square centre. Longer input is truncated to
+ * 8 chars (the Maidenhead maximum); malformed or out-of-range input yields
+ * null.
+ */
 fun qthToPosition(locator: String): GeoPos? {
-    val trimmedQth = locator.take(6)
-    if (!isValidLocator(trimmedQth)) return null
-    val lonFirst = (trimmedQth[0].uppercaseChar().code - 65) * 20
-    val latFirst = (trimmedQth[1].uppercaseChar().code - 65) * 10
+    val trimmedQth = locator.trim().uppercase().take(8)
+    if (trimmedQth.length !in listOf(4, 6, 8) || !isValidLocator(trimmedQth)) return null
+    val lonFirst = (trimmedQth[0].code - 65) * 20
+    val latFirst = (trimmedQth[1].code - 65) * 10
     val lonSecond = trimmedQth[2].toString().toInt() * 2
     val latSecond = trimmedQth[3].toString().toInt()
-    val lonThird = (((trimmedQth[4].lowercaseChar().code - 97) / 12.0) + (1.0 / 24.0)) - 180
-    val latThird = (((trimmedQth[5].lowercaseChar().code - 97) / 24.0) + (1.0 / 48.0)) - 90
-    val longitude = (lonFirst + lonSecond + lonThird).round(4)
-    val latitude = (latFirst + latSecond + latThird).round(4)
-    return GeoPos(latitude, longitude)
+    // Start from the 4-char square centre, refine for 6/8-char subsquares.
+    var longitude = lonFirst + lonSecond + 1.0
+    var latitude = latFirst + latSecond + 0.5
+    if (trimmedQth.length >= 6) {
+        val lonSub = (trimmedQth[4].code - 65) * 5.0 / 60.0
+        val latSub = (trimmedQth[5].code - 65) * 2.5 / 60.0
+        if (lonSub < 0.0 || lonSub > 115.0 / 60.0 || latSub < 0.0 || latSub > 57.5 / 60.0) return null
+        longitude = lonFirst + lonSecond + lonSub + 2.5 / 60.0
+        latitude = latFirst + latSecond + latSub + 1.25 / 60.0
+        if (trimmedQth.length >= 8) {
+            val lonExt = (trimmedQth[6].code - 48) * 30.0 / 3600.0
+            val latExt = (trimmedQth[7].code - 48) * 15.0 / 3600.0
+            if (lonExt < 0.0 || lonExt > 270.0 / 3600.0 || latExt < 0.0 || latExt > 135.0 / 3600.0) return null
+            longitude += lonExt + 15.0 / 3600.0
+            latitude += latExt + 7.5 / 3600.0
+        }
+    }
+    return GeoPos((latitude - 90.0).round(4), (longitude - 180.0).round(4))
 }
 
+/**
+ * Convert a position to its 6-char Maidenhead locator, upper-cased (field,
+ * square and subsquare letters). Returns null for out-of-range positions.
+ */
 fun positionToQth(latitude: Double, longitude: Double): String? {
     if (!isValidPosition(latitude, longitude)) return null
     val newLongitude = if (longitude > 180.0) longitude else longitude + 180
@@ -41,8 +64,8 @@ fun positionToQth(latitude: Double, longitude: Double): String? {
     val latFirst = (65 + (newLatitude / 10)).toInt().toChar()
     val lonSecond = ((newLongitude / 2) % 10).toInt()
     val latSecond = (newLatitude % 10).toInt()
-    val lonThird = (65 + (newLongitude % 2) * 12).toInt().toChar().lowercaseChar()
-    val latThird = (65 + (newLatitude % 1) * 24).toInt().toChar().lowercaseChar()
+    val lonThird = (65 + (newLongitude % 2) * 12).toInt().toChar().uppercaseChar()
+    val latThird = (65 + (newLatitude % 1) * 24).toInt().toChar().uppercaseChar()
     return "$lonFirst$latFirst$lonSecond$latSecond$lonThird$latThird"
 }
 
@@ -51,5 +74,11 @@ private fun isValidPosition(lat: Double, lon: Double): Boolean {
 }
 
 private fun isValidLocator(locator: String): Boolean {
-    return locator.matches("[a-xA-X][a-xA-X]\\d\\d[a-xA-X][a-xA-X]".toRegex())
+    // 4 chars: [A-X][A-X]\d\d ; 6 chars: + [A-X][A-X] ; 8 chars: + \d\d
+    return when (locator.length) {
+        4 -> Regex("[A-X]{2}\\d{2}").matches(locator)
+        6 -> Regex("[A-X]{2}\\d{2}[A-X]{2}").matches(locator)
+        8 -> Regex("[A-X]{2}\\d{2}[A-X]{2}\\d{2}").matches(locator)
+        else -> false
+    }
 }
