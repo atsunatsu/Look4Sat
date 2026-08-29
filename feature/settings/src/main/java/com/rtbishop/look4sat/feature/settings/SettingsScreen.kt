@@ -82,13 +82,25 @@ import java.util.Locale
 fun SettingsDestination() {
     val context = LocalContext.current
     val container = (context.applicationContext as IContainerProvider).getMainContainer()
-    val viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(container))
+    val viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(container, context))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreen(uiState, viewModel::onAction)
 }
 
 @Composable
 private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) -> Unit) {
+    var showUpdateChecker by rememberSaveable { mutableStateOf(false) }
+    if (showUpdateChecker) {
+        UpdateCheckerScreen(
+            currentVersion = uiState.appVersionName,
+            state = uiState.updateChecker,
+            onBack = { showUpdateChecker = false },
+            onCheck = { onAction(SettingsAction.CheckForUpdate) },
+            onDownload = { onAction(SettingsAction.DownloadUpdate) },
+            onConsumeApk = { onAction(SettingsAction.ConsumeDownloadedApk) }
+        )
+        return
+    }
     val dialogs = rememberDialogVisibility()
     val pendingCustomSourcesGrant = remember { mutableStateOf<(() -> Unit)?>(null) }
     val pendingCustomSourcesDeny = remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -128,11 +140,19 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
         DataSourcesDialog(
             satelliteUrls = uiState.dataSourcesSettings.satelliteUrls,
             transceiversUrls = uiState.dataSourcesSettings.transceiversUrls,
+            satelliteEnabled = uiState.dataSourcesSettings.satelliteEnabled,
+            transceiversEnabled = uiState.dataSourcesSettings.transceiversEnabled,
+            statusCodes = uiState.dataSourcesStatus,
             onImportTle = { permissions.launchTleImport(); dialogs.dataSources = false },
             onImportTransceivers = { permissions.launchTransceiverImport(); dialogs.dataSources = false },
             onDismiss = { dialogs.dataSources = false },
-            onSave = { satUrls, txUrls ->
-                val newSettings = DataSourcesSettings(satelliteUrls = satUrls, transceiversUrls = txUrls)
+            onSave = { satUrls, txUrls, satEnabled, txEnabled ->
+                val newSettings = DataSourcesSettings(
+                    satelliteUrls = satUrls,
+                    transceiversUrls = txUrls,
+                    satelliteEnabled = satEnabled,
+                    transceiversEnabled = txEnabled
+                )
                 if (newSettings != uiState.dataSourcesSettings) onAction(SettingsAction.UpdateDataSources(newSettings))
                 onAction(SettingsAction.UpdateFromWeb)
             }
@@ -287,6 +307,13 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
             }
             item { OtherCard(uiState.otherSettings, onAction) }
             item { CardCredits() }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                CardButton(
+                    onClick = { showUpdateChecker = true },
+                    text = stringResource(R.string.update_check_button),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }

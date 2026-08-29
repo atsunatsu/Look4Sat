@@ -31,6 +31,7 @@ interface IMainContainer {
     val satelliteRepo: ISatelliteRepo
     val databaseRepo: IDatabaseRepo
     val amSatRepo: IAmSatRepository
+    val updateRepo: IUpdateRepository
     val radioTrackingService: IRadioTrackingService
     val mutualPassData: StateFlow<MutualPassData>
     fun setMutualPassData(data: MutualPassData)

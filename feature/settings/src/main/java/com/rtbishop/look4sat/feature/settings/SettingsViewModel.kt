@@ -17,6 +17,7 @@
  */
 package com.rtbishop.look4sat.feature.settings
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -24,16 +25,21 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rtbishop.look4sat.core.domain.repository.IDatabaseRepo
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
+import com.rtbishop.look4sat.core.domain.repository.IUpdateRepository
 import com.rtbishop.look4sat.core.domain.usecase.IShowToast
+import com.rtbishop.look4sat.core.domain.utility.VersionComparator
 import com.rtbishop.look4sat.core.presentation.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 class SettingsViewModel(
     private val databaseRepo: IDatabaseRepo,
     private val settingsRepo: ISettingsRepo,
+    private val updateRepo: IUpdateRepository,
+    private val apkFile: File,
     private val showToast: IShowToast
 ) : ViewModel() {
 
@@ -47,7 +53,8 @@ class SettingsViewModel(
             otherSettings = settingsRepo.otherSettings.value,
             rcSettings = settingsRepo.rcSettings.value,
             radioControlSettings = settingsRepo.radioControlSettings.value,
-            dataSourcesSettings = settingsRepo.dataSourcesSettings.value
+            dataSourcesSettings = settingsRepo.dataSourcesSettings.value,
+            dataSourcesStatus = settingsRepo.dataSourcesStatus.value
         )
     )
 
@@ -91,6 +98,11 @@ class SettingsViewModel(
             }
         }
         viewModelScope.launch {
+            settingsRepo.dataSourcesStatus.collect { status ->
+                _uiState.update { it.copy(dataSourcesStatus = status) }
+            }
+        }
+        viewModelScope.launch {
             settingsRepo.radioControlSettings.collect { settings ->
                 _uiState.update { it.copy(radioControlSettings = settings) }
             }
@@ -125,10 +137,58 @@ class SettingsViewModel(
             is SettingsAction.UpdateRC -> settingsRepo.updateRCSettings(action.settings)
             is SettingsAction.UpdateRadioControl -> settingsRepo.updateRadioControlSettings(action.settings)
             is SettingsAction.UpdateDataSources -> settingsRepo.updateDataSourcesSettings(action.settings)
+            // Update checker
+            SettingsAction.CheckForUpdate -> checkForUpdate()
+            SettingsAction.DownloadUpdate -> downloadUpdate()
+            SettingsAction.ConsumeDownloadedApk -> consumeDownloadedApk()
             // System
             is SettingsAction.ShowToast -> showToast(action.message)
         }
     }
+
+    // region Update checker
+
+    private fun checkForUpdate() {
+        _uiState.update { it.copy(updateChecker = it.updateChecker.copy(isChecking = true, errorResId = null)) }
+        viewModelScope.launch {
+            val release = updateRepo.getLatestRelease()
+            val hasUpdate = release != null &&
+                VersionComparator.isNewer(release.versionTag, settingsRepo.appVersionName)
+            _uiState.update {
+                it.copy(
+                    updateChecker = it.updateChecker.copy(
+                        isChecking = false,
+                        release = release,
+                        hasUpdate = hasUpdate,
+                        errorResId = if (release == null) R.string.update_check_error else null
+                    )
+                )
+            }
+        }
+    }
+
+    private fun downloadUpdate() {
+        val url = _uiState.value.updateChecker.release?.apkUrl ?: return
+        _uiState.update { it.copy(updateChecker = it.updateChecker.copy(isDownloading = true, errorResId = null)) }
+        viewModelScope.launch {
+            val success = updateRepo.downloadApk(url, apkFile)
+            _uiState.update {
+                it.copy(
+                    updateChecker = it.updateChecker.copy(
+                        isDownloading = false,
+                        apkFile = if (success) apkFile else null,
+                        errorResId = if (success) null else R.string.update_check_download_error
+                    )
+                )
+            }
+        }
+    }
+
+    private fun consumeDownloadedApk() {
+        _uiState.update { it.copy(updateChecker = it.updateChecker.copy(apkFile = null)) }
+    }
+
+    // endregion
 
     // region Position helpers — consolidated from 3 near-identical functions
 
@@ -201,11 +261,13 @@ class SettingsViewModel(
 
     companion object {
 
-        fun factory(container: IMainContainer) = viewModelFactory {
+        fun factory(container: IMainContainer, context: Context) = viewModelFactory {
             initializer {
                 SettingsViewModel(
                     databaseRepo = container.databaseRepo,
                     settingsRepo = container.settingsRepo,
+                    updateRepo = container.updateRepo,
+                    apkFile = File(context.cacheDir, "look4sat-update.apk"),
                     showToast = container.provideShowToast()
                 )
             }

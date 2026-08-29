@@ -286,5 +286,17 @@
     <string name="mutual_open_radar">Open Radar</string>
     <string name="mutual_station_a">Station A</string>
     <string name="mutual_station_b">Station B</string>
+    <string name="update_check_title">Check for updates</string>
+    <string name="update_check_button">Check for updates</string>
+    <string name="update_check_current">Current version: %s</string>
+    <string name="update_check_latest">Latest version: %s</string>
+    <string name="update_check_up_to_date">You are up to date</string>
+    <string name="update_check_available">New version available</string>
+    <string name="update_check_release_notes">Release notes</string>
+    <string name="update_check_download">Download &amp; install</string>
+    <string name="update_check_downloading">Downloading…</string>
+    <string name="update_check_error">Failed to check for updates. Check your connection.</string>
+    <string name="update_check_download_error">Download failed. Try again.</string>
+    <string name="update_check_no_apk">No APK attached to this release.</string>
 
 </resources>

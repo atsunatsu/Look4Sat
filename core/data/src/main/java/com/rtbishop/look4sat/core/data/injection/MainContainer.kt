@@ -35,6 +35,7 @@ import com.rtbishop.look4sat.core.data.repository.SatelliteRepo
 import com.rtbishop.look4sat.core.data.repository.SelectionRepo
 import com.rtbishop.look4sat.core.data.repository.SensorsRepo
 import com.rtbishop.look4sat.core.data.repository.SettingsRepo
+import com.rtbishop.look4sat.core.data.repository.UpdateRepository
 import com.rtbishop.look4sat.core.data.source.LocalSource
 import com.rtbishop.look4sat.core.data.source.RemoteSource
 import com.rtbishop.look4sat.core.data.usecase.AddToCalendar
@@ -79,6 +80,7 @@ class MainContainer(private val context: Context) : IMainContainer {
     override val satelliteRepo = provideSatelliteRepo()
     override val databaseRepo = provideDatabaseRepo()
     override val amSatRepo by lazy { AmSatRepository(remoteSource, appScope) }
+    override val updateRepo by lazy { UpdateRepository(remoteSource) }
     override val radioTrackingService: IRadioTrackingService by lazy {
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         RadioTrackingService(appScope, manager, satelliteRepo, settingsRepo)

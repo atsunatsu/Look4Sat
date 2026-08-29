@@ -251,5 +251,17 @@
     <string name="mutual_open_radar">查看雷达</string>
     <string name="mutual_station_a">站点A</string>
     <string name="mutual_station_b">站点B</string>
+    <string name="update_check_title">检查更新</string>
+    <string name="update_check_button">检查更新</string>
+    <string name="update_check_current">当前版本：%s</string>
+    <string name="update_check_latest">最新版本：%s</string>
+    <string name="update_check_up_to_date">已是最新版本</string>
+    <string name="update_check_available">发现新版本</string>
+    <string name="update_check_release_notes">更新内容</string>
+    <string name="update_check_download">下载并安装</string>
+    <string name="update_check_downloading">正在下载…</string>
+    <string name="update_check_error">检查更新失败，请检查网络连接。</string>
+    <string name="update_check_download_error">下载失败，请重试。</string>
+    <string name="update_check_no_apk">该版本未附带 APK 安装包。</string>
 
 </resources>
