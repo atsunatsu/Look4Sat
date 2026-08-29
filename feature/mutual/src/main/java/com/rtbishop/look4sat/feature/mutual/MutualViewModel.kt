@@ -26,6 +26,9 @@ import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
 import com.rtbishop.look4sat.core.domain.repository.ISatelliteRepo
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
+import com.rtbishop.look4sat.core.domain.utility.positionToQth
+import com.rtbishop.look4sat.core.domain.utility.qthToPosition
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +37,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
-import kotlin.math.floor
 import kotlin.math.roundToInt
 
 data class MutualUiState(
@@ -56,7 +58,10 @@ data class MutualUiState(
 
 class MutualViewModel(
     private val satelliteRepo: ISatelliteRepo,
-    private val settingsRepo: ISettingsRepo
+    private val settingsRepo: ISettingsRepo,
+    // Injected so unit tests can run the pass computation on a test dispatcher;
+    // production callers keep the CPU-bound pool default.
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MutualUiState())
@@ -66,7 +71,7 @@ class MutualViewModel(
         // Pre-fill station A with the user's current station position (as grid),
         // and default min elevation to the same value used by the main radar passes
         val pos = settingsRepo.stationPosition.value
-        val grid = latLonToGrid(pos.latitude, pos.longitude)
+        val grid = positionToQth(pos.latitude, pos.longitude) ?: ""
         _uiState.update { it.copy(
             stationAGrid = grid,
             stationALat = "%.4f".format(pos.latitude),
@@ -81,7 +86,9 @@ class MutualViewModel(
         val lat = value.toDoubleOrNull()
         val lon = _uiState.value.stationALon.toDoubleOrNull()
         if (lat != null && lon != null) {
-            _uiState.update { it.copy(stationAGrid = latLonToGrid(lat, lon)) }
+            positionToQth(lat, lon)?.let { grid ->
+                _uiState.update { it.copy(stationAGrid = grid) }
+            }
         }
     }
 
@@ -90,15 +97,18 @@ class MutualViewModel(
         val lat = _uiState.value.stationALat.toDoubleOrNull()
         val lon = value.toDoubleOrNull()
         if (lat != null && lon != null) {
-            _uiState.update { it.copy(stationAGrid = latLonToGrid(lat, lon)) }
+            positionToQth(lat, lon)?.let { grid ->
+                _uiState.update { it.copy(stationAGrid = grid) }
+            }
         }
     }
 
     fun onStationAGrid(value: String) {
         val old = _uiState.value.stationAGrid
-        _uiState.update { it.copy(stationAGrid = value) }
-        if (value.trim().uppercase() == old.trim().uppercase()) return
-        val pos = gridToLatLon(value.trim().uppercase())
+        val newGrid = value.trim().uppercase()
+        _uiState.update { it.copy(stationAGrid = newGrid) }
+        if (newGrid == old.trim().uppercase()) return
+        val pos = qthToPosition(newGrid)
         if (pos != null) {
             _uiState.update { it.copy(
                 stationALat = "%.4f".format(pos.latitude),
@@ -112,7 +122,9 @@ class MutualViewModel(
         val lat = value.toDoubleOrNull()
         val lon = _uiState.value.stationBLon.toDoubleOrNull()
         if (lat != null && lon != null) {
-            _uiState.update { it.copy(stationBGrid = latLonToGrid(lat, lon)) }
+            positionToQth(lat, lon)?.let { grid ->
+                _uiState.update { it.copy(stationBGrid = grid) }
+            }
         }
     }
 
@@ -121,15 +133,18 @@ class MutualViewModel(
         val lat = _uiState.value.stationBLat.toDoubleOrNull()
         val lon = value.toDoubleOrNull()
         if (lat != null && lon != null) {
-            _uiState.update { it.copy(stationBGrid = latLonToGrid(lat, lon)) }
+            positionToQth(lat, lon)?.let { grid ->
+                _uiState.update { it.copy(stationBGrid = grid) }
+            }
         }
     }
 
     fun onStationBGrid(value: String) {
         val old = _uiState.value.stationBGrid
-        _uiState.update { it.copy(stationBGrid = value) }
-        if (value.trim().uppercase() == old.trim().uppercase()) return
-        val pos = gridToLatLon(value.trim().uppercase())
+        val newGrid = value.trim().uppercase()
+        _uiState.update { it.copy(stationBGrid = newGrid) }
+        if (newGrid == old.trim().uppercase()) return
+        val pos = qthToPosition(newGrid)
         if (pos != null) {
             _uiState.update { it.copy(
                 stationBLat = "%.4f".format(pos.latitude),
@@ -144,7 +159,7 @@ class MutualViewModel(
         _uiState.update { it.copy(
             stationALat = "%.4f".format(pos.latitude),
             stationALon = "%.4f".format(pos.longitude),
-            stationAGrid = latLonToGrid(pos.latitude, pos.longitude)
+            stationAGrid = positionToQth(pos.latitude, pos.longitude) ?: ""
         ) }
     }
     fun onHoursAhead(value: Int) = _uiState.update { it.copy(hoursAhead = value) }
@@ -184,7 +199,7 @@ class MutualViewModel(
             val minElevB = state.stationBMinElev
             val hours = state.hoursAhead
 
-            val results = withContext(Dispatchers.Default) {
+            val results = withContext(computeDispatcher) {
                 findMutualPasses(satellites, posA, posB, minElevA, minElevB, time, hours)
             }
 
@@ -213,81 +228,11 @@ class MutualViewModel(
     private fun resolvePosition(latText: String, lonText: String, gridText: String): GeoPos? {
         val trimmed = gridText.trim().uppercase()
         if (trimmed.length in listOf(4, 6, 8) && trimmed.all { it.isLetterOrDigit() }) {
-            return gridToLatLon(trimmed)
+            return qthToPosition(trimmed)
         }
         val lat = latText.toDoubleOrNull()
         val lon = lonText.toDoubleOrNull()
         return if (lat != null && lon != null) GeoPos(lat, lon) else null
-    }
-
-    /** Convert lat/lon to Maidenhead grid (6-char). */
-    private fun latLonToGrid(lat: Double, lon: Double): String {
-        var adjLon = (lon + 180.0) % 360.0
-        var adjLat = (lat + 90.0) % 180.0
-
-        val fieldLon = (adjLon / 20.0).toInt()
-        val fieldLat = (adjLat / 10.0).toInt()
-        adjLon -= fieldLon * 20.0
-        adjLat -= fieldLat * 10.0
-
-        val squareLon = (adjLon / 2.0).toInt()
-        val squareLat = (adjLat / 1.0).toInt()
-        adjLon -= squareLon * 2.0
-        adjLat -= squareLat * 1.0
-
-        val subLon = (adjLon * 60.0 / 5.0).toInt()
-        val subLat = (adjLat * 60.0 / 2.5).toInt()
-
-        return buildString {
-            append('A' + fieldLon)
-            append('A' + fieldLat)
-            append('0' + squareLon)
-            append('0' + squareLat)
-            append('A' + subLon)
-            append('A' + subLat)
-        }
-    }
-
-    /** Convert Maidenhead grid (4, 6, or 8 chars) to lat/lon center of the square. */
-    private fun gridToLatLon(grid: String): GeoPos? {
-        val g = grid.uppercase()
-        if (g.length < 4) return null
-        val lonField = (g[0] - 'A').toDouble() * 20.0
-        val latField = (g[1] - 'A').toDouble() * 10.0
-        if (lonField < 0 || lonField > 340 || latField < 0 || latField > 170) return null
-
-        val lonSquare = (g[2] - '0').toDouble() * 2.0
-        val latSquare = (g[3] - '0').toDouble() * 1.0
-        if (lonSquare < 0 || lonSquare > 18 || latSquare < 0 || latSquare > 9) return null
-
-        var lon = lonField + lonSquare
-        var lat = latField + latSquare
-
-        if (g.length >= 6) {
-            val lonSub = (g[4] - 'A').toDouble() * 5.0 / 60.0
-            val latSub = (g[5] - 'A').toDouble() * 2.5 / 60.0
-            if (lonSub < 0 || lonSub > 115.0 / 60.0 || latSub < 0 || latSub > 57.5 / 60.0) return null
-            lon += lonSub
-            lat += latSub
-
-            if (g.length >= 8) {
-                val lonExt = (g[6] - '0').toDouble() * 30.0 / 3600.0
-                val latExt = (g[7] - '0').toDouble() * 15.0 / 3600.0
-                if (lonExt < 0 || lonExt > 270.0 / 3600.0 || latExt < 0 || latExt > 135.0 / 3600.0) return null
-                lon += lonExt + 15.0 / 3600.0
-                lat += latExt + 7.5 / 3600.0
-            } else {
-                lon += 2.5 / 60.0
-                lat += 1.25 / 60.0
-            }
-        } else {
-            lon += 1.0
-            lat += 0.5
-        }
-
-        lon = lon - 180.0
-        lat = lat - 90.0
-        return GeoPos(lat, lon)
     }
 
     private fun findMutualPasses(
