@@ -79,6 +79,10 @@
     <string name="amsat_load_failed">Load failed - check network and retry</string>
     <string name="amsat_no_reports">No reports for this period</string>
     <string name="amsat_close">Close</string>
+    <string name="amsat_status_heard">Heard</string>
+    <string name="amsat_status_tlm_only">Telemetry Only</string>
+    <string name="amsat_status_not_heard">Not Heard</string>
+    <string name="amsat_status_crew_active">Crew Active</string>
 
     <!-- Radar screen -->
     <string name="radar_back">Back</string>
