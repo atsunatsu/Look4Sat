@@ -19,7 +19,9 @@ package com.rtbishop.look4sat.feature.settings
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +31,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -126,7 +132,8 @@ fun UpdateCheckerScreen(
                 !state.hasUpdate -> StatusRow(showSpinner = false, message = stringResource(R.string.update_check_up_to_date))
                 else -> ReleaseCard(
                     state = state,
-                    onDownload = onDownload
+                    onDownload = onDownload,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -155,12 +162,12 @@ private fun StatusRow(showSpinner: Boolean, message: String? = null) {
 }
 
 @Composable
-private fun ReleaseCard(state: UpdateCheckerState, onDownload: () -> Unit) {
+private fun ReleaseCard(state: UpdateCheckerState, onDownload: () -> Unit, modifier: Modifier = Modifier) {
     val release = state.release ?: return
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             Text(
@@ -183,11 +190,24 @@ private fun ReleaseCard(state: UpdateCheckerState, onDownload: () -> Unit) {
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp
                 )
-                Text(
-                    text = release.body,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(top = 4.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                        .verticalScroll(rememberScrollState())
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        text = release.body,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(10.dp))
             when {
