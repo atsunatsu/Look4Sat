@@ -199,11 +199,10 @@ class AmSatRepository(
     /** Build one SatStatus (3 days x 12 slots) per catalog satellite, slotting reports by age. */
     private fun buildStatuses(names: List<String>, reports: List<ApiReport>, nowSec: Long): List<SatStatus> {
         val byName = reports.groupBy { it.name }
-        val monthAbbr = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
         val utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
         val labels = (0 until 3).map { d ->
             utc.timeInMillis = (nowSec - d * 86400L) * 1000
-            "${monthAbbr[utc.get(Calendar.MONTH)]} ${utc.get(Calendar.DAY_OF_MONTH)}"
+            formatDayLabel(utc)
         }
         return names.map { name ->
             val slots = (0 until 36).map { slotIdx ->
@@ -225,6 +224,15 @@ class AmSatRepository(
                 SatDay(dateLabel = labels[d], slots = slots.subList(d * 12, (d + 1) * 12))
             }
             SatStatus(name = name, days = days)
+        }
+    }
+
+    private fun formatDayLabel(calendar: Calendar): String {
+        return if (Locale.getDefault().language == Locale.CHINESE.language) {
+            "${calendar.get(Calendar.MONTH) + 1}月${calendar.get(Calendar.DAY_OF_MONTH)}日"
+        } else {
+            val monthAbbr = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+            "${monthAbbr[calendar.get(Calendar.MONTH)]} ${calendar.get(Calendar.DAY_OF_MONTH)}"
         }
     }
 

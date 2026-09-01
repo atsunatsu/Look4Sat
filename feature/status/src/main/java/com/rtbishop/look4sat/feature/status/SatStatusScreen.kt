@@ -608,12 +608,16 @@ private fun formatFetchedAt(utcMs: Long): String {
     val cal = Calendar.getInstance()
     cal.timeInMillis = utcMs
     val day = cal.get(Calendar.DAY_OF_MONTH)
-    val month = MONTH_ABBR[cal.get(Calendar.MONTH)]
+    val monthIndex = cal.get(Calendar.MONTH)
     val year = cal.get(Calendar.YEAR)
     val hh = cal.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0')
     val mm = cal.get(Calendar.MINUTE).toString().padStart(2, '0')
     val ss = cal.get(Calendar.SECOND).toString().padStart(2, '0')
-    return "$day$month $year - $hh:$mm:$ss"
+    return if (Locale.getDefault().language == Locale.CHINESE.language) {
+        "${year}年${monthIndex + 1}月${day}日 - $hh:$mm:$ss"
+    } else {
+        "$day${MONTH_ABBR[monthIndex]} $year - $hh:$mm:$ss"
+    }
 }
 
 private fun formatUtcNowForUpload(utcMs: Long): String {
