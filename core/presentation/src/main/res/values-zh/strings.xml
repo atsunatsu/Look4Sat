@@ -30,6 +30,26 @@
     <string name="amsat_status_tlm_only">仅遥测</string>
     <string name="amsat_status_not_heard">未听到</string>
     <string name="amsat_status_crew_active">乘组活跃</string>
+    <string name="amsat_upload">上传</string>
+    <string name="amsat_upload_back">返回</string>
+    <string name="amsat_upload_report">上传报告到 AMSAT</string>
+    <string name="amsat_upload_status">状态</string>
+    <string name="amsat_upload_callsign">呼号</string>
+    <string name="amsat_upload_grid">网格</string>
+    <string name="amsat_upload_time_now">时间：当前 UTC %s</string>
+    <string name="amsat_upload_submit">提交到 AMSAT</string>
+    <string name="amsat_upload_confirm">确认上传</string>
+    <string name="amsat_upload_confirm_title">确认上传到 AMSAT</string>
+    <string name="amsat_upload_confirm_message">这条公开报告将上传到 AMSAT。\n卫星：%1$s\n状态：%2$s\n呼号：%3$s\n网格：%4$s</string>
+    <string name="amsat_upload_grid_none">未填写</string>
+    <string name="amsat_upload_success">报告已上传</string>
+    <string name="amsat_upload_failed">上传失败：%s</string>
+    <string name="amsat_upload_callsign_required">请填写呼号</string>
+    <string name="amsat_upload_grid_invalid">网格应为 4 或 6 位 Maidenhead 定位符</string>
+    <string name="amsat_upload_active">活跃</string>
+    <string name="amsat_upload_tlm">遥测/信标</string>
+    <string name="amsat_upload_not_heard">未听到</string>
+    <string name="amsat_upload_crew_active">ISS 语音</string>
 
     <!-- Satellites screen -->
     <string name="sat_type_hint">模式：%s</string>

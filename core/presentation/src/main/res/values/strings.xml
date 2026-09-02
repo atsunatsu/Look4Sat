@@ -83,6 +83,26 @@
     <string name="amsat_status_tlm_only">Telemetry Only</string>
     <string name="amsat_status_not_heard">Not Heard</string>
     <string name="amsat_status_crew_active">Crew Active</string>
+    <string name="amsat_upload">Upload</string>
+    <string name="amsat_upload_back">Back</string>
+    <string name="amsat_upload_report">Upload report to AMSAT</string>
+    <string name="amsat_upload_status">Status</string>
+    <string name="amsat_upload_callsign">Callsign</string>
+    <string name="amsat_upload_grid">Grid</string>
+    <string name="amsat_upload_time_now">Time: current UTC %s</string>
+    <string name="amsat_upload_submit">Submit to AMSAT</string>
+    <string name="amsat_upload_confirm">Upload</string>
+    <string name="amsat_upload_confirm_title">Confirm AMSAT upload</string>
+    <string name="amsat_upload_confirm_message">This public report will be uploaded to AMSAT.\nSatellite: %1$s\nStatus: %2$s\nCallsign: %3$s\nGrid: %4$s</string>
+    <string name="amsat_upload_grid_none">Not provided</string>
+    <string name="amsat_upload_success">Report uploaded</string>
+    <string name="amsat_upload_failed">Upload failed: %s</string>
+    <string name="amsat_upload_callsign_required">Callsign is required</string>
+    <string name="amsat_upload_grid_invalid">Grid must be a 4 or 6 character Maidenhead locator</string>
+    <string name="amsat_upload_active">Active</string>
+    <string name="amsat_upload_tlm">TLM/Beacon</string>
+    <string name="amsat_upload_not_heard">Not Heard</string>
+    <string name="amsat_upload_crew_active">Crew Active</string>
 
     <!-- Radar screen -->
     <string name="radar_back">Back</string>
