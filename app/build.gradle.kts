@@ -1,6 +1,18 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.convention.applicationPlugin)
 }
+
+// Release signing credentials live in local.properties (gitignored) or
+// environment variables — never hardcode passwords in VCS.
+val releaseProps = Properties().apply {
+    val propsFile = rootProject.file("local.properties")
+    if (propsFile.exists()) FileInputStream(propsFile).use { load(it) }
+}
+fun releaseCred(name: String): String =
+    releaseProps.getProperty(name) ?: System.getenv(name) ?: ""
 
 android {
     namespace = libs.versions.packageName.get()
@@ -11,9 +23,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file(System.getProperty("user.home") + "/my-release-key.jks")
-            storePassword = "look4sat123"
-            keyAlias = "look4sat"
-            keyPassword = "look4sat123"
+            storePassword = releaseCred("RELEASE_STORE_PASSWORD")
+            keyAlias = releaseCred("RELEASE_KEY_ALIAS").ifEmpty { "look4sat" }
+            keyPassword = releaseCred("RELEASE_KEY_PASSWORD")
         }
     }
     buildTypes {
