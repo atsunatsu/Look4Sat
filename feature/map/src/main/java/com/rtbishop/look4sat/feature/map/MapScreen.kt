@@ -173,7 +173,9 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
                     view.invalidate()
                 }
                 uiState.mapData?.let { mapData ->
-                    if (isVertical) MapDataCard(mapData) else MapDataCards(mapData)
+                    if (!uiState.isGridMode) {
+                        if (isVertical) MapDataCard(mapData) else MapDataCards(mapData)
+                    }
                 }
             }
         }

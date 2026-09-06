@@ -84,6 +84,7 @@ class MaidenheadGridOverlay : Overlay() {
         // crosses the antimeridian; index arithmetic still works (PMxx at 360° == same grid)
         val firstCol = floor(leftLon / cellLon).toInt()
         val lastCol = ceil(rightLon / cellLon).toInt()
+        val centerLon = (leftLon + rightLon) / 2.0
 
         // Worked-grid highlight fills (only meaningful at sub-square zoom)
         if (workedGrids.isNotEmpty() && zoom >= GRID_ZOOM_SUB) {
@@ -97,8 +98,8 @@ class MaidenheadGridOverlay : Overlay() {
                 if (yTop == null || yBottom == null) continue
                 for (col in firstCol..lastCol) {
                     val lon = col * cellLon
-                    val xLeft = projectionToX(projection, lon) ?: continue
-                    val xRight = projectionToX(projection, lon + cellLon) ?: continue
+                    val xLeft = projectionToX(projection, lon, centerLon) ?: continue
+                    val xRight = projectionToX(projection, lon + cellLon, centerLon) ?: continue
                     if (xRight < 0f || xLeft > canvas.width) continue
                     if (cellLabel(lat, lon, zoom) in workedGrids) {
                         canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
@@ -110,7 +111,7 @@ class MaidenheadGridOverlay : Overlay() {
         // Vertical lines (meridians)
         for (col in firstCol..lastCol) {
             val lon = col * cellLon
-            val x = projectionToX(projection, lon)
+            val x = projectionToX(projection, lon, centerLon)
             if (x == null) continue
             canvas.drawLine(x, 0f, x, canvas.height.toFloat(), linePaint)
         }
@@ -149,7 +150,7 @@ class MaidenheadGridOverlay : Overlay() {
             if (y < -labelPaint.textSize || y > canvas.height) continue
             for (col in firstCol..lastCol) {
                 val lon = col * cellLon
-                val x = projectionToX(projection, lon) ?: continue
+                val x = projectionToX(projection, lon, centerLon) ?: continue
                 if (x < -200f || x > canvas.width) continue
                 val label = cellLabel(lat, lon, zoom)
                 canvas.drawText(label, x + labelOffset, y + labelPaint.textSize + labelOffset, labelPaint)
@@ -158,8 +159,16 @@ class MaidenheadGridOverlay : Overlay() {
     }
 
     /** X pixel for a longitude (meridians are vertical in Web Mercator). */
-    private fun projectionToX(projection: Projection, lon: Double): Float? {
-        val geo = org.osmdroid.util.GeoPoint(0.0, lon)
+    private fun projectionToX(projection: Projection, lon: Double, centerLon: Double): Float? {
+        // osmdroid clips Mercator X to [0, mapSize], which destroys the projection of
+        // longitudes outside the [0, 360) window of the current view (visible at low
+        // zoom where the whole world is narrower than the viewport). Normalizing the
+        // longitude to the equivalent value closest to the view center keeps every
+        // meridian's X near the center, safely inside the clip window.
+        var normalized = lon
+        while (normalized < centerLon - 180.0) normalized += 360.0
+        while (normalized > centerLon + 180.0) normalized -= 360.0
+        val geo = org.osmdroid.util.GeoPoint(0.0, normalized)
         val p = projection.toPixels(geo, null)
         return if (p.x in -MAX_OVERSHOOT_PX..MAX_OVERSHOOT_PX + 4096) p.x.toFloat() else null
     }
