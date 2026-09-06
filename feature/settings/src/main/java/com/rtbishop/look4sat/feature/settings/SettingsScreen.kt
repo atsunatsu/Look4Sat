@@ -63,6 +63,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rtbishop.look4sat.core.domain.model.DataSourcesSettings
 import com.rtbishop.look4sat.core.domain.model.OtherSettings
+import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
+import com.rtbishop.look4sat.core.domain.model.WavelogSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.repository.IContainerProvider
 import com.rtbishop.look4sat.core.presentation.CardButton
@@ -201,6 +203,17 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
             onSave = { onAction(SettingsAction.UpdateRadioControl(it)) }
         )
     }
+    if (dialogs.wavelog) {
+        WavelogDialog(
+            initialSettings = uiState.wavelogSettings,
+            workedGridsCount = uiState.workedGridsCount,
+            isSyncing = uiState.wavelogSyncing,
+            message = uiState.wavelogMessage,
+            dismiss = { dialogs.wavelog = false },
+            onSave = { onAction(SettingsAction.UpdateWavelog(it)) },
+            onSync = { onAction(SettingsAction.SyncWorkedGrids) }
+        )
+    }
 
     // URLs for top bar
     val uriHandler = LocalUriHandler.current
@@ -303,6 +316,13 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
                     onNetworkClick = permissions.launchNetwork,
                     onBluetoothClick = permissions.launchBluetooth,
                     onRadioControlClick = { dialogs.radioControl = true }
+                )
+            }
+            item {
+                WavelogCard(
+                    settings = uiState.wavelogSettings,
+                    workedGridsCount = uiState.workedGridsCount,
+                    showWavelogDialog = { dialogs.wavelog = true }
                 )
             }
             item { OtherCard(uiState.otherSettings, onAction) }
@@ -489,6 +509,7 @@ private fun OtherCardPreview() = MainTheme {
         stateOfUtc = false,
         stateOfLightTheme = false,
         stateOfNightMode = false,
+        stateOfMapGrid = false,
         shouldSeeWarning = false,
         shouldSeeWhatsNew = false
     )
@@ -500,7 +521,7 @@ private fun OtherCard(settings: OtherSettings, onAction: (SettingsAction) -> Uni
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .height(268.dp)
+            .height(312.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
             Text(
@@ -522,6 +543,9 @@ private fun OtherCard(settings: OtherSettings, onAction: (SettingsAction) -> Uni
             SwitchRow(R.string.prefs_other_switch_night_mode, settings.stateOfNightMode) {
                 onAction(SettingsAction.ToggleNightMode(it))
             }
+            SwitchRow(R.string.prefs_other_switch_map_grid, settings.stateOfMapGrid) {
+                onAction(SettingsAction.ToggleMapGrid(it))
+            }
         }
     }
 }
@@ -535,6 +559,44 @@ private fun SwitchRow(labelResId: Int, checked: Boolean, onCheckedChange: (Boole
     ) {
         Text(text = stringResource(id = labelResId))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun WavelogCardPreview() = MainTheme {
+    WavelogCard(settings = WavelogSettings("http://192.168.1.10", "wl2_demo"), workedGridsCount = 42) {}
+}
+
+@Composable
+private fun WavelogCard(
+    settings: WavelogSettings,
+    workedGridsCount: Int,
+    showWavelogDialog: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Text(
+                text = stringResource(id = R.string.prefs_wavelog_title),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = if (settings.isConfigured) {
+                    stringResource(R.string.prefs_wavelog_configured, workedGridsCount)
+                } else {
+                    stringResource(R.string.prefs_wavelog_not_configured)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            CardButton(
+                onClick = showWavelogDialog,
+                text = stringResource(id = R.string.prefs_wavelog_configure),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -657,6 +719,7 @@ private class DialogVisibility {
     var network by mutableStateOf(false)
     var bluetooth by mutableStateOf(false)
     var radioControl by mutableStateOf(false)
+    var wavelog by mutableStateOf(false)
 }
 
 @Composable
@@ -664,12 +727,12 @@ private fun rememberDialogVisibility(): DialogVisibility {
     return rememberSaveable(saver = run {
         androidx.compose.runtime.saveable.Saver(
             save = {
-                listOf(it.position, it.locator, it.dataSources, it.network, it.bluetooth, it.radioControl)
+                listOf(it.position, it.locator, it.dataSources, it.network, it.bluetooth, it.radioControl, it.wavelog)
             },
             restore = {
                 DialogVisibility().apply {
                     position = it[0]; locator = it[1]; dataSources = it[2]
-                    network = it[3]; bluetooth = it[4]; radioControl = it[5]
+                    network = it[3]; bluetooth = it[4]; radioControl = it[5]; wavelog = it[6]
                 }
             }
         )

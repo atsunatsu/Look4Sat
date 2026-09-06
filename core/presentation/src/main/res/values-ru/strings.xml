@@ -149,6 +149,7 @@
     <string name="prefs_other_switch_sweep">Показывать анимацию радара</string>
     <string name="prefs_other_switch_sensors">Использовать сенсоры устройства</string>
     <string name="prefs_other_switch_night_mode">Включить красный ночной фильтр</string>
+    <string name="prefs_other_switch_map_grid">Показывать сетку Maidenhead на карте</string>
 
     <string name="prefs_highlight_title">Подсветка высоты</string>
     <string name="prefs_highlight_low">Низко &lt; %1$d°</string>

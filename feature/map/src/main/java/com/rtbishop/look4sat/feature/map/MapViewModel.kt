@@ -74,7 +74,12 @@ class MapViewModel(
     init {
         viewModelScope.launch {
             settingsRepo.otherSettings.collectLatest { settings ->
-                _uiState.update { it.copy(isUtc = settings.stateOfUtc) }
+                _uiState.update { it.copy(isUtc = settings.stateOfUtc, isGridMode = settings.stateOfMapGrid) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepo.wavelogSettings.collectLatest { _ ->
+                _uiState.update { it.copy(workedGrids = settingsRepo.getWorkedGrids()) }
             }
         }
         val (selectedCatNum, _) = satelliteRepo.selectedPass.value

@@ -192,6 +192,7 @@
     <string name="prefs_other_switch_sweep">Radar taramasını etkinleştir</string>
     <string name="prefs_other_switch_sensors">Radar görünümünü döndürmek için sensörleri kullan</string>
     <string name="prefs_other_switch_night_mode">Kırmızı gece filtresini etkinleştir</string>
+    <string name="prefs_other_switch_map_grid">Haritada Maidenhead ızgarasını göster</string>
 
     <string name="prefs_highlight_title">Elevasyon vurgusu</string>
     <string name="prefs_highlight_low">Düşük &lt; %1$d°</string>

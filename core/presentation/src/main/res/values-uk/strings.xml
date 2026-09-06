@@ -150,6 +150,7 @@
     <string name="prefs_other_switch_sweep">Показувати анімацію радара</string>
     <string name="prefs_other_switch_sensors">Використовувати сенсори пристрою</string>
     <string name="prefs_other_switch_night_mode">Увімкнути червоний нічний фільтр</string>
+    <string name="prefs_other_switch_map_grid">Показувати сітку Maidenhead на мапі</string>
 
     <string name="prefs_highlight_title">Підсвічування висоти</string>
     <string name="prefs_highlight_low">Низько &lt; %1$d°</string>

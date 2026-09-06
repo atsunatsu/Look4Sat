@@ -150,6 +150,7 @@
     <string name="prefs_other_switch_sweep">Habilitar animaciones radar</string>
     <string name="prefs_other_switch_sensors">Usar sensores para rotar vista de radar</string>
     <string name="prefs_other_switch_night_mode">Activar filtro nocturno rojo</string>
+    <string name="prefs_other_switch_map_grid">Mostrar cuadrícula Maidenhead en el mapa</string>
 
     <string name="prefs_highlight_title">Resaltado de elevación</string>
     <string name="prefs_highlight_low">Baja &lt; %1$d°</string>

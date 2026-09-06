@@ -22,6 +22,7 @@ import com.rtbishop.look4sat.core.domain.model.LatestRelease
 import com.rtbishop.look4sat.core.domain.model.OtherSettings
 import com.rtbishop.look4sat.core.domain.model.RCSettings
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
+import com.rtbishop.look4sat.core.domain.model.WavelogSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import java.io.File
 
@@ -54,6 +55,10 @@ data class SettingsState(
     val radioControlSettings: RadioControlSettings,
     val dataSourcesSettings: DataSourcesSettings,
     val dataSourcesStatus: Map<String, Int> = emptyMap(),
+    val wavelogSettings: WavelogSettings = WavelogSettings(),
+    val workedGridsCount: Int = 0,
+    val wavelogSyncing: Boolean = false,
+    val wavelogMessage: String? = null,
     val updateChecker: UpdateCheckerState = UpdateCheckerState()
 )
 
@@ -77,6 +82,7 @@ sealed interface SettingsAction {
     data class ToggleSensor(val value: Boolean) : SettingsAction
     data class ToggleLightTheme(val value: Boolean) : SettingsAction
     data class ToggleNightMode(val value: Boolean) : SettingsAction
+    data class ToggleMapGrid(val value: Boolean) : SettingsAction
 
     // Remote control
     data class UpdateRC(val settings: RCSettings) : SettingsAction
@@ -84,6 +90,10 @@ sealed interface SettingsAction {
 
     // Data sources
     data class UpdateDataSources(val settings: DataSourcesSettings) : SettingsAction
+
+    // Wavelog worked grids
+    data class UpdateWavelog(val settings: WavelogSettings) : SettingsAction
+    data object SyncWorkedGrids : SettingsAction
 
     // Update checker
     data object CheckForUpdate : SettingsAction

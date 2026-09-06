@@ -26,6 +26,7 @@ import com.rtbishop.look4sat.core.domain.repository.IDatabaseRepo
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.repository.IUpdateRepository
+import com.rtbishop.look4sat.core.domain.repository.IWavelogRepository
 import com.rtbishop.look4sat.core.domain.usecase.IShowToast
 import com.rtbishop.look4sat.core.domain.utility.VersionComparator
 import com.rtbishop.look4sat.core.presentation.R
@@ -39,6 +40,7 @@ class SettingsViewModel(
     private val databaseRepo: IDatabaseRepo,
     private val settingsRepo: ISettingsRepo,
     private val updateRepo: IUpdateRepository,
+    private val wavelogRepo: IWavelogRepository,
     private val apkFile: File,
     private val showToast: IShowToast
 ) : ViewModel() {
@@ -54,7 +56,9 @@ class SettingsViewModel(
             rcSettings = settingsRepo.rcSettings.value,
             radioControlSettings = settingsRepo.radioControlSettings.value,
             dataSourcesSettings = settingsRepo.dataSourcesSettings.value,
-            dataSourcesStatus = settingsRepo.dataSourcesStatus.value
+            dataSourcesStatus = settingsRepo.dataSourcesStatus.value,
+            wavelogSettings = settingsRepo.wavelogSettings.value,
+            workedGridsCount = settingsRepo.getWorkedGrids().size
         )
     )
 
@@ -107,6 +111,11 @@ class SettingsViewModel(
                 _uiState.update { it.copy(radioControlSettings = settings) }
             }
         }
+        viewModelScope.launch {
+            settingsRepo.wavelogSettings.collect { settings ->
+                _uiState.update { it.copy(wavelogSettings = settings) }
+            }
+        }
     }
 
 
@@ -133,10 +142,14 @@ class SettingsViewModel(
             is SettingsAction.ToggleSensor -> settingsRepo.updateOtherSettings { it.copy(stateOfSensors = action.value) }
             is SettingsAction.ToggleLightTheme -> settingsRepo.updateOtherSettings { it.copy(stateOfLightTheme = action.value) }
             is SettingsAction.ToggleNightMode -> settingsRepo.updateOtherSettings { it.copy(stateOfNightMode = action.value) }
+            is SettingsAction.ToggleMapGrid -> settingsRepo.updateOtherSettings { it.copy(stateOfMapGrid = action.value) }
             // Remote control & data sources
             is SettingsAction.UpdateRC -> settingsRepo.updateRCSettings(action.settings)
             is SettingsAction.UpdateRadioControl -> settingsRepo.updateRadioControlSettings(action.settings)
             is SettingsAction.UpdateDataSources -> settingsRepo.updateDataSourcesSettings(action.settings)
+            // Wavelog worked grids
+            is SettingsAction.UpdateWavelog -> settingsRepo.updateWavelogSettings(action.settings)
+            SettingsAction.SyncWorkedGrids -> syncWorkedGrids()
             // Update checker
             SettingsAction.CheckForUpdate -> checkForUpdate()
             SettingsAction.DownloadUpdate -> downloadUpdate()
@@ -145,6 +158,30 @@ class SettingsViewModel(
             is SettingsAction.ShowToast -> showToast(action.message)
         }
     }
+
+    // region Wavelog worked grids
+
+    private fun syncWorkedGrids() {
+        val settings = _uiState.value.wavelogSettings
+        if (!settings.isConfigured) {
+            _uiState.update { it.copy(wavelogMessage = "Wavelog URL/token not configured") }
+            return
+        }
+        _uiState.update { it.copy(wavelogSyncing = true, wavelogMessage = null) }
+        viewModelScope.launch {
+            val grids = wavelogRepo.fetchWorkedGrids(settings.url, settings.token)
+            _uiState.update {
+                if (grids != null) {
+                    settingsRepo.setWorkedGrids(grids)
+                    it.copy(wavelogSyncing = false, workedGridsCount = grids.size, wavelogMessage = null)
+                } else {
+                    it.copy(wavelogSyncing = false, wavelogMessage = "Sync failed — check URL/token/network")
+                }
+            }
+        }
+    }
+
+    // endregion
 
     // region Update checker
 
@@ -267,6 +304,7 @@ class SettingsViewModel(
                     databaseRepo = container.databaseRepo,
                     settingsRepo = container.settingsRepo,
                     updateRepo = container.updateRepo,
+                    wavelogRepo = container.wavelogRepo,
                     apkFile = File(context.cacheDir, "look4sat-update.apk"),
                     showToast = container.provideShowToast()
                 )

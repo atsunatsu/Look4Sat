@@ -36,6 +36,7 @@ import com.rtbishop.look4sat.core.data.repository.SelectionRepo
 import com.rtbishop.look4sat.core.data.repository.SensorsRepo
 import com.rtbishop.look4sat.core.data.repository.SettingsRepo
 import com.rtbishop.look4sat.core.data.repository.UpdateRepository
+import com.rtbishop.look4sat.core.data.repository.WavelogRepository
 import com.rtbishop.look4sat.core.data.source.LocalSource
 import com.rtbishop.look4sat.core.data.source.RemoteSource
 import com.rtbishop.look4sat.core.data.usecase.AddToCalendar
@@ -52,6 +53,7 @@ import com.rtbishop.look4sat.core.domain.repository.ISatelliteRepo
 import com.rtbishop.look4sat.core.domain.repository.ISelectionRepo
 import com.rtbishop.look4sat.core.domain.repository.ISensorsRepo
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
+import com.rtbishop.look4sat.core.domain.repository.IWavelogRepository
 import com.rtbishop.look4sat.core.domain.repository.MutualPassData
 import com.rtbishop.look4sat.core.domain.source.ILocalSource
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
@@ -81,6 +83,7 @@ class MainContainer(private val context: Context) : IMainContainer {
     override val databaseRepo = provideDatabaseRepo()
     override val amSatRepo by lazy { AmSatRepository(remoteSource, appScope) }
     override val updateRepo by lazy { UpdateRepository(remoteSource) }
+    override val wavelogRepo: IWavelogRepository by lazy { WavelogRepository() }
     override val radioTrackingService: IRadioTrackingService by lazy {
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         RadioTrackingService(appScope, manager, satelliteRepo, settingsRepo)

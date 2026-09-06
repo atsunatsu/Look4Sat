@@ -51,6 +51,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -151,6 +152,69 @@ fun LocatorDialog(qthLocator: String, dismiss: () -> Unit, save: (String) -> Uni
             label = { Text(text = stringResource(id = R.string.prefs_locator_text)) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large),
         )
+        Spacer(modifier = Modifier.height(0.dp))
+    }
+}
+
+@Composable
+fun WavelogDialog(
+    initialSettings: com.rtbishop.look4sat.core.domain.model.WavelogSettings,
+    workedGridsCount: Int,
+    isSyncing: Boolean,
+    message: String?,
+    dismiss: () -> Unit,
+    onSave: (com.rtbishop.look4sat.core.domain.model.WavelogSettings) -> Unit,
+    onSync: () -> Unit
+) {
+    val url = rememberSaveable { mutableStateOf(initialSettings.url) }
+    val token = rememberSaveable { mutableStateOf(initialSettings.token) }
+    SharedDialog(
+        title = stringResource(R.string.prefs_wavelog_title),
+        onCancel = dismiss,
+        onAccept = {
+            onSave(com.rtbishop.look4sat.core.domain.model.WavelogSettings(url.value, token.value))
+            dismiss()
+        }
+    ) {
+        OutlinedTextField(
+            value = url.value,
+            onValueChange = { url.value = it },
+            label = { Text(text = stringResource(id = R.string.prefs_wavelog_url)) },
+            placeholder = { Text(text = "http://192.168.1.10") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large),
+        )
+        OutlinedTextField(
+            value = token.value,
+            onValueChange = { token.value = it },
+            label = { Text(text = stringResource(id = R.string.prefs_wavelog_token)) },
+            placeholder = { Text(text = "wl2_...") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large),
+        )
+        Text(
+            text = stringResource(R.string.prefs_wavelog_hint, workedGridsCount),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
+        )
+        if (message != null) {
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
+            )
+        }
+        // Sync button row (inside dialog content so token must be saved first)
+        Row(
+            horizontalArrangement = Arrangement.End,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large)
+        ) {
+            TextButton(onClick = onSync, enabled = !isSyncing) {
+                Text(text = if (isSyncing) stringResource(R.string.prefs_wavelog_syncing)
+                else stringResource(R.string.prefs_wavelog_sync))
+            }
+        }
         Spacer(modifier = Modifier.height(0.dp))
     }
 }

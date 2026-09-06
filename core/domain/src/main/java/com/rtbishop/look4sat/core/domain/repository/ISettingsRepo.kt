@@ -23,6 +23,7 @@ import com.rtbishop.look4sat.core.domain.model.OtherSettings
 import com.rtbishop.look4sat.core.domain.model.PassesSettings
 import com.rtbishop.look4sat.core.domain.model.RCSettings
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
+import com.rtbishop.look4sat.core.domain.model.WavelogSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import kotlinx.coroutines.flow.StateFlow
 
@@ -91,5 +92,12 @@ interface ISettingsRepo {
     //region # AMSAT status report settings
     fun getAmSatCallsign(): String
     fun setAmSatCallsign(callsign: String)
+    //endregion
+
+    //region # Wavelog worked-grids settings
+    val wavelogSettings: StateFlow<WavelogSettings>
+    fun updateWavelogSettings(settings: WavelogSettings)
+    fun getWorkedGrids(): Set<String>
+    fun setWorkedGrids(grids: Set<String>)
     //endregion
 }

@@ -29,6 +29,7 @@ import com.rtbishop.look4sat.core.domain.model.OtherSettings
 import com.rtbishop.look4sat.core.domain.model.PassesSettings
 import com.rtbishop.look4sat.core.domain.model.RCSettings
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
+import com.rtbishop.look4sat.core.domain.model.WavelogSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.utility.positionToQth
@@ -81,6 +82,7 @@ class SettingsRepo(
     private val keyStateOfUtc = "stateOfUtc"
     private val keyStateOfLightTheme = "stateOfLightTheme"
     private val keyStateOfNightMode = "stateOfNightMode"
+    private val keyStateOfMapGrid = "stateOfMapGrid"
     private val keyStationAltitude = "stationAltitude"
     private val keyStationLatitude = "stationLatitude"
     private val keyStationLongitude = "stationLongitude"
@@ -137,7 +139,48 @@ class SettingsRepo(
     }
     //endregion
 
-    //region # Passes filter settings
+    //region # Wavelog worked-grids settings
+    private val keyWavelogUrl = "wavelogUrl"
+    private val keyWavelogToken = "wavelogToken"
+    private val keyWorkedGrids = "workedGrids"
+
+    private val _wavelogSettings = MutableStateFlow(getWavelogSettings())
+    override val wavelogSettings: StateFlow<WavelogSettings> = _wavelogSettings
+
+    override fun updateWavelogSettings(settings: WavelogSettings) {
+        preferences.edit {
+            putString(keyWavelogUrl, settings.url.trim())
+            putString(keyWavelogToken, settings.token.trim())
+        }
+        _wavelogSettings.value = settings.copy(url = settings.url.trim(), token = settings.token.trim())
+    }
+
+    private fun getWavelogSettings(): WavelogSettings = WavelogSettings(
+        url = preferences.getString(keyWavelogUrl, null).orEmpty(),
+        token = preferences.getString(keyWavelogToken, null).orEmpty()
+    )
+
+    override fun getWorkedGrids(): Set<String> {
+        val json = preferences.getString(keyWorkedGrids, null).orEmpty()
+        if (json.isBlank()) return emptySet()
+        return try {
+            val array = org.json.JSONArray(json)
+            (0 until array.length()).mapNotNull { i ->
+                array.optString(i).takeIf { it.isNotBlank() }
+            }.toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+
+    override fun setWorkedGrids(grids: Set<String>) {
+        val array = org.json.JSONArray()
+        grids.sorted().forEach { array.put(it) }
+        preferences.edit { putString(keyWorkedGrids, array.toString()) }
+    }
+    //endregion
+
+    //region # Transceivers settings
     private val _passesSettings = MutableStateFlow(getPassesSettings())
     override val passesSettings: StateFlow<PassesSettings> = _passesSettings
 
@@ -371,6 +414,7 @@ class SettingsRepo(
                 putBoolean(keyStateOfUtc, new.stateOfUtc)
                 putBoolean(keyStateOfLightTheme, new.stateOfLightTheme)
                 putBoolean(keyStateOfNightMode, new.stateOfNightMode)
+                putBoolean(keyStateOfMapGrid, new.stateOfMapGrid)
                 putBoolean(keyShouldSeeWarning, new.shouldSeeWarning)
                 putBoolean(keyShouldSeeWhatsNew, new.shouldSeeWhatsNew)
                 putString(keySstvMode, new.sstvMode)
@@ -388,6 +432,7 @@ class SettingsRepo(
         stateOfUtc = preferences.getBoolean(keyStateOfUtc, false),
         stateOfLightTheme = preferences.getBoolean(keyStateOfLightTheme, false),
         stateOfNightMode = preferences.getBoolean(keyStateOfNightMode, false),
+        stateOfMapGrid = preferences.getBoolean(keyStateOfMapGrid, false),
         shouldSeeWarning = preferences.getBoolean(keyShouldSeeWarning, true),
         shouldSeeWhatsNew = preferences.getBoolean(keyShouldSeeWhatsNew, true),
         sstvMode = preferences.getString(keySstvMode, null) ?: "Auto",

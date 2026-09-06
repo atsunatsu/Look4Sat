@@ -150,6 +150,7 @@
     <string name="prefs_other_switch_sweep">radar sweep සජීවිකරණය සබල කරන්න</string>
     <string name="prefs_other_switch_sensors">Radar දර්ශනය කරකැවීමට සංවේදක භාවිතා කරන්න </string>
     <string name="prefs_other_switch_night_mode">රතු රාත්‍රී පෙරහන සබල කරන්න</string>
+    <string name="prefs_other_switch_map_grid">සිතියමේ Maidenhead ජාලකය පෙන්වන්න</string>
 
     <string name="prefs_highlight_title">උස් උද්දීපනය</string>
     <string name="prefs_highlight_low">අඩු &lt; %1$d°</string>

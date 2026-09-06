@@ -80,14 +80,15 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 
 // Overlay indices
-private const val OVERLAY_STATION = 0
-private const val OVERLAY_TRACK = 1
-private const val OVERLAY_FOOTPRINT = 2
-private const val OVERLAY_POSITIONS = 3
-private const val OVERLAY_TERMINATOR = 4
-private const val OVERLAY_SUN = 5
-private const val OVERLAY_MOON = 6
-private const val OVERLAY_COUNT = 7
+private const val OVERLAY_GRID = 0
+private const val OVERLAY_STATION = 1
+private const val OVERLAY_TRACK = 2
+private const val OVERLAY_FOOTPRINT = 3
+private const val OVERLAY_POSITIONS = 4
+private const val OVERLAY_TERMINATOR = 5
+private const val OVERLAY_SUN = 6
+private const val OVERLAY_MOON = 7
+private const val OVERLAY_COUNT = 8
 
 private val minLat = MapView.getTileSystem().minLatitude
 private val maxLat = MapView.getTileSystem().maxLatitude
@@ -159,13 +160,16 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
         ElevatedCard(modifier = Modifier.weight(1f)) {
             Box(contentAlignment = Alignment.BottomCenter) {
                 AndroidView({ mapView }) { view ->
-                    uiState.stationPosition?.let { setStationPosition(it, view) }
-                    uiState.track?.let { setSatelliteTrack(it, view) }
-                    uiState.footprint?.let { setFootprint(it, view) }
-                    uiState.positions?.let { setPositions(it, view) { item -> onAction(MapAction.SelectItem(item)) } }
-                    setTerminator(uiState.sunLatDeg, uiState.sunLonDeg, view)
-                    setSubSolarPoint(uiState.sunLatDeg, uiState.sunLonDeg, view)
-                    setMoonPosition(uiState.moonLatDeg, uiState.moonLonDeg, view)
+                    setGridMode(uiState.isGridMode, uiState.workedGrids, view)
+                    if (!uiState.isGridMode) {
+                        uiState.stationPosition?.let { setStationPosition(it, view) }
+                        uiState.track?.let { setSatelliteTrack(it, view) }
+                        uiState.footprint?.let { setFootprint(it, view) }
+                        uiState.positions?.let { setPositions(it, view) { item -> onAction(MapAction.SelectItem(item)) } }
+                        setTerminator(uiState.sunLatDeg, uiState.sunLonDeg, view)
+                        setSubSolarPoint(uiState.sunLatDeg, uiState.sunLonDeg, view)
+                        setMoonPosition(uiState.moonLatDeg, uiState.moonLonDeg, view)
+                    }
                     view.invalidate()
                 }
                 uiState.mapData?.let { mapData ->
@@ -261,6 +265,30 @@ private fun MapDataCards(data: MapData) {
 // endregion
 
 // region Map overlay helpers
+
+/** Toggle the grid-mode layer visibility on/off without recreating any overlay. */
+private fun setGridMode(gridMode: Boolean, workedGrids: Set<String>, mapView: MapView) {
+    try {
+        val gridOverlay = mapView.overlays[OVERLAY_GRID]
+        if (gridOverlay is MaidenheadGridOverlay) {
+            gridOverlay.isEnabled = gridMode
+            gridOverlay.workedGrids = workedGrids
+        } else {
+            mapView.overlays[OVERLAY_GRID] = MaidenheadGridOverlay().apply {
+                isEnabled = gridMode
+                this.workedGrids = workedGrids
+            }
+        }
+        // Satellite-related layers are hidden in grid mode; the grid overlay
+        // itself is controlled by its own enabled flag.
+        for (index in OVERLAY_STATION..OVERLAY_MOON) {
+            mapView.overlays.getOrNull(index)?.isEnabled = !gridMode
+        }
+    } catch (e: Exception) {
+        println(e)
+    }
+}
+
 private fun setStationPosition(stationPos: GeoPos, mapView: MapView) {
     try {
         val overlay = mapView.overlays[OVERLAY_STATION]
@@ -500,6 +528,7 @@ private fun rememberMapViewWithLifecycle(): MapView {
             overlayManager.tilesOverlay.setColorFilter(createColorFilter())
             setScrollableAreaLimitLatitude(maxLat, minLat, 0)
             overlays.addAll(Array(OVERLAY_COUNT) { FolderOverlay() })
+            overlays[OVERLAY_GRID] = MaidenheadGridOverlay()
         }
     }
     val lifecycleObserver = rememberMapViewLifecycleObserver(mapView)

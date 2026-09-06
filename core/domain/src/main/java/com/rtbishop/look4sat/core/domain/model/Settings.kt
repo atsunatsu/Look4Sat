@@ -59,6 +59,7 @@ data class OtherSettings(
     val stateOfUtc: Boolean,
     val stateOfLightTheme: Boolean,
     val stateOfNightMode: Boolean = false,
+    val stateOfMapGrid: Boolean = false,
     val shouldSeeWarning: Boolean,
     val shouldSeeWhatsNew: Boolean,
     val sstvMode: String = "Auto",
@@ -74,6 +75,13 @@ data class DataSourcesSettings(
 ) {
     fun isSatelliteEnabled(index: Int): Boolean = satelliteEnabled.getOrElse(index) { true }
     fun isTransceiverEnabled(index: Int): Boolean = transceiversEnabled.getOrElse(index) { true }
+}
+
+data class WavelogSettings(
+    val url: String = "",
+    val token: String = ""
+) {
+    val isConfigured: Boolean get() = url.isNotBlank() && token.isNotBlank()
 }
 
 data class RadioControlSettings(
