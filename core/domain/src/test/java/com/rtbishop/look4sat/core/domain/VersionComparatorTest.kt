@@ -40,9 +40,19 @@ class VersionComparatorTest {
     }
 
     @Test
-    fun `parse extracts base and build number`() {
-        assertEquals(listOf(4, 4, 6) to 7, VersionComparator.parse("v4.4.6-ba7opf.7"))
-        assertEquals(listOf(4, 4, 6) to 0, VersionComparator.parse("4.4.6"))
-        assertEquals(listOf(4, 4, 6) to 0, VersionComparator.parse("4.4.6-ba7opf"))
+    fun `multi level suffixes compare correctly`() {
+        // The .9.1 hotfix case that exposed the old single-build-number logic.
+        assertTrue(VersionComparator.isNewer("4.4.6-ba7opf.9.1", "4.4.6-ba7opf.9"))
+        assertTrue(VersionComparator.isNewer("v4.4.6-ba7opf.9.1", "4.4.6-ba7opf.8"))
+        assertFalse(VersionComparator.isNewer("4.4.6-ba7opf.9", "4.4.6-ba7opf.9.1"))
+        assertTrue(VersionComparator.isNewer("4.4.6-ba7opf.10", "4.4.6-ba7opf.9.1"))
+    }
+
+    @Test
+    fun `parse extracts base and suffix segments`() {
+        assertEquals(listOf(4, 4, 6) to listOf(7), VersionComparator.parse("v4.4.6-ba7opf.7"))
+        assertEquals(listOf(4, 4, 6) to listOf(9, 1), VersionComparator.parse("v4.4.6-ba7opf.9.1"))
+        assertEquals(listOf(4, 4, 6) to emptyList<Int>(), VersionComparator.parse("4.4.6"))
+        assertEquals(listOf(4, 4, 6) to emptyList<Int>(), VersionComparator.parse("4.4.6-ba7opf"))
     }
 }
