@@ -211,7 +211,7 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
             message = uiState.wavelogMessage,
             dismiss = { dialogs.wavelog = false },
             onSave = { onAction(SettingsAction.UpdateWavelog(it)) },
-            onSync = { onAction(SettingsAction.SyncWorkedGrids) }
+            onSync = { onAction(SettingsAction.SyncWorkedGrids(it)) }
         )
     }
 
@@ -223,7 +223,7 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
             message = uiState.lotwMessage,
             dismiss = { dialogs.lotw = false },
             onSave = { onAction(SettingsAction.UpdateLoTW(it)) },
-            onSync = { onAction(SettingsAction.SyncLoTWGrids) }
+            onSync = { onAction(SettingsAction.SyncLoTWGrids(it)) }
         )
     }
 
@@ -634,7 +634,7 @@ private fun LoTWCard(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = if (settings.isConfigured) {
-                    stringResource(R.string.prefs_wavelog_configured, workedGridsCount)
+                    stringResource(R.string.prefs_lotw_configured, workedGridsCount)
                 } else {
                     stringResource(R.string.prefs_lotw_not_configured)
                 },

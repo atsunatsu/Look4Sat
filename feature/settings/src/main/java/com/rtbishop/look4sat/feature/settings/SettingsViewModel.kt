@@ -23,6 +23,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rtbishop.look4sat.core.domain.repository.IDatabaseRepo
+import com.rtbishop.look4sat.core.domain.model.WavelogSettings
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.repository.IUpdateRepository
@@ -155,10 +156,10 @@ class SettingsViewModel(
             is SettingsAction.UpdateDataSources -> settingsRepo.updateDataSourcesSettings(action.settings)
             // Wavelog worked grids
             is SettingsAction.UpdateWavelog -> settingsRepo.updateWavelogSettings(action.settings)
-            SettingsAction.SyncWorkedGrids -> syncWorkedGrids()
+            is SettingsAction.SyncWorkedGrids -> syncWorkedGrids(action.settings)
             // LoTW confirmed grids
             is SettingsAction.UpdateLoTW -> settingsRepo.updateLoTWSettings(action.settings)
-            SettingsAction.SyncLoTWGrids -> syncLoTWGrids()
+            is SettingsAction.SyncLoTWGrids -> syncLoTWGrids(action.settings)
             // Update checker
             SettingsAction.CheckForUpdate -> checkForUpdate()
             SettingsAction.DownloadUpdate -> downloadUpdate()
@@ -170,12 +171,13 @@ class SettingsViewModel(
 
     // region Wavelog worked grids
 
-    private fun syncWorkedGrids() {
-        val settings = _uiState.value.wavelogSettings
+    private fun syncWorkedGrids(settings: WavelogSettings) {
         if (!settings.isConfigured) {
             _uiState.update { it.copy(wavelogMessage = "Wavelog URL/token not configured") }
             return
         }
+        // Persist the credentials first, then sync with the freshly-typed values.
+        settingsRepo.updateWavelogSettings(settings)
         _uiState.update { it.copy(wavelogSyncing = true, wavelogMessage = null) }
         viewModelScope.launch {
             val grids = wavelogRepo.fetchWorkedGrids(settings.url, settings.token)
@@ -190,12 +192,13 @@ class SettingsViewModel(
         }
     }
 
-    private fun syncLoTWGrids() {
-        val settings = _uiState.value.lotwSettings
+    private fun syncLoTWGrids(settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings) {
         if (!settings.isConfigured) {
             _uiState.update { it.copy(lotwMessage = "LoTW callsign/password not configured") }
             return
         }
+        // Persist the credentials first, then sync with the freshly-typed values.
+        settingsRepo.updateLoTWSettings(settings)
         _uiState.update { it.copy(lotwSyncing = true, lotwMessage = null) }
         viewModelScope.launch {
             val lotwGrids = lotwRepo.fetchConfirmedGrids(settings.callsign, settings.password)

@@ -96,11 +96,11 @@ sealed interface SettingsAction {
 
     // Wavelog worked grids
     data class UpdateWavelog(val settings: WavelogSettings) : SettingsAction
-    data object SyncWorkedGrids : SettingsAction
+    data class SyncWorkedGrids(val settings: WavelogSettings) : SettingsAction
 
     // LoTW confirmed grids
     data class UpdateLoTW(val settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings) : SettingsAction
-    data object SyncLoTWGrids : SettingsAction
+    data class SyncLoTWGrids(val settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings) : SettingsAction
 
     // Update checker
     data object CheckForUpdate : SettingsAction

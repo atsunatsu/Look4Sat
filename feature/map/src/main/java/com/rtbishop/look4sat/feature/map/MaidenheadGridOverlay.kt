@@ -124,8 +124,8 @@ class MaidenheadGridOverlay : Overlay() {
             canvas.drawLine(0f, y, canvas.width.toFloat(), y, linePaint)
         }
 
-        // Labels: place at the top-left corner of each cell, only when the cell
-        // is large enough on screen to hold a label (avoid clutter at low zoom)
+        // Labels: centered in each cell, only when the cell is large enough on
+        // screen to hold a label (avoid clutter at low zoom)
         val showLabels = when {
             zoom >= GRID_ZOOM_SUB -> true
             zoom >= FIELD_ZOOM_LABELS -> true
@@ -140,20 +140,25 @@ class MaidenheadGridOverlay : Overlay() {
         val pixelsPerDegree = Math.abs(y2 - y1)
         if (pixelsPerDegree * cellLat < MIN_LABEL_CELL_PX) return
 
-        val labelOffset = 8f
+        labelPaint.textAlign = Paint.Align.CENTER
+        val fontMetrics = labelPaint.fontMetrics
+        val textHalfHeight = (fontMetrics.descent + fontMetrics.ascent) / 2f
         for (row in firstRow..lastRow) {
             val lat = row * cellLat
             if (lat < -90.0 || lat >= 90.0) continue
             val topLatCell = lat + cellLat
             if (topLatCell > 90.0) continue
-            val y = projectionToY(projection, topLatCell) ?: continue
-            if (y < -labelPaint.textSize || y > canvas.height) continue
+            val yTop = projectionToY(projection, topLatCell) ?: continue
+            val yBottom = projectionToY(projection, lat) ?: continue
+            val yCenter = (yTop + yBottom) / 2f - textHalfHeight
+            if (yBottom < 0f || yTop > canvas.height) continue
             for (col in firstCol..lastCol) {
                 val lon = col * cellLon
-                val x = projectionToX(projection, lon, centerLon) ?: continue
-                if (x < -200f || x > canvas.width) continue
+                val xLeft = projectionToX(projection, lon, centerLon) ?: continue
+                val xRight = projectionToX(projection, lon + cellLon, centerLon) ?: continue
+                if (xRight < 0f || xLeft > canvas.width) continue
                 val label = cellLabel(lat, lon, zoom)
-                canvas.drawText(label, x + labelOffset, y + labelPaint.textSize + labelOffset, labelPaint)
+                canvas.drawText(label, (xLeft + xRight) / 2f, yCenter, labelPaint)
             }
         }
     }

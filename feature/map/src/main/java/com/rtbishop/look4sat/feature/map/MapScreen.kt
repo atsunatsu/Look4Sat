@@ -42,7 +42,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -159,8 +161,15 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
         }
         ElevatedCard(modifier = Modifier.weight(1f)) {
             Box(contentAlignment = Alignment.BottomCenter) {
+                // Track grid-mode transitions so the map only re-centers when the
+                // mode is switched ON, not on every recomposition.
+                var prevGridMode by remember { mutableStateOf(uiState.isGridMode) }
                 AndroidView({ mapView }) { view ->
-                    setGridMode(uiState.isGridMode, uiState.workedGrids, view)
+                    setGridMode(
+                        uiState.isGridMode, uiState.workedGrids, view,
+                        if (uiState.isGridMode && !prevGridMode) uiState.stationPosition else null
+                    )
+                    prevGridMode = uiState.isGridMode
                     if (!uiState.isGridMode) {
                         uiState.stationPosition?.let { setStationPosition(it, view) }
                         uiState.track?.let { setSatelliteTrack(it, view) }
@@ -269,7 +278,12 @@ private fun MapDataCards(data: MapData) {
 // region Map overlay helpers
 
 /** Toggle the grid-mode layer visibility on/off without recreating any overlay. */
-private fun setGridMode(gridMode: Boolean, workedGrids: Set<String>, mapView: MapView) {
+private fun setGridMode(
+    gridMode: Boolean,
+    workedGrids: Set<String>,
+    mapView: MapView,
+    stationPosition: GeoPos?
+) {
     try {
         val gridOverlay = mapView.overlays[OVERLAY_GRID]
         if (gridOverlay is MaidenheadGridOverlay) {
@@ -285,6 +299,18 @@ private fun setGridMode(gridMode: Boolean, workedGrids: Set<String>, mapView: Ma
         // itself is controlled by its own enabled flag.
         for (index in OVERLAY_STATION..OVERLAY_MOON) {
             mapView.overlays.getOrNull(index)?.isEnabled = !gridMode
+        }
+        // Entering grid mode: center on the station's current grid square,
+        // keeping the current zoom level unchanged.
+        if (gridMode) {
+            val pos = stationPosition ?: return
+            val lat = pos.latitude
+            val lon = pos.longitude
+            val fieldLat = ((lat + 90.0) / 10.0).toInt().coerceIn(0, 17)
+            val fieldLon = ((lon + 180.0) / 20.0).toInt().coerceIn(0, 17)
+            val centerLat = fieldLat * 10.0 + 5.0
+            val centerLon = fieldLon * 20.0 + 10.0
+            mapView.controller.setCenter(GeoPoint(centerLat, centerLon))
         }
     } catch (e: Exception) {
         println(e)

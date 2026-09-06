@@ -164,7 +164,7 @@ fun WavelogDialog(
     message: String?,
     dismiss: () -> Unit,
     onSave: (com.rtbishop.look4sat.core.domain.model.WavelogSettings) -> Unit,
-    onSync: () -> Unit
+    onSync: (com.rtbishop.look4sat.core.domain.model.WavelogSettings) -> Unit
 ) {
     val url = rememberSaveable { mutableStateOf(initialSettings.url) }
     val token = rememberSaveable { mutableStateOf(initialSettings.token) }
@@ -205,12 +205,16 @@ fun WavelogDialog(
                 modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
             )
         }
-        // Sync button row (inside dialog content so token must be saved first)
+        // Sync uses the values typed in the fields directly — saving and syncing
+        // happen in one step, no need to close and reopen the dialog.
         Row(
             horizontalArrangement = Arrangement.End,
             modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large)
         ) {
-            TextButton(onClick = onSync, enabled = !isSyncing) {
+            TextButton(
+                onClick = { onSync(com.rtbishop.look4sat.core.domain.model.WavelogSettings(url.value, token.value)) },
+                enabled = !isSyncing
+            ) {
                 Text(text = if (isSyncing) stringResource(R.string.prefs_wavelog_syncing)
                 else stringResource(R.string.prefs_wavelog_sync))
             }
@@ -227,7 +231,7 @@ fun LoTWDialog(
     message: String?,
     dismiss: () -> Unit,
     onSave: (com.rtbishop.look4sat.core.domain.model.LoTWSettings) -> Unit,
-    onSync: () -> Unit
+    onSync: (com.rtbishop.look4sat.core.domain.model.LoTWSettings) -> Unit
 ) {
     val call = rememberSaveable { mutableStateOf(initialSettings.callsign) }
     val pass = rememberSaveable { mutableStateOf(initialSettings.password) }
@@ -269,11 +273,16 @@ fun LoTWDialog(
                 modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
             )
         }
+        // Sync uses the values typed in the fields directly — saving and syncing
+        // happen in one step, no need to close and reopen the dialog.
         Row(
             horizontalArrangement = Arrangement.End,
             modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large)
         ) {
-            TextButton(onClick = onSync, enabled = !isSyncing) {
+            TextButton(
+                onClick = { onSync(com.rtbishop.look4sat.core.domain.model.LoTWSettings(call.value, pass.value)) },
+                enabled = !isSyncing
+            ) {
                 Text(text = if (isSyncing) stringResource(R.string.prefs_lotw_syncing)
                 else stringResource(R.string.prefs_lotw_sync))
             }

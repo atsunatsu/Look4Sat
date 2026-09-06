@@ -84,6 +84,7 @@ class MapViewModel(
         }
         val (selectedCatNum, _) = satelliteRepo.selectedPass.value
         selectDefaultSatellite(if (selectedCatNum != 0) selectedCatNum else -1)
+        getStationPosition()
     }
 
     fun onAction(action: MapAction) {

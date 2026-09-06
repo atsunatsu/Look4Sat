@@ -145,15 +145,16 @@
     <string name="prefs_wavelog_not_configured">未配置 — 连接你的 Wavelog 日志以在地图上高亮已通联网格</string>
     <string name="prefs_wavelog_url">Wavelog 地址</string>
     <string name="prefs_wavelog_token">API key ：日志 ID</string>
-    <string name="prefs_wavelog_hint">已同步网格数：%1$d。格式：API key:日志ID。请先保存，再点同步。</string>
+    <string name="prefs_wavelog_hint">已同步网格数：%1$d。格式：API key:日志ID。填好直接点同步，会自动保存并拉取。</string>
     <string name="prefs_wavelog_sync">立即同步</string>
     <string name="prefs_wavelog_syncing">同步中…</string>
     <string name="prefs_lotw_title">LoTW 已确认网格</string>
     <string name="prefs_lotw_callsign">LoTW 呼号</string>
     <string name="prefs_lotw_password">LoTW 密码</string>
-    <string name="prefs_lotw_hint">直接从 ARRL LoTW 拉取已确认 QSO 的网格并与 Wavelog 网格合并（当前 %1$d 个）。密码仅保存在手机本地。请先保存，再点同步。</string>
+    <string name="prefs_lotw_hint">直接从 ARRL LoTW 拉取已确认 QSO 的网格并与 Wavelog 网格合并（当前 %1$d 个）。密码仅保存在手机本地。填好直接点同步，会自动保存并拉取。</string>
     <string name="prefs_lotw_sync">立即同步</string>
     <string name="prefs_lotw_syncing">同步中…</string>
+    <string name="prefs_lotw_configured">已从 LoTW 同步 — 共 %1$d 个网格</string>
     <string name="prefs_lotw_not_configured">未配置 — 直接登录 ARRL LoTW 拉取已确认 QSO 的网格，无需自建服务器</string>
     <string name="prefs_locator_text">使用梅登黑德网格设置站点位置</string>
 

@@ -180,15 +180,16 @@
     <string name="prefs_wavelog_not_configured">Not configured — connect your Wavelog logbook to highlight worked grids on the map</string>
     <string name="prefs_wavelog_url">Wavelog URL</string>
     <string name="prefs_wavelog_token">API key : logbook ID</string>
-    <string name="prefs_wavelog_hint">Worked grids synced: %1$d. Format: API key, colon, logbook ID. Save first, then tap Sync.</string>
+    <string name="prefs_wavelog_hint">Worked grids synced: %1$d. Format: API key, colon, logbook ID. Just tap Sync — credentials are saved automatically.</string>
     <string name="prefs_wavelog_sync">Sync now</string>
     <string name="prefs_wavelog_syncing">Syncing…</string>
     <string name="prefs_lotw_title">LoTW confirmed grids</string>
     <string name="prefs_lotw_callsign">LoTW callsign</string>
     <string name="prefs_lotw_password">LoTW password</string>
-    <string name="prefs_lotw_hint">Fetch confirmed-QSO grids directly from ARRL LoTW and merge them with Wavelog grids (currently %1$d). The password is stored on this device only. Save first, then tap Sync.</string>
+    <string name="prefs_lotw_hint">Fetch confirmed-QSO grids directly from ARRL LoTW and merge them with Wavelog grids (currently %1$d). The password is stored on this device only. Just tap Sync — credentials are saved automatically.</string>
     <string name="prefs_lotw_sync">Sync now</string>
     <string name="prefs_lotw_syncing">Syncing…</string>
+    <string name="prefs_lotw_configured">Synced from LoTW — %1$d grids total</string>
     <string name="prefs_lotw_not_configured">Not configured — pull confirmed grids directly from ARRL LoTW, no self-hosted server needed</string>
     <string name="prefs_locator_text">Set station\'s position using locator</string>
 
