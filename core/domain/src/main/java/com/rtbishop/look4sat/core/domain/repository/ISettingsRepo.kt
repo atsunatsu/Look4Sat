@@ -100,4 +100,9 @@ interface ISettingsRepo {
     fun getWorkedGrids(): Set<String>
     fun setWorkedGrids(grids: Set<String>)
     //endregion
+
+    //region # LoTW confirmed-grids settings
+    val lotwSettings: StateFlow<com.rtbishop.look4sat.core.domain.model.LoTWSettings>
+    fun updateLoTWSettings(settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings)
+    //endregion
 }

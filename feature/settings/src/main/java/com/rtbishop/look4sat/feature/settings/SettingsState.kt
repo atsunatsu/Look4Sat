@@ -59,6 +59,9 @@ data class SettingsState(
     val workedGridsCount: Int = 0,
     val wavelogSyncing: Boolean = false,
     val wavelogMessage: String? = null,
+    val lotwSettings: com.rtbishop.look4sat.core.domain.model.LoTWSettings = com.rtbishop.look4sat.core.domain.model.LoTWSettings(),
+    val lotwSyncing: Boolean = false,
+    val lotwMessage: String? = null,
     val updateChecker: UpdateCheckerState = UpdateCheckerState()
 )
 
@@ -94,6 +97,10 @@ sealed interface SettingsAction {
     // Wavelog worked grids
     data class UpdateWavelog(val settings: WavelogSettings) : SettingsAction
     data object SyncWorkedGrids : SettingsAction
+
+    // LoTW confirmed grids
+    data class UpdateLoTW(val settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings) : SettingsAction
+    data object SyncLoTWGrids : SettingsAction
 
     // Update checker
     data object CheckForUpdate : SettingsAction

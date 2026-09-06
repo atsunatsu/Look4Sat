@@ -33,6 +33,7 @@ interface IMainContainer {
     val amSatRepo: IAmSatRepository
     val updateRepo: IUpdateRepository
     val wavelogRepo: IWavelogRepository
+    val lotwRepo: com.rtbishop.look4sat.core.domain.repository.ILoTWRepository
     val radioTrackingService: IRadioTrackingService
     val mutualPassData: StateFlow<MutualPassData>
     fun setMutualPassData(data: MutualPassData)

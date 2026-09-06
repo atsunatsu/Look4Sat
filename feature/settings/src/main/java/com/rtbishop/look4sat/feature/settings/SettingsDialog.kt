@@ -219,6 +219,69 @@ fun WavelogDialog(
     }
 }
 
+@Composable
+fun LoTWDialog(
+    initialSettings: com.rtbishop.look4sat.core.domain.model.LoTWSettings,
+    workedGridsCount: Int,
+    isSyncing: Boolean,
+    message: String?,
+    dismiss: () -> Unit,
+    onSave: (com.rtbishop.look4sat.core.domain.model.LoTWSettings) -> Unit,
+    onSync: () -> Unit
+) {
+    val call = rememberSaveable { mutableStateOf(initialSettings.callsign) }
+    val pass = rememberSaveable { mutableStateOf(initialSettings.password) }
+    SharedDialog(
+        title = stringResource(R.string.prefs_lotw_title),
+        onCancel = dismiss,
+        onAccept = {
+            onSave(com.rtbishop.look4sat.core.domain.model.LoTWSettings(call.value, pass.value))
+            dismiss()
+        }
+    ) {
+        OutlinedTextField(
+            value = call.value,
+            onValueChange = { call.value = it.uppercase() },
+            label = { Text(text = stringResource(id = R.string.prefs_lotw_callsign)) },
+            placeholder = { Text(text = "BA7OPF") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large),
+        )
+        OutlinedTextField(
+            value = pass.value,
+            onValueChange = { pass.value = it },
+            label = { Text(text = stringResource(id = R.string.prefs_lotw_password)) },
+            placeholder = { Text(text = "********") },
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large),
+        )
+        Text(
+            text = stringResource(R.string.prefs_lotw_hint, workedGridsCount),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
+        )
+        if (message != null) {
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.End,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large)
+        ) {
+            TextButton(onClick = onSync, enabled = !isSyncing) {
+                Text(text = if (isSyncing) stringResource(R.string.prefs_lotw_syncing)
+                else stringResource(R.string.prefs_lotw_sync))
+            }
+        }
+        Spacer(modifier = Modifier.height(0.dp))
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun TransceiversDialogPreview() {

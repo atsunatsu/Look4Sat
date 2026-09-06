@@ -178,6 +178,31 @@ class SettingsRepo(
         grids.sorted().forEach { array.put(it) }
         preferences.edit { putString(keyWorkedGrids, array.toString()) }
     }
+
+    // LoTW credentials (stored locally on the device only)
+    private val keyLoTWCall = "lotwCallsign"
+    private val keyLoTWPass = "lotwPassword"
+
+    override val lotwSettings: kotlinx.coroutines.flow.StateFlow<com.rtbishop.look4sat.core.domain.model.LoTWSettings>
+        get() = _lotwSettings
+    private val _lotwSettings = MutableStateFlow(getLoTWSettings())
+
+    override fun updateLoTWSettings(settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings) {
+        preferences.edit {
+            putString(keyLoTWCall, settings.callsign.trim().uppercase())
+            putString(keyLoTWPass, settings.password)
+        }
+        _lotwSettings.value = settings.copy(
+            callsign = settings.callsign.trim().uppercase(),
+            password = settings.password
+        )
+    }
+
+    private fun getLoTWSettings(): com.rtbishop.look4sat.core.domain.model.LoTWSettings =
+        com.rtbishop.look4sat.core.domain.model.LoTWSettings(
+            callsign = preferences.getString(keyLoTWCall, null).orEmpty(),
+            password = preferences.getString(keyLoTWPass, null).orEmpty()
+        )
     //endregion
 
     //region # Transceivers settings

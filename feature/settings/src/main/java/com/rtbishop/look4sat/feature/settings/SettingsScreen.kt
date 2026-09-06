@@ -215,6 +215,18 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
         )
     }
 
+    if (dialogs.lotw) {
+        LoTWDialog(
+            initialSettings = uiState.lotwSettings,
+            workedGridsCount = uiState.workedGridsCount,
+            isSyncing = uiState.lotwSyncing,
+            message = uiState.lotwMessage,
+            dismiss = { dialogs.lotw = false },
+            onSave = { onAction(SettingsAction.UpdateLoTW(it)) },
+            onSync = { onAction(SettingsAction.SyncLoTWGrids) }
+        )
+    }
+
     // URLs for top bar
     val uriHandler = LocalUriHandler.current
     val appUrl = stringResource(R.string.prefs_app_url)
@@ -323,6 +335,13 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
                     settings = uiState.wavelogSettings,
                     workedGridsCount = uiState.workedGridsCount,
                     showWavelogDialog = { dialogs.wavelog = true }
+                )
+            }
+            item {
+                LoTWCard(
+                    settings = uiState.lotwSettings,
+                    workedGridsCount = uiState.workedGridsCount,
+                    showLoTWDialog = { dialogs.lotw = true }
                 )
             }
             item { OtherCard(uiState.otherSettings, onAction) }
@@ -601,6 +620,38 @@ private fun WavelogCard(
 }
 
 @Composable
+private fun LoTWCard(
+    settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings,
+    workedGridsCount: Int,
+    showLoTWDialog: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Text(
+                text = stringResource(id = R.string.prefs_lotw_title),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = if (settings.isConfigured) {
+                    stringResource(R.string.prefs_wavelog_configured, workedGridsCount)
+                } else {
+                    stringResource(R.string.prefs_lotw_not_configured)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            CardButton(
+                onClick = showLoTWDialog,
+                text = stringResource(id = R.string.prefs_wavelog_configure),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
 private fun formatUpdateTime(updateTime: Long): String {
     val timePattern = stringResource(id = R.string.prefs_updated_time)
     val placeholder = stringResource(id = R.string.pass_time_placeholder)
@@ -720,6 +771,7 @@ private class DialogVisibility {
     var bluetooth by mutableStateOf(false)
     var radioControl by mutableStateOf(false)
     var wavelog by mutableStateOf(false)
+    var lotw by mutableStateOf(false)
 }
 
 @Composable
@@ -727,12 +779,13 @@ private fun rememberDialogVisibility(): DialogVisibility {
     return rememberSaveable(saver = run {
         androidx.compose.runtime.saveable.Saver(
             save = {
-                listOf(it.position, it.locator, it.dataSources, it.network, it.bluetooth, it.radioControl, it.wavelog)
+                listOf(it.position, it.locator, it.dataSources, it.network, it.bluetooth, it.radioControl, it.wavelog, it.lotw)
             },
             restore = {
                 DialogVisibility().apply {
                     position = it[0]; locator = it[1]; dataSources = it[2]
                     network = it[3]; bluetooth = it[4]; radioControl = it[5]; wavelog = it[6]
+                    lotw = it.getOrElse(7) { false }
                 }
             }
         )

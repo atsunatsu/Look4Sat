@@ -84,6 +84,13 @@ data class WavelogSettings(
     val isConfigured: Boolean get() = url.isNotBlank() && token.isNotBlank()
 }
 
+data class LoTWSettings(
+    val callsign: String = "",
+    val password: String = ""
+) {
+    val isConfigured: Boolean get() = callsign.isNotBlank() && password.isNotBlank()
+}
+
 data class RadioControlSettings(
     val enabled: Boolean,
     val radioModel: String,

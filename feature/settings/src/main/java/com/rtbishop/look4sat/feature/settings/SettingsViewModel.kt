@@ -41,6 +41,7 @@ class SettingsViewModel(
     private val settingsRepo: ISettingsRepo,
     private val updateRepo: IUpdateRepository,
     private val wavelogRepo: IWavelogRepository,
+    private val lotwRepo: com.rtbishop.look4sat.core.domain.repository.ILoTWRepository,
     private val apkFile: File,
     private val showToast: IShowToast
 ) : ViewModel() {
@@ -116,6 +117,11 @@ class SettingsViewModel(
                 _uiState.update { it.copy(wavelogSettings = settings) }
             }
         }
+        viewModelScope.launch {
+            settingsRepo.lotwSettings.collect { settings ->
+                _uiState.update { it.copy(lotwSettings = settings) }
+            }
+        }
     }
 
 
@@ -150,6 +156,9 @@ class SettingsViewModel(
             // Wavelog worked grids
             is SettingsAction.UpdateWavelog -> settingsRepo.updateWavelogSettings(action.settings)
             SettingsAction.SyncWorkedGrids -> syncWorkedGrids()
+            // LoTW confirmed grids
+            is SettingsAction.UpdateLoTW -> settingsRepo.updateLoTWSettings(action.settings)
+            SettingsAction.SyncLoTWGrids -> syncLoTWGrids()
             // Update checker
             SettingsAction.CheckForUpdate -> checkForUpdate()
             SettingsAction.DownloadUpdate -> downloadUpdate()
@@ -176,6 +185,28 @@ class SettingsViewModel(
                     it.copy(wavelogSyncing = false, workedGridsCount = grids.size, wavelogMessage = null)
                 } else {
                     it.copy(wavelogSyncing = false, wavelogMessage = "Sync failed — check URL/token/network")
+                }
+            }
+        }
+    }
+
+    private fun syncLoTWGrids() {
+        val settings = _uiState.value.lotwSettings
+        if (!settings.isConfigured) {
+            _uiState.update { it.copy(lotwMessage = "LoTW callsign/password not configured") }
+            return
+        }
+        _uiState.update { it.copy(lotwSyncing = true, lotwMessage = null) }
+        viewModelScope.launch {
+            val lotwGrids = lotwRepo.fetchConfirmedGrids(settings.callsign, settings.password)
+            _uiState.update { state ->
+                if (lotwGrids == null) {
+                    state.copy(lotwSyncing = false, lotwMessage = "LoTW sync failed — check callsign/password/network")
+                } else {
+                    // Merge with Wavelog grids: union of both sources, all confirmed/worked
+                    val merged = settingsRepo.getWorkedGrids() + lotwGrids
+                    settingsRepo.setWorkedGrids(merged)
+                    state.copy(lotwSyncing = false, workedGridsCount = merged.size, lotwMessage = null)
                 }
             }
         }
@@ -305,6 +336,7 @@ class SettingsViewModel(
                     settingsRepo = container.settingsRepo,
                     updateRepo = container.updateRepo,
                     wavelogRepo = container.wavelogRepo,
+                    lotwRepo = container.lotwRepo,
                     apkFile = File(context.cacheDir, "look4sat-update.apk"),
                     showToast = container.provideShowToast()
                 )
