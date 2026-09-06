@@ -144,8 +144,8 @@
     <string name="prefs_wavelog_configured">已从 Wavelog 同步 — 通联 %1$d 个网格</string>
     <string name="prefs_wavelog_not_configured">未配置 — 连接你的 Wavelog 日志以在地图上高亮已通联网格</string>
     <string name="prefs_wavelog_url">Wavelog 地址</string>
-    <string name="prefs_wavelog_token">API 令牌</string>
-    <string name="prefs_wavelog_hint">已同步网格数：%1$d。请先保存，再点同步。</string>
+    <string name="prefs_wavelog_token">API key ：日志 ID</string>
+    <string name="prefs_wavelog_hint">已同步网格数：%1$d。格式：API key:日志ID。请先保存，再点同步。</string>
     <string name="prefs_wavelog_sync">立即同步</string>
     <string name="prefs_wavelog_syncing">同步中…</string>
     <string name="prefs_locator_text">使用梅登黑德网格设置站点位置</string>

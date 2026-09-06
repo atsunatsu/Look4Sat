@@ -188,7 +188,7 @@ fun WavelogDialog(
             value = token.value,
             onValueChange = { token.value = it },
             label = { Text(text = stringResource(id = R.string.prefs_wavelog_token)) },
-            placeholder = { Text(text = "wl2_...") },
+            placeholder = { Text(text = "abcdef123456:1") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large),
         )

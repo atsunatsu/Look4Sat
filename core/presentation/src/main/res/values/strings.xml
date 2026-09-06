@@ -179,8 +179,8 @@
     <string name="prefs_wavelog_configured">Synced from Wavelog — %1$d grids worked</string>
     <string name="prefs_wavelog_not_configured">Not configured — connect your Wavelog logbook to highlight worked grids on the map</string>
     <string name="prefs_wavelog_url">Wavelog URL</string>
-    <string name="prefs_wavelog_token">API token</string>
-    <string name="prefs_wavelog_hint">Worked grids synced: %1$d. Save first, then tap Sync.</string>
+    <string name="prefs_wavelog_token">API key : logbook ID</string>
+    <string name="prefs_wavelog_hint">Worked grids synced: %1$d. Format: API key, colon, logbook ID. Save first, then tap Sync.</string>
     <string name="prefs_wavelog_sync">Sync now</string>
     <string name="prefs_wavelog_syncing">Syncing…</string>
     <string name="prefs_locator_text">Set station\'s position using locator</string>
