@@ -25,6 +25,8 @@ import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Maidenhead locator grid overlay, drawn directly on the map canvas.
@@ -71,10 +73,10 @@ class MaidenheadGridOverlay : Overlay() {
         // Visible bounding box in geographic coordinates
         val north = projection.fromPixels(0, 0)
         val south = projection.fromPixels(canvas.width, canvas.height)
-        val topLat = north.latitude.coerceIn(-90.0, 90.0)
-        val bottomLat = south.latitude.coerceIn(-90.0, 90.0)
-        val leftLon = south.longitude
-        val rightLon = north.longitude
+        val topLat = max(north.latitude, south.latitude).coerceIn(-90.0, 90.0)
+        val bottomLat = min(north.latitude, south.latitude).coerceIn(-90.0, 90.0)
+        val leftLon = min(north.longitude, south.longitude)
+        val rightLon = max(north.longitude, south.longitude)
 
         val firstRow = floor(bottomLat / cellLat).toInt()
         val lastRow = ceil(topLat / cellLat).toInt()
