@@ -169,20 +169,52 @@ class MaidenheadGridOverlay : Overlay() {
             }
         }
 
-        // Vertical lines (meridians)
+        // Vertical lines (meridians), segmented per cell row so that worked
+        // grid cells stay line-free (same look as field-zoom fills: green
+        // patches without square grid lines). Only relevant at sub-square
+        // zoom; at field zoom cellLabel() yields 2-char fields which never
+        // match the 4-char workedGrids, so all lines draw.
         for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
             val lon = col * cellLon
             val x = projectionToX(projection, lon, centerLon, worldWidthPx)
             if (x == null) continue
-            canvas.drawLine(x, 0f, x, canvas.height.toFloat(), linePaint)
+            for (row in firstRow..lastRow) {
+                val lat = row * cellLat
+                if (lat < -90.0 || lat >= 90.0) continue
+                val topLatCell = lat + cellLat
+                if (topLatCell > 90.0) continue
+                val yTop = projectionToY(projection, topLatCell) ?: continue
+                val yBottom = projectionToY(projection, lat) ?: continue
+                // This meridian is a border of the cell on its right (col)
+                // and of the cell on its left (col-1); skip the segment if
+                // either cell is a worked grid.
+                val workedHere =
+                    cellLabel(lat, lon, zoom) in workedGrids ||
+                        cellLabel(lat, lon - cellLon, zoom) in workedGrids
+                if (workedHere) continue
+                canvas.drawLine(x, yTop, x, yBottom, linePaint)
+            }
         }
-        // Horizontal lines (parallels)
+        // Horizontal lines (parallels), segmented per cell column so worked
+        // cells have no lines through them either.
         for (row in firstRow..lastRow) {
             val lat = row * cellLat
             if (lat <= -90.0 || lat >= 90.0) continue
             val y = projectionToY(projection, lat)
             if (y == null) continue
-            canvas.drawLine(0f, y, canvas.width.toFloat(), y, linePaint)
+            for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
+                val lon = col * cellLon
+                val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                if (xRight < 0f || xLeft > canvas.width) continue
+                // This parallel borders the cell above (row) and below
+                // (row-1); skip the segment if either is worked.
+                val workedHere =
+                    cellLabel(lat, lon, zoom) in workedGrids ||
+                        cellLabel(lat - cellLat, lon, zoom) in workedGrids
+                if (workedHere) continue
+                canvas.drawLine(xLeft, y, xRight, y, linePaint)
+            }
         }
 
         // The station's own grid square: redraw its four borders thicker on top.
