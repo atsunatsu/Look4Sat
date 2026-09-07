@@ -415,8 +415,8 @@ class MaidenheadGridOverlay : Overlay() {
         // on-screen size of each square.
         const val GRID_ZOOM_SUB = 6.0
         // Zoom at which the 4-char sub-square names appear (one level above the
-        // grid lines: zoom 6 = lines only, zoom 7+ = lines + names).
-        const val LABEL_ZOOM_SUB = 7.0
+        // grid lines: zoom 6 = lines only, zoom 6.5+ = lines + names).
+        const val LABEL_ZOOM_SUB = 6.5
         const val MIN_LABEL_CELL_PX = 48f
         const val MAX_OVERSHOOT_PX = 64
     }

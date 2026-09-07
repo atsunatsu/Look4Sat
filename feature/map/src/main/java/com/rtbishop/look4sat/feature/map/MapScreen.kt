@@ -153,7 +153,9 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
                 if (!isGridMode || p == null) return false
                 val zoom = mapView.zoomLevelDouble
-                if (zoom < MaidenheadGridOverlay.LABEL_ZOOM_SUB) return false
+                // Allow tapping worked cells as soon as the 4-char grid LINES
+                // appear (GRID_ZOOM_SUB), not only when labels show (LABEL_ZOOM_SUB).
+                if (zoom < MaidenheadGridOverlay.GRID_ZOOM_SUB) return false
                 val grid = gridOfPoint(p.latitude, p.longitude) ?: return false
                 if (grid !in workedGrids) return false
                 selectedGrid = grid
