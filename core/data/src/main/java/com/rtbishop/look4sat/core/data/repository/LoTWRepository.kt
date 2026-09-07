@@ -44,10 +44,16 @@ class LoTWRepository : ILoTWRepository {
             val call = callsign.trim().uppercase()
             val pwd = password.trim()
             if (call.isBlank() || pwd.isBlank()) return@withContext null
+            // qso_qslsince with an early date forces a FULL confirmed-QSL report.
+            // Without it, LoTW applies a "system supplied default" since-date and
+            // only returns confirmations newer than the account's last query —
+            // subsequent syncs would return an empty/incremental report.
+            val since = "2000-01-01"
             val query = buildString {
                 append("login=").append(URLEncoder.encode(call, "UTF-8"))
                 append("&password=").append(URLEncoder.encode(pwd, "UTF-8"))
                 append("&qso_query=1&qso_qsl=yes&qso_qsldetail=yes&qso_mydetail=yes")
+                append("&qso_qslsince=").append(URLEncoder.encode(since, "UTF-8"))
             }
             try {
                 val connection = URL("$BASE_URL?$query").openConnection() as HttpURLConnection
@@ -73,7 +79,10 @@ class LoTWRepository : ILoTWRepository {
         // LoTW answers with ADIF text; on bad credentials it returns a short error page
         // containing "password=?" or an <eoh>-less block. Treat anything without a header
         // marker as failure so the caller can show a sensible message.
-        if (!body.contains("<ADIF_VERS") && !body.contains("<EOH>")) return null
+        // LoTW answers with ADIF text; on bad credentials it returns a short error
+        // page without an <eoh> header terminator. Real reports always carry <eoh>
+        // (LoTW writes it lowercase). Match case-insensitively to be safe.
+        if (!body.contains("<eoh>", ignoreCase = true)) return null
         val grids = mutableSetOf<String>()
         for (raw in body.lineSequence()) {
             val line = raw.trim()
