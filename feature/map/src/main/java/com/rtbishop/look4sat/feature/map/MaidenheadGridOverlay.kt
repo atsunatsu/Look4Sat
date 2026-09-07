@@ -201,12 +201,10 @@ class MaidenheadGridOverlay : Overlay() {
         }
 
         // Labels: centered in each cell, only when the cell is large enough on
-        // screen to hold a label (avoid clutter at low zoom)
-        val showLabels = when {
-            zoom >= GRID_ZOOM_SUB -> true
-            zoom >= FIELD_ZOOM_LABELS -> true
-            else -> false
-        }
+        // screen to hold a label (avoid clutter at low zoom).
+        // Field (2-char) labels show at every zoom, subject only to the pixel-
+        // size check below; sub-square (4-char) labels only from GRID_ZOOM_SUB.
+        val showLabels = zoom >= GRID_ZOOM_SUB || cellLat == FIELD_LAT
         if (!showLabels) return
         // Estimate on-screen cell height to avoid clutter at low zoom:
         // project two points 1° apart in latitude and measure the pixel distance.
