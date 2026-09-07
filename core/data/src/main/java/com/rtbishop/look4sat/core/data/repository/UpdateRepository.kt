@@ -66,16 +66,18 @@ class UpdateRepository(
             .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
             .replace("&quot;", "\"").replace("&#39;", "'")
             .trim()
-        // The release APK asset follows the fixed naming scheme used by the build:
-        // Look4Sat-<tag without leading v>-release.apk. When the page was fetched
+        // The release APK asset naming: Look4Sat-<tag without leading v>.apk
+        // (since v4.4.6-ba7opf.9.9 the releases are uploaded with the bare
+        // versioned filename, no "-release" suffix). When the page was fetched
         // through an accelerator mirror (https://<mirror>/https://github.com/...),
         // download through the same mirror — raw github.com is unreachable on the
         // networks that needed the mirror in the first place.
         val mirrorPrefix = sourceUrl.substringBefore("https://github.com")
+        val apkName = "Look4Sat-${tag.removePrefix("v")}.apk"
         val apkUrl = if (mirrorPrefix.isEmpty()) {
-            "$DOWNLOAD_BASE_URL/$tag/Look4Sat-${tag.removePrefix("v")}-release.apk"
+            "$DOWNLOAD_BASE_URL/$tag/$apkName"
         } else {
-            "${mirrorPrefix}https://github.com/atsunatsu/Look4Sat/releases/download/$tag/Look4Sat-${tag.removePrefix("v")}-release.apk"
+            "${mirrorPrefix}https://github.com/atsunatsu/Look4Sat/releases/download/$tag/$apkName"
         }
         return LatestRelease(
             versionTag = tag,
