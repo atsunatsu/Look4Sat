@@ -112,6 +112,17 @@ class LoTWRepositoryTest {
     }
 
     @Test
+    fun parseQsosVuccQuadrupleFeedsAllFourGrids() {
+        // VUCC allows up to four grids in one contact.
+        val qso = "<PROP_MODE:3>SAT\n<SAT_NAME:5>SO-50\n" +
+            "<QSO_DATE:8>20260819\n<TIME_ON:4>1231\n" +
+            "<VUCC_GRIDS:23>EN52en,EN53fa,EN42gj,EN43kh\n<EOR>\n"
+        val result = repo.parseConfirmedGridQsos(report(qso))!!
+        assertEquals(setOf("EN52", "EN53", "EN42", "EN43"), result.keys)
+        result.values.forEach { assertEquals(1, it.size) }
+    }
+
+    @Test
     fun parseQsosRejectsBodyWithoutEoh() {
         assertNull(repo.parseConfirmedGridQsos("<HTML>Username/password incorrect</HTML>"))
     }

@@ -194,8 +194,9 @@ class LoTWRepository : ILoTWRepository {
                 line.startsWith("<BAND:") && !line.startsWith("<BAND_RX:") ->
                     bandDown = adifValue(line).uppercase()
                 line.startsWith("<GRIDSQUARE:") || line.startsWith("<VUCC_GRIDS:") -> {
-                    // VUCC_GRIDS holds a comma-separated PAIR of grids
-                    // ("EN52en,EN53fa"); split and keep every 4-char field.
+                    // VUCC_GRIDS holds a comma-separated list of grids
+                    // ("EN52en,EN53fa"), up to four for contacts spanning
+                    // several squares; split and keep every 4-char field.
                     adifValue(line).split(',').forEach { grid ->
                         val field = grid.trim().uppercase()
                         if (field.length >= 4) gridsInRecord.add(field.take(4))
