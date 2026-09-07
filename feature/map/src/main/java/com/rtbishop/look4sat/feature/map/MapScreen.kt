@@ -165,11 +165,18 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
                 // the map page with grid mode already ON also centers the map.
                 var prevGridMode by remember { mutableStateOf(false) }
                 AndroidView({ mapView }) { view ->
+                    // Center on the station grid whenever entering grid mode.
+                    // Only mark the transition as consumed once a real position
+                    // was available; otherwise a first frame with a null
+                    // stationPosition would swallow the centering forever.
+                    val shouldCenter = uiState.isGridMode && !prevGridMode
                     setGridMode(
                         uiState.isGridMode, uiState.workedGrids, view,
-                        if (uiState.isGridMode && !prevGridMode) uiState.stationPosition else null
+                        if (shouldCenter) uiState.stationPosition else null
                     )
-                    prevGridMode = uiState.isGridMode
+                    if (!shouldCenter || uiState.stationPosition != null) {
+                        prevGridMode = uiState.isGridMode
+                    }
                     if (!uiState.isGridMode) {
                         uiState.stationPosition?.let { setStationPosition(it, view) }
                         uiState.track?.let { setSatelliteTrack(it, view) }

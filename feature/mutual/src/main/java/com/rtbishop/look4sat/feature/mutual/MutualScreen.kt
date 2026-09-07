@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rtbishop.look4sat.core.domain.repository.MutualPassData
 import com.rtbishop.look4sat.core.domain.repository.TrackSampleData
+import com.rtbishop.look4sat.core.presentation.GridTargetChip
 import com.rtbishop.look4sat.core.presentation.R
 import com.rtbishop.look4sat.core.presentation.ScreenColumn
 import com.rtbishop.look4sat.core.presentation.TopBar
@@ -114,7 +115,29 @@ fun MutualScreen(
                                 strokeWidth = 2.dp
                             )
                         }
-                        MutualStatusChip(state)
+                        // Target-grid chip: station B grid (station A defaults to
+                        // the user's own position), bearing/distance from A to B.
+                        val gridB = state.stationBGrid.trim().uppercase()
+                        val posA = com.rtbishop.look4sat.core.domain.utility.qthToPosition(state.stationAGrid)
+                            ?: state.stationALat.toDoubleOrNull()?.let { lat ->
+                                state.stationALon.toDoubleOrNull()?.let { lon ->
+                                    com.rtbishop.look4sat.core.domain.predict.GeoPos(lat, lon)
+                                }
+                            }
+                        val posB = com.rtbishop.look4sat.core.domain.utility.qthToPosition(gridB)
+                        if (posA != null && posB != null) {
+                            GridTargetChip(
+                                grid = gridB,
+                                distanceKm = com.rtbishop.look4sat.core.presentation.greatCircleDistanceKm(
+                                    posA.latitude, posA.longitude, posB.latitude, posB.longitude
+                                ),
+                                bearingDeg = com.rtbishop.look4sat.core.presentation.greatCircleBearingDeg(
+                                    posA.latitude, posA.longitude, posB.latitude, posB.longitude
+                                )
+                            )
+                        } else {
+                            GridTargetChip(grid = null, distanceKm = null, bearingDeg = null)
+                        }
                     }
                 }
             )
