@@ -143,6 +143,10 @@
     <string name="map_period">Period: %.0f min</string>
     <string name="map_velocity">Velocity: %.2f km/s</string>
     <string name="map_visibility">Visibility: %s</string>
+    <!-- Worked-grid QSO dialog -->
+    <string name="grid_qso_calls_count">%d callsigns · %d QSOs</string>
+    <string name="grid_qso_first">First</string>
+    <string name="grid_qso_no_sat">satellite unknown</string>
     <string name="map_visible">Visible</string>
 
     <!-- Settings screen -->

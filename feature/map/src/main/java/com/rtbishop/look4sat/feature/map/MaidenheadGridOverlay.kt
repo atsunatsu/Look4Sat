@@ -61,12 +61,20 @@ class MaidenheadGridOverlay : Overlay() {
         style = Paint.Style.STROKE
         color = Color.argb(255, 90, 200, 255)
     }
+    private val selectedLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        strokeWidth = 4.5f
+        style = Paint.Style.STROKE
+        color = Color.argb(255, 76, 217, 100)
+    }
 
     /** Worked gridsquares (4-char, uppercase) to highlight, e.g. {"OL62", "PM95"}. */
     var workedGrids: Set<String> = emptySet()
 
     /** The station's own 4-char gridsquare, drawn with a distinct outline. */
     var ownGrid: String? = null
+
+    /** The currently tapped worked grid (4-char) highlighted with a distinct outline, or null. */
+    var selectedGrid: String? = null
 
     /** Viewport width, refreshed each draw; used by projectionToX bounds. */
     private var canvasWidthPx = 1080f
@@ -118,6 +126,8 @@ class MaidenheadGridOverlay : Overlay() {
 
         // The station's own grid square (4-char, only meaningful at sub-square zoom)
         val ownCell = ownGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
+        // The tapped worked grid gets a distinct outline (same zoom gate).
+        val selectedCell = selectedGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
 
         // Worked-grid highlight fills.
         //  - Sub-square zoom: fill each worked 4-char cell directly.
@@ -180,22 +190,24 @@ class MaidenheadGridOverlay : Overlay() {
         }
 
         // The station's own grid square: redraw its four borders thicker on top.
-        if (ownCell != null) {
-            val ownColIdx = firstCol..lastCol
+        // The tapped worked grid gets the same treatment in a different color.
+        if (ownCell != null || selectedCell != null) {
             for (row in firstRow..lastRow) {
                 val lat = row * cellLat
                 if (lat < -90.0 || lat >= 90.0) continue
-                for (col in ownColIdx) {
+                for (col in firstCol..lastCol) {
                     val lon = col * cellLon
-                    if (cellLabel(lat, lon, zoom) != ownCell) continue
+                    val label = cellLabel(lat, lon, zoom)
+                    if (label != ownCell && label != selectedCell) continue
                     val yTop = projectionToY(projection, lat + cellLat) ?: continue
                     val yBottom = projectionToY(projection, lat) ?: continue
                     val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
                     val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
-                    canvas.drawLine(xLeft, yTop, xRight, yTop, ownLinePaint)
-                    canvas.drawLine(xLeft, yBottom, xRight, yBottom, ownLinePaint)
-                    canvas.drawLine(xLeft, yTop, xLeft, yBottom, ownLinePaint)
-                    canvas.drawLine(xRight, yTop, xRight, yBottom, ownLinePaint)
+                    val paint = if (label == selectedCell) selectedLinePaint else ownLinePaint
+                    canvas.drawLine(xLeft, yTop, xRight, yTop, paint)
+                    canvas.drawLine(xLeft, yBottom, xRight, yBottom, paint)
+                    canvas.drawLine(xLeft, yTop, xLeft, yBottom, paint)
+                    canvas.drawLine(xRight, yTop, xRight, yBottom, paint)
                 }
             }
         }
@@ -306,7 +318,7 @@ class MaidenheadGridOverlay : Overlay() {
         return l
     }
 
-    private companion object {
+    internal companion object {
         const val FIELD_LAT = 10.0
         const val FIELD_LON = 20.0
         const val SUB_SQUARE_LAT = 1.0

@@ -99,6 +99,9 @@ interface ISettingsRepo {
     fun updateWavelogSettings(settings: WavelogSettings)
     fun getWorkedGrids(): Set<String>
     fun setWorkedGrids(grids: Set<String>)
+    /** Confirmed satellite QSOs grouped by worked 4-char gridsquare (map tap detail). */
+    fun getWorkedGridQsos(): Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>
+    fun setWorkedGridQsos(qsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>)
     //endregion
 
     //region # LoTW confirmed-grids settings

@@ -179,6 +179,57 @@ class SettingsRepo(
         preferences.edit { putString(keyWorkedGrids, array.toString()) }
     }
 
+    // Confirmed satellite QSOs per worked gridsquare, persisted as a single JSON
+    // object: {"OL62":[{"c":call,"t":epochMs,"s":sat,"m":mode,"bu":up,"bd":down}]}.
+    private val keyWorkedGridQsos = "workedGridQsos"
+
+    override fun getWorkedGridQsos(): Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>> {
+        val json = preferences.getString(keyWorkedGridQsos, null).orEmpty()
+        if (json.isBlank()) return emptyMap()
+        return try {
+            val root = org.json.JSONObject(json)
+            val result = mutableMapOf<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>()
+            for (grid in root.keys()) {
+                val array = root.optJSONArray(grid) ?: continue
+                val list = (0 until array.length()).mapNotNull { i ->
+                    val o = array.optJSONObject(i) ?: return@mapNotNull null
+                    com.rtbishop.look4sat.core.domain.model.GridQso(
+                        call = o.optString("c"),
+                        epochMs = o.optLong("t"),
+                        satName = o.optString("s"),
+                        mode = o.optString("m"),
+                        bandUp = o.optString("bu"),
+                        bandDown = o.optString("bd")
+                    )
+                }
+                if (list.isNotEmpty()) result[grid] = list
+            }
+            result
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    override fun setWorkedGridQsos(qsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>) {
+        val root = org.json.JSONObject()
+        for ((grid, list) in qsos) {
+            val array = org.json.JSONArray()
+            for (q in list) {
+                array.put(
+                    org.json.JSONObject()
+                        .put("c", q.call)
+                        .put("t", q.epochMs)
+                        .put("s", q.satName)
+                        .put("m", q.mode)
+                        .put("bu", q.bandUp)
+                        .put("bd", q.bandDown)
+                )
+            }
+            root.put(grid, array)
+        }
+        preferences.edit { putString(keyWorkedGridQsos, root.toString()) }
+    }
+
     // LoTW credentials (stored locally on the device only)
     private val keyLoTWCall = "lotwCallsign"
     private val keyLoTWPass = "lotwPassword"

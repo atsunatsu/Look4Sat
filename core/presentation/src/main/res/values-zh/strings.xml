@@ -118,6 +118,10 @@
     <string name="map_period">周期：% .0f min</string>
     <string name="map_velocity">速度：%.2f km/s</string>
     <string name="map_visibility">能见度：%s</string>
+    <!-- Worked-grid QSO dialog -->
+    <string name="grid_qso_calls_count">%d 个呼号 · %d 次通联</string>
+    <string name="grid_qso_first">首通</string>
+    <string name="grid_qso_no_sat">卫星未知</string>
     <string name="map_visible">日照中</string>
 
     <!-- Settings screen -->

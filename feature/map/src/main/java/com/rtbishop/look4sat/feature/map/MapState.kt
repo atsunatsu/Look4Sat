@@ -28,6 +28,7 @@ data class MapState(
     val isUtc: Boolean = false,
     val isGridMode: Boolean = false,
     val workedGrids: Set<String> = emptySet(),
+    val workedGridQsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>> = emptyMap(),
     val stationPosition: GeoPos? = null,
     val orbitalPass: OrbitalPass,
     val track: List<List<GeoPos>>? = null,

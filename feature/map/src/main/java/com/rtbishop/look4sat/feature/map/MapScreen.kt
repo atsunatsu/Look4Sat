@@ -25,14 +25,18 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import androidx.collection.LruCache
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -138,6 +142,36 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
     val timeString = uiState.mapData?.aosTime ?: "00:00:00"
     val isTimeAos = uiState.mapData?.isTimeAos ?: true
 
+    // Tapped worked grid -> centered QSO dialog. Local UI state: the map is the
+    // only consumer and it resets when leaving the page.
+    var selectedGrid by remember { mutableStateOf<String?>(null) }
+    // Attach the tap listener whenever grid mode / worked grids change.
+    val workedGrids = uiState.workedGrids
+    val isGridMode = uiState.isGridMode
+    DisposableEffect(isGridMode, workedGrids) {
+        val receiver = object : org.osmdroid.events.MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                if (!isGridMode || p == null) return false
+                val zoom = mapView.zoomLevelDouble
+                if (zoom < MaidenheadGridOverlay.LABEL_ZOOM_SUB) return false
+                val grid = gridOfPoint(p.latitude, p.longitude) ?: return false
+                if (grid !in workedGrids) return false
+                selectedGrid = grid
+                return true
+            }
+
+            override fun longPressHelper(p: GeoPoint?): Boolean = false
+        }
+        val eventsOverlay = org.osmdroid.views.overlay.MapEventsOverlay(receiver)
+        mapView.overlays.add(eventsOverlay)
+        onDispose { mapView.overlays.remove(eventsOverlay) }
+    }
+    // Keep the overlay's selected highlight in sync with the dialog.
+    LaunchedEffect(selectedGrid) {
+        (mapView.overlays.getOrNull(OVERLAY_GRID) as? MaidenheadGridOverlay)?.selectedGrid = selectedGrid
+        mapView.invalidate()
+    }
+
     LaunchedEffect(uiState.track) {
         // In grid mode the map is centered on the local grid square; following
         // the satellite subpoint here would override that centering on every
@@ -200,7 +234,154 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
             }
         }
     }
+    // Centered dialog listing the tapped worked grid's confirmed satellite QSOs.
+    // Dismissed by tapping outside (no explicit close button).
+    selectedGrid?.let { grid ->
+        WorkedGridQsoDialog(
+            grid = grid,
+            qsos = uiState.workedGridQsos[grid].orEmpty().sortedBy { it.epochMs },
+            isUtc = uiState.isUtc,
+            onDismiss = { selectedGrid = null }
+        )
+    }
 }
+
+// region Worked-grid QSO dialog
+
+@Composable
+private fun WorkedGridQsoDialog(
+    grid: String,
+    qsos: List<com.rtbishop.look4sat.core.domain.model.GridQso>,
+    isUtc: Boolean,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        // Centered card, ~85% width, internal scroll for long lists.
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            modifier = Modifier.fillMaxWidth(0.88f)
+        ) {
+            Column {
+                // Header: grid + counts
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Text(
+                        text = grid,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                    val distinctCalls = qsos.map { it.call }.distinct().size
+                    Text(
+                        text = stringResource(R.string.grid_qso_calls_count, distinctCalls, qsos.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                androidx.compose.material3.HorizontalDivider()
+                if (qsos.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.grid_qso_no_sat),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                } else {
+                    // Group by callsign preserving first-contact order (list is
+                    // already sorted oldest-first); expandable rows.
+                    val grouped = remember(qsos) {
+                        qsos.groupBy { it.call }.entries.sortedBy { it.value.first().epochMs }
+                    }
+                    Column(
+                        Modifier
+                            .heightIn(max = 380.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        grouped.forEach { (call, callQsos) ->
+                            WorkedGridCallRow(call, callQsos = callQsos, isUtc = isUtc)
+                            androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkedGridCallRow(
+    call: String,
+    callQsos: List<com.rtbishop.look4sat.core.domain.model.GridQso>,
+    isUtc: Boolean,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val first = callQsos.first()
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+        ) {
+            Text(
+                text = call,
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = formatDate(first.epochMs, isUtc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = if (expanded) " ▴" else " ▾",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        // First-QSO summary line, always visible.
+        Text(
+            text = stringResource(R.string.grid_qso_first) + " · " + qsoSummary(first, isUtc),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 3.dp)
+        )
+        // Subsequent QSOs in this grid, revealed on expand.
+        if (expanded && callQsos.size > 1) {
+            callQsos.drop(1).forEachIndexed { index, qso ->
+                val ordinal = "${index + 2}"
+                Text(
+                    text = "$ordinal " + qsoSummary(qso, isUtc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun qsoSummary(qso: com.rtbishop.look4sat.core.domain.model.GridQso, isUtc: Boolean): String {
+    val sat = qso.satName.ifBlank { "?" }
+    val mode = qso.mode.ifBlank { "?" }
+    val band = qso.bandLabel
+    val time = formatTime(qso.epochMs, isUtc)
+    return listOf(sat, mode, band, time).filter { it.isNotBlank() }.joinToString(" · ")
+}
+
+private fun formatDate(epochMs: Long, isUtc: Boolean): String {
+    if (epochMs <= 0L) return "--"
+    val zone = if (isUtc) java.time.ZoneOffset.UTC else java.time.ZoneId.systemDefault()
+    return java.time.Instant.ofEpochMilli(epochMs).atZone(zone)
+        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+}
+
+private fun formatTime(epochMs: Long, isUtc: Boolean): String {
+    if (epochMs <= 0L) return "--:--"
+    val zone = if (isUtc) java.time.ZoneOffset.UTC else java.time.ZoneId.systemDefault()
+    return java.time.Instant.ofEpochMilli(epochMs).atZone(zone)
+        .format(java.time.format.DateTimeFormatter.ofPattern(if (isUtc) "HH:mm'Z'" else "HH:mm"))
+}
+// endregion
 
 // region Map data composables
 @Composable
@@ -341,6 +522,17 @@ private fun ownGridOf(stationPosition: GeoPos?): String? {
     val fieldLat = ((lat + 90.0) / 10.0).toInt().coerceIn(0, 17)
     val fieldLon = ((lon + 180.0) / 20.0).toInt().coerceIn(0, 17)
     val subLat = ((lat + 90.0) % 10.0).toInt()
+    val subLon = ((lon + 180.0) % 20.0 / 2.0).toInt()
+    return "${'A' + fieldLon}${'A' + fieldLat}$subLon$subLat"
+}
+
+/** The 4-char Maidenhead gridsquare containing the given point, or null outside the grid. */
+private fun gridOfPoint(latitude: Double, longitude: Double): String? {
+    if (latitude < -90.0 || latitude >= 90.0) return null
+    val lon = ((longitude + 180.0) % 360.0 + 360.0) % 360.0 - 180.0
+    val fieldLat = ((latitude + 90.0) / 10.0).toInt().coerceIn(0, 17)
+    val fieldLon = ((lon + 180.0) / 20.0).toInt().coerceIn(0, 17)
+    val subLat = ((latitude + 90.0) % 10.0).toInt()
     val subLon = ((lon + 180.0) % 20.0 / 2.0).toInt()
     return "${'A' + fieldLon}${'A' + fieldLat}$subLon$subLat"
 }

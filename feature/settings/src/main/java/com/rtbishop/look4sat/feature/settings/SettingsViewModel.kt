@@ -201,15 +201,17 @@ class SettingsViewModel(
         settingsRepo.updateLoTWSettings(settings)
         _uiState.update { it.copy(lotwSyncing = true, lotwMessage = null) }
         viewModelScope.launch {
-            val lotwGrids = lotwRepo.fetchConfirmedGrids(settings.callsign, settings.password)
+            val lotwResult = lotwRepo.fetchConfirmedGridQsos(settings.callsign, settings.password)
             _uiState.update { state ->
-                if (lotwGrids == null) {
+                if (lotwResult == null) {
                     state.copy(lotwSyncing = false, lotwMessage = "LoTW sync failed — check callsign/password/network")
                 } else {
                     // Wavelog entry removed: LoTW is now the only source, so the
                     // synced set fully replaces the stored worked grids.
-                    settingsRepo.setWorkedGrids(lotwGrids)
-                    state.copy(lotwSyncing = false, workedGridsCount = lotwGrids.size, lotwMessage = null)
+                    val (grids, qsos) = lotwResult
+                    settingsRepo.setWorkedGrids(grids)
+                    settingsRepo.setWorkedGridQsos(qsos)
+                    state.copy(lotwSyncing = false, workedGridsCount = grids.size, lotwMessage = null)
                 }
             }
         }

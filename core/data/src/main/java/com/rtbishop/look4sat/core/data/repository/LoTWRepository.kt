@@ -85,6 +85,144 @@ class LoTWRepository : ILoTWRepository {
             }
         }
 
+    override suspend fun fetchConfirmedGridQsos(
+        callsign: String,
+        password: String
+    ): Pair<Set<String>, Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>>? {
+        // Single report fetch: grids are derived from the same body as the
+        // per-QSO detail (avoids a second ARRL hit and keeps the two datasets
+        // perfectly consistent).
+        val body = fetchReportBody(callsign, password) ?: return null
+        val grids = parseConfirmedGrids(body) ?: return null
+        val qsos = parseConfirmedGridQsos(body) ?: return null
+        return grids to qsos
+    }
+
+    private fun fetchReportBody(callsign: String, password: String): String? {
+        val call = callsign.trim().uppercase()
+        val pwd = password.trim()
+        if (call.isBlank() || pwd.isBlank()) return null
+        val since = "2000-01-01"
+        val query = buildString {
+            append("login=").append(URLEncoder.encode(call, "UTF-8"))
+            append("&password=").append(URLEncoder.encode(pwd, "UTF-8"))
+            append("&qso_query=1&qso_qsl=yes&qso_qsldetail=yes&qso_mydetail=yes")
+            append("&qso_qslsince=").append(URLEncoder.encode(since, "UTF-8"))
+        }
+        return try {
+            val connection = URL("$BASE_URL?$query").openConnection() as HttpURLConnection
+            connection.connectTimeout = 30_000
+            connection.readTimeout = 120_000
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Accept-Encoding", "gzip")
+            connection.instanceFollowRedirects = true
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                connection.disconnect()
+                return null
+            }
+            val stream = connection.inputStream
+            val body = ("gzip".equals(connection.contentEncoding, ignoreCase = true))
+                .let { gz -> if (gz) java.util.zip.GZIPInputStream(stream) else stream }
+                .bufferedReader().use { it.readText() }
+            connection.disconnect()
+            if (body.contains(" password=") && !body.startsWith("ARRL")) return null
+            body
+        } catch (e: Exception) {
+            println("LoTWRepository fetch failure: $e")
+            null
+        }
+    }
+
+    internal fun parseConfirmedGridQsos(
+        body: String
+    ): Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>? {
+        if (!body.contains("<eoh>", ignoreCase = true)) return null
+        // One ADIF record = fields up to <EOR>. We buffer the fields we care
+        // about, then emit a GridQso on <EOR> when the record is a satellite
+        // QSO (PROP_MODE=SAT) carrying a grid.
+        val result = mutableMapOf<String, MutableList<com.rtbishop.look4sat.core.domain.model.GridQso>>()
+        var propMode: String? = null
+        var call = ""
+        var qsoDate = ""
+        var timeOn = ""
+        var satName = ""
+        var mode = ""
+        var bandUp = ""
+        var bandDown = ""
+        val gridsInRecord = mutableListOf<String>()
+
+        fun emitRecord() {
+            if (propMode != "SAT" || gridsInRecord.isEmpty()) return
+            val epochMs = adifTimestampToEpoch(qsoDate, timeOn)
+            val qso = com.rtbishop.look4sat.core.domain.model.GridQso(
+                call = call, epochMs = epochMs, satName = satName,
+                mode = mode, bandUp = bandUp, bandDown = bandDown
+            )
+            for (grid in gridsInRecord) {
+                result.getOrPut(grid) { mutableListOf() }.add(qso)
+            }
+        }
+
+        fun resetRecord() {
+            propMode = null; call = ""; qsoDate = ""; timeOn = ""
+            satName = ""; mode = ""; bandUp = ""; bandDown = ""
+            gridsInRecord.clear()
+        }
+
+        for (raw in body.lineSequence()) {
+            val line = raw.trim()
+            when {
+                line.equals("<EOR>", ignoreCase = true) -> {
+                    emitRecord()
+                    resetRecord()
+                }
+                line.startsWith("<PROP_MODE:") ->
+                    propMode = adifValue(line).uppercase()
+                line.startsWith("<CALL:") ->
+                    call = adifValue(line).uppercase()
+                line.startsWith("<QSO_DATE:") ->
+                    qsoDate = adifValue(line)
+                line.startsWith("<TIME_ON:") ->
+                    timeOn = adifValue(line)
+                line.startsWith("<SAT_NAME:") ->
+                    satName = adifValue(line)
+                line.startsWith("<MODE:") ->
+                    mode = adifValue(line)
+                line.startsWith("<BAND_RX:") ->
+                    bandUp = adifValue(line).uppercase()
+                line.startsWith("<BAND:") && !line.startsWith("<BAND_RX:") ->
+                    bandDown = adifValue(line).uppercase()
+                line.startsWith("<GRIDSQUARE:") || line.startsWith("<VUCC_GRIDS:") -> {
+                    // VUCC_GRIDS holds a comma-separated PAIR of grids
+                    // ("EN52en,EN53fa"); split and keep every 4-char field.
+                    adifValue(line).split(',').forEach { grid ->
+                        val field = grid.trim().uppercase()
+                        if (field.length >= 4) gridsInRecord.add(field.take(4))
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    /** ADIF field value: "<GRIDSQUARE:4>OL62" -> "OL62". */
+    private fun adifValue(line: String): String =
+        line.substringAfter('>').substringBefore("E<").trim()
+
+    /** "20260820" + "1130" (or "113000") -> UTC epoch ms; 0 when unparseable. */
+    private fun adifTimestampToEpoch(date: String, time: String): Long = try {
+        val d = date.trim()
+        val t = time.trim().padEnd(6, '0').take(6)
+        val fmt = java.time.format.DateTimeFormatterBuilder()
+            .appendPattern("yyyyMMddHHmmss")
+            .toFormatter()
+            .withZone(java.time.ZoneOffset.UTC)
+        java.time.Instant.from(fmt.parse(d + t)).toEpochMilli()
+    } catch (_: Exception) {
+        0L
+    }
+
     internal fun parseConfirmedGrids(body: String): Set<String>? {
         // LoTW answers with ADIF text; on bad credentials it returns a short error page
         // containing "password=?" or an <eoh>-less block. Treat anything without a header

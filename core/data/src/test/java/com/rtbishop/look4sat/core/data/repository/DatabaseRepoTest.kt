@@ -19,6 +19,7 @@ package com.rtbishop.look4sat.core.data.repository
 
 import com.rtbishop.look4sat.core.domain.model.DataSourcesSettings
 import com.rtbishop.look4sat.core.domain.model.DatabaseState
+import com.rtbishop.look4sat.core.domain.model.GridQso
 import com.rtbishop.look4sat.core.domain.model.OtherSettings
 import com.rtbishop.look4sat.core.domain.model.PassesSettings
 import com.rtbishop.look4sat.core.domain.model.RCSettings
@@ -291,6 +292,10 @@ private class FakeSettingsRepo(dataSources: DataSourcesSettings = defaultDataSou
         MutableStateFlow(com.rtbishop.look4sat.core.domain.model.LoTWSettings())
 
     override fun updateLoTWSettings(settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings) = Unit
+
+    override fun getWorkedGridQsos(): Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>> = emptyMap()
+
+    override fun setWorkedGridQsos(qsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>) = Unit
 }
 
 private fun defaultDataSourcesSettings(): DataSourcesSettings {
