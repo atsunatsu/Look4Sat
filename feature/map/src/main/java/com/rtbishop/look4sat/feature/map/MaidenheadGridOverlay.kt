@@ -142,8 +142,13 @@ class MaidenheadGridOverlay : Overlay() {
                     if (yTop == null || yBottom == null) continue
                     for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
                         val lon = col * cellLon
-                        val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
-                        val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                        // World-repeat copies: keep the turn offset in pixels
+                        // (colRepeats is 0 at this zoom today, but the same
+                        // alpha-stacking fix applies if it ever becomes > 0).
+                        val xLeftBase = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                        val xRightBase = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                        val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
+                        val xRight = xRightBase + turn * worldWidthPx.toFloat()
                         if (xRight < 0f || xLeft > canvas.width) continue
                         if (cellLabel(lat, lon, zoom) in workedGrids) {
                             canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
@@ -153,14 +158,22 @@ class MaidenheadGridOverlay : Overlay() {
             } else {
                 for (grid in workedGrids) {
                     val cell = gridCellBounds(grid) ?: continue
+                    // World-repeat copies: a 360° turn shifts the cell by a
+                    // full world width in pixels. projectionToX() normalizes
+                    // longitude back into [-180,180), so WITHOUT adding the
+                    // turn*worldWidthPx offset every copy lands on the SAME
+                    // screen x and the cell gets painted 2*colRepeats+1 times
+                    // in place — alpha stacks and the green turns brighter and
+                    // more opaque. Keep the world-width offset on the x.
                     for (turn in -colRepeats..colRepeats) {
-                        // Shift the cell by whole world turns to cover repeats.
                         val dLon = turn * 360.0
                         if (cell.lonRight + dLon <= leftLon || cell.lonLeft + dLon >= rightLon) continue
                         val yTop = projectionToY(projection, cell.latTop) ?: continue
                         val yBottom = projectionToY(projection, cell.latBottom) ?: continue
-                        val xLeft = projectionToX(projection, cell.lonLeft + dLon, centerLon, worldWidthPx) ?: continue
-                        val xRight = projectionToX(projection, cell.lonRight + dLon, centerLon, worldWidthPx) ?: continue
+                        val xLeftBase = projectionToX(projection, cell.lonLeft, centerLon, worldWidthPx) ?: continue
+                        val xRightBase = projectionToX(projection, cell.lonRight, centerLon, worldWidthPx) ?: continue
+                        val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
+                        val xRight = xRightBase + turn * worldWidthPx.toFloat()
                         if (xRight < 0f || xLeft > canvas.width) continue
                         if (yBottom < 0f || yTop > canvas.height) continue
                         canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
@@ -177,8 +190,11 @@ class MaidenheadGridOverlay : Overlay() {
         // sub-square grid to decide which field-line segments to skip.
         for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
             val lon = col * cellLon
-            val x = projectionToX(projection, lon, centerLon, worldWidthPx)
-            if (x == null) continue
+            // World-repeat copies: keep the turn offset in pixels, otherwise
+            // every turn normalizes to the same x and the line paints over
+            // itself 2*colRepeats+1 times (alpha stacking).
+            val xBase = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+            val x = xBase + turn * worldWidthPx.toFloat()
             for (row in firstRow..lastRow) {
                 val lat = row * cellLat
                 if (lat < -90.0 || lat >= 90.0) continue
@@ -220,8 +236,12 @@ class MaidenheadGridOverlay : Overlay() {
             if (y == null) continue
             for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
                 val lon = col * cellLon
-                val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
-                val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                // World-repeat copies: keep the turn offset in pixels (same
+                // alpha-stacking fix as the vertical lines above).
+                val xLeftBase = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                val xRightBase = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
+                val xRight = xRightBase + turn * worldWidthPx.toFloat()
                 if (xRight < 0f || xLeft > canvas.width) continue
                 if (cellLon == SUB_SQUARE_LON && cellLat == SUB_SQUARE_LAT) {
                     // Sub-square zoom: one segment == one cell edge.
@@ -235,8 +255,10 @@ class MaidenheadGridOverlay : Overlay() {
                     // and skip the segments bordering a worked 2°x1° square.
                     for (sub in 0 until (cellLon / SUB_SQUARE_LON).toInt()) {
                         val subLon = lon + sub * SUB_SQUARE_LON
-                        val xSubLeft = projectionToX(projection, subLon, centerLon, worldWidthPx) ?: continue
-                        val xSubRight = projectionToX(projection, subLon + SUB_SQUARE_LON, centerLon, worldWidthPx) ?: continue
+                        val xSubLeftBase = projectionToX(projection, subLon, centerLon, worldWidthPx) ?: continue
+                        val xSubRightBase = projectionToX(projection, subLon + SUB_SQUARE_LON, centerLon, worldWidthPx) ?: continue
+                        val xSubLeft = xSubLeftBase + turn * worldWidthPx.toFloat()
+                        val xSubRight = xSubRightBase + turn * worldWidthPx.toFloat()
                         if (xSubRight < 0f || xSubLeft > canvas.width) continue
                         // Force 4-char labels (see vertical lines above).
                         val workedHere =
@@ -301,8 +323,12 @@ class MaidenheadGridOverlay : Overlay() {
             if (yBottom < 0f || yTop > canvas.height) continue
             for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
                 val lon = col * cellLon
-                val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
-                val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                // World-repeat copies: keep the turn offset in pixels (same
+                // alpha-stacking fix as the lines above).
+                val xLeftBase = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                val xRightBase = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
+                val xRight = xRightBase + turn * worldWidthPx.toFloat()
                 if (xRight < 0f || xLeft > canvas.width) continue
                 val label = cellLabel(lat, lon, zoom)
                 canvas.drawText(label, (xLeft + xRight) / 2f, yCenter, labelPaint)
