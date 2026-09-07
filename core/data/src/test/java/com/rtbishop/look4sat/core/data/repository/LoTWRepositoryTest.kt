@@ -1,5 +1,6 @@
 package com.rtbishop.look4sat.core.data.repository
 
+import com.rtbishop.look4sat.core.domain.repository.LoTWResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -125,6 +126,30 @@ class LoTWRepositoryTest {
     @Test
     fun parseQsosRejectsBodyWithoutEoh() {
         assertNull(repo.parseConfirmedGridQsos("<HTML>Username/password incorrect</HTML>"))
+    }
+
+    // endregion
+
+    // region failure classification (fetchReportBody -> LoTWResult mapping)
+
+    @Test
+    fun failureClassificationMapsEachException() {
+        // LoTWRepository.toResult() must keep each failure cause distinct so
+        // the UI can show a specific message per cause.
+        assertEquals(
+            LoTWResult.BadCredentials,
+            repo.toResult(LoTWRepository.CredentialsException())
+        )
+        assertEquals(
+            LoTWResult.RateLimited,
+            repo.toResult(LoTWRepository.RateLimitException())
+        )
+        assertEquals(
+            LoTWResult.Timeout,
+            repo.toResult(LoTWRepository.TimeoutException("read timed out"))
+        )
+        val net = repo.toResult(java.io.IOException("HTTP 500"))
+        assertEquals(LoTWResult.NetworkError("HTTP 500"), net)
     }
 
     // endregion

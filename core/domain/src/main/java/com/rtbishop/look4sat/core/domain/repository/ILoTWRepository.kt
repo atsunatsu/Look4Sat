@@ -22,17 +22,17 @@ interface ILoTWRepository {
 
     /**
      * Fetch all confirmed (QSL_RCVD=Y) gridsquares for the given LoTW account.
-     * Returns the 4-char grid set, or null on any failure (network / bad credentials).
+     * Returns the 4-char grid set with an explicit failure cause on error.
      */
-    suspend fun fetchConfirmedGrids(callsign: String, password: String): Set<String>?
+    suspend fun fetchConfirmedGrids(callsign: String, password: String): LoTWResult
 
     /**
      * Same report, but keeps the per-QSO detail of every confirmed satellite
      * QSO (call / time / satellite / mode / bands), grouped by worked 4-char
-     * gridsquare. Returns null on any failure.
+     * gridsquare. Failure cause is kept explicit.
      */
     suspend fun fetchConfirmedGridQsos(
         callsign: String,
         password: String
-    ): Pair<Set<String>, Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>>?
+    ): LoTWResult
 }

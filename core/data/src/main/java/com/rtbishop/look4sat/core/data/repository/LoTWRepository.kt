@@ -18,11 +18,15 @@
 package com.rtbishop.look4sat.core.data.repository
 
 import com.rtbishop.look4sat.core.domain.repository.ILoTWRepository
+import com.rtbishop.look4sat.core.domain.repository.LoTWResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLEncoder
+import java.io.IOException
+import javax.net.ssl.SSLException
 
 /**
  * Fetches confirmed gridsquares directly from ARRL LoTW via the official report endpoint:
@@ -34,74 +38,50 @@ import java.net.URLEncoder
  * value; VUCC_GRIDS ("EN52en,EN53fa") also yields 4-char fields. All values are
  * truncated/expanded to the 4-char form used by the map overlay.
  *
- * ARRL rate-limits the report endpoint (roughly once per hour per account), which is
- * fine for a manual sync button.
+ * ARRL rate-limits the report endpoint: one download in progress per user id, and
+ * frequent full-report pulls get refused. Failures are reported with an explicit
+ * cause (see LoTWResult) so the UI can tell the user what to do next.
  */
 class LoTWRepository : ILoTWRepository {
 
-    override suspend fun fetchConfirmedGrids(callsign: String, password: String): Set<String>? =
-        withContext(Dispatchers.IO) {
-            val call = callsign.trim().uppercase()
-            val pwd = password.trim()
-            if (call.isBlank() || pwd.isBlank()) return@withContext null
-            // qso_qslsince with an early date forces a FULL confirmed-QSL report.
-            // Without it, LoTW applies a "system supplied default" since-date and
-            // only returns confirmations newer than the account's last query —
-            // subsequent syncs would return an empty/incremental report.
-            val since = "2000-01-01"
-            val query = buildString {
-                append("login=").append(URLEncoder.encode(call, "UTF-8"))
-                append("&password=").append(URLEncoder.encode(pwd, "UTF-8"))
-                append("&qso_query=1&qso_qsl=yes&qso_qsldetail=yes&qso_mydetail=yes")
-                append("&qso_qslsince=").append(URLEncoder.encode(since, "UTF-8"))
-            }
-            try {
-                val connection = URL("$BASE_URL?$query").openConnection() as HttpURLConnection
-                // ARRL can be slow to accept connections from mobile networks
-                // (long TLS handshakes across the Pacific, occasional server-side
-                // queueing). 30s connect + 120s read gives the request enough
-                // headroom; the sync button stays disabled meanwhile so users
-                // see progress rather than a hung dialog.
-                connection.connectTimeout = 30_000
-                connection.readTimeout = 120_000
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("Accept-Encoding", "gzip")
-                connection.instanceFollowRedirects = true
-                val code = connection.responseCode
-                if (code !in 200..299) {
-                    connection.disconnect()
-                    return@withContext null
-                }
-                val stream = connection.inputStream
-                val body = ("gzip".equals(connection.contentEncoding, ignoreCase = true))
-                    .let { gz -> if (gz) java.util.zip.GZIPInputStream(stream) else stream }
-                    .bufferedReader().use { it.readText() }
-                connection.disconnect()
-                if (body.contains(" password=") && !body.startsWith("ARRL")) return@withContext null
-                parseConfirmedGrids(body)
-            } catch (e: Exception) {
-                println("LoTWRepository fetch failure: $e")
-                null
-            }
-        }
+    override suspend fun fetchConfirmedGrids(callsign: String, password: String): LoTWResult =
+        fetchReportBody(callsign, password).fold(
+            onSuccess = { body -> parseBoth(body)?.let { LoTWResult.Success(it.first, it.second) }
+                ?: LoTWResult.RateLimited },
+            onFailure = { toResult(it) }
+        )
 
     override suspend fun fetchConfirmedGridQsos(
         callsign: String,
         password: String
-    ): Pair<Set<String>, Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>>? {
-        // Single report fetch: grids are derived from the same body as the
-        // per-QSO detail (avoids a second ARRL hit and keeps the two datasets
-        // perfectly consistent).
-        val body = fetchReportBody(callsign, password) ?: return null
+    ): LoTWResult = fetchReportBody(callsign, password).fold(
+        onSuccess = { body -> parseBoth(body)?.let { LoTWResult.Success(it.first, it.second) }
+            ?: LoTWResult.RateLimited },
+        onFailure = { toResult(it) }
+    )
+
+    internal fun toResult(e: Throwable): LoTWResult = when (e) {
+        is CredentialsException -> LoTWResult.BadCredentials
+        is RateLimitException -> LoTWResult.RateLimited
+        is TimeoutException -> LoTWResult.Timeout
+        else -> LoTWResult.NetworkError(e.message ?: e.javaClass.simpleName)
+    }
+
+    /** Single report fetch feeding both the grid set and the per-QSO detail. */
+    private fun parseBoth(body: String): Pair<Set<String>, Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>>? {
         val grids = parseConfirmedGrids(body) ?: return null
         val qsos = parseConfirmedGridQsos(body) ?: return null
         return grids to qsos
     }
 
-    private fun fetchReportBody(callsign: String, password: String): String? {
+    private fun fetchReportBody(callsign: String, password: String): Result<String> {
         val call = callsign.trim().uppercase()
         val pwd = password.trim()
-        if (call.isBlank() || pwd.isBlank()) return null
+        if (call.isBlank() || pwd.isBlank()) return Result.failure(IOException("empty credentials"))
+        // qso_qslsince with an early date forces a FULL confirmed-QSL report.
+        // Without it, LoTW applies a "system supplied default" since-date and
+        // only returns confirmations newer than the account's last query —
+        // subsequent syncs would return an empty/incremental report.
         val since = "2000-01-01"
         val query = buildString {
             append("login=").append(URLEncoder.encode(call, "UTF-8"))
@@ -111,6 +91,11 @@ class LoTWRepository : ILoTWRepository {
         }
         return try {
             val connection = URL("$BASE_URL?$query").openConnection() as HttpURLConnection
+            // ARRL can be slow to accept connections from mobile networks
+            // (long TLS handshakes across the Pacific, occasional server-side
+            // queueing). 30s connect + 120s read gives the request enough
+            // headroom; the sync button stays disabled meanwhile so users
+            // see progress rather than a hung dialog.
             connection.connectTimeout = 30_000
             connection.readTimeout = 120_000
             connection.requestMethod = "GET"
@@ -119,20 +104,37 @@ class LoTWRepository : ILoTWRepository {
             val code = connection.responseCode
             if (code !in 200..299) {
                 connection.disconnect()
-                return null
+                // Observed in the wild (CQRLOG #2422): LoTW answers a throttled
+                // report pull with HTTP 503 "Page request limit".
+                return if (code == 503 || code == 429) Result.failure(RateLimitException())
+                else Result.failure(IOException("HTTP $code"))
             }
             val stream = connection.inputStream
             val body = ("gzip".equals(connection.contentEncoding, ignoreCase = true))
                 .let { gz -> if (gz) java.util.zip.GZIPInputStream(stream) else stream }
                 .bufferedReader().use { it.readText() }
             connection.disconnect()
-            if (body.contains(" password=") && !body.startsWith("ARRL")) return null
-            body
+            when {
+                // Login failure: HTTP 200 + HTML login page with the error text.
+                body.contains("incorrect", ignoreCase = true) &&
+                    body.contains("assword", ignoreCase = true) -> Result.failure(CredentialsException())
+                // Any other non-ADIF body: rate-limit refusal / server error page.
+                !body.contains("<eoh>", ignoreCase = true) -> Result.failure(RateLimitException())
+                else -> Result.success(body)
+            }
+        } catch (e: SocketTimeoutException) {
+            Result.failure(TimeoutException(e.message ?: "timed out"))
+        } catch (e: SSLException) {
+            Result.failure(IOException("TLS: ${e.message ?: "handshake failed"}"))
         } catch (e: Exception) {
             println("LoTWRepository fetch failure: $e")
-            null
+            Result.failure(IOException(e.message ?: e.javaClass.simpleName))
         }
     }
+
+    internal class CredentialsException : Exception("bad callsign/password")
+    internal class RateLimitException : Exception("report refused (rate limit / server error)")
+    internal class TimeoutException(message: String) : Exception(message)
 
     internal fun parseConfirmedGridQsos(
         body: String

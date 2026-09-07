@@ -201,18 +201,47 @@ class SettingsViewModel(
         settingsRepo.updateLoTWSettings(settings)
         _uiState.update { it.copy(lotwSyncing = true, lotwMessage = null) }
         viewModelScope.launch {
-            val lotwResult = lotwRepo.fetchConfirmedGridQsos(settings.callsign, settings.password)
-            _uiState.update { state ->
-                if (lotwResult == null) {
-                    state.copy(lotwSyncing = false, lotwMessage = "LoTW sync failed — check callsign/password/network")
-                } else {
+            when (val result = lotwRepo.fetchConfirmedGridQsos(settings.callsign, settings.password)) {
+                is com.rtbishop.look4sat.core.domain.repository.LoTWResult.Success -> {
                     // Wavelog entry removed: LoTW is now the only source, so the
                     // synced set fully replaces the stored worked grids.
-                    val (grids, qsos) = lotwResult
-                    settingsRepo.setWorkedGrids(grids)
-                    settingsRepo.setWorkedGridQsos(qsos)
-                    state.copy(lotwSyncing = false, workedGridsCount = grids.size, lotwMessage = null)
+                    settingsRepo.setWorkedGrids(result.grids)
+                    settingsRepo.setWorkedGridQsos(result.qsos)
+                    _uiState.update { state ->
+                        state.copy(
+                            lotwSyncing = false, workedGridsCount = result.grids.size,
+                            lotwMessage = null
+                        )
+                    }
                 }
+                is com.rtbishop.look4sat.core.domain.repository.LoTWResult.BadCredentials ->
+                    _uiState.update { state ->
+                        state.copy(
+                            lotwSyncing = false,
+                            lotwMessage = "LoTW sync failed — callsign or password incorrect"
+                        )
+                    }
+                is com.rtbishop.look4sat.core.domain.repository.LoTWResult.RateLimited ->
+                    _uiState.update { state ->
+                        state.copy(
+                            lotwSyncing = false,
+                            lotwMessage = "LoTW sync failed — rate limited by server, wait a few minutes and retry"
+                        )
+                    }
+                is com.rtbishop.look4sat.core.domain.repository.LoTWResult.Timeout ->
+                    _uiState.update { state ->
+                        state.copy(
+                            lotwSyncing = false,
+                            lotwMessage = "LoTW sync failed — connection timed out, try another network"
+                        )
+                    }
+                is com.rtbishop.look4sat.core.domain.repository.LoTWResult.NetworkError ->
+                    _uiState.update { state ->
+                        state.copy(
+                            lotwSyncing = false,
+                            lotwMessage = "LoTW sync failed — network error (${result.detail})"
+                        )
+                    }
             }
         }
     }
