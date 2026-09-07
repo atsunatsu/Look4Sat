@@ -57,15 +57,25 @@ class LoTWRepository : ILoTWRepository {
             }
             try {
                 val connection = URL("$BASE_URL?$query").openConnection() as HttpURLConnection
-                connection.connectTimeout = 15_000
-                connection.readTimeout = 60_000
+                // ARRL can be slow to accept connections from mobile networks
+                // (long TLS handshakes across the Pacific, occasional server-side
+                // queueing). 30s connect + 120s read gives the request enough
+                // headroom; the sync button stays disabled meanwhile so users
+                // see progress rather than a hung dialog.
+                connection.connectTimeout = 30_000
+                connection.readTimeout = 120_000
                 connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept-Encoding", "gzip")
+                connection.instanceFollowRedirects = true
                 val code = connection.responseCode
                 if (code !in 200..299) {
                     connection.disconnect()
                     return@withContext null
                 }
-                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                val stream = connection.inputStream
+                val body = ("gzip".equals(connection.contentEncoding, ignoreCase = true))
+                    .let { gz -> if (gz) java.util.zip.GZIPInputStream(stream) else stream }
+                    .bufferedReader().use { it.readText() }
                 connection.disconnect()
                 if (body.contains(" password=") && !body.startsWith("ARRL")) return@withContext null
                 parseConfirmedGrids(body)
