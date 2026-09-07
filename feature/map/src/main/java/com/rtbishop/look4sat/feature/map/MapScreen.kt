@@ -161,9 +161,9 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
         }
         ElevatedCard(modifier = Modifier.weight(1f)) {
             Box(contentAlignment = Alignment.BottomCenter) {
-                // Track grid-mode transitions so the map only re-centers when the
-                // mode is switched ON, not on every recomposition.
-                var prevGridMode by remember { mutableStateOf(uiState.isGridMode) }
+                // Track grid-mode transitions; initial value false so that entering
+                // the map page with grid mode already ON also centers the map.
+                var prevGridMode by remember { mutableStateOf(false) }
                 AndroidView({ mapView }) { view ->
                     setGridMode(
                         uiState.isGridMode, uiState.workedGrids, view,
@@ -289,10 +289,12 @@ private fun setGridMode(
         if (gridOverlay is MaidenheadGridOverlay) {
             gridOverlay.isEnabled = gridMode
             gridOverlay.workedGrids = workedGrids
+            gridOverlay.ownGrid = ownGridOf(stationPosition)
         } else {
             mapView.overlays[OVERLAY_GRID] = MaidenheadGridOverlay().apply {
                 isEnabled = gridMode
                 this.workedGrids = workedGrids
+                this.ownGrid = ownGridOf(stationPosition)
             }
         }
         // Satellite-related layers are hidden in grid mode; the grid overlay
@@ -315,6 +317,18 @@ private fun setGridMode(
     } catch (e: Exception) {
         println(e)
     }
+}
+
+/** The station's 4-char Maidenhead gridsquare, e.g. "OL62", or null without a position. */
+private fun ownGridOf(stationPosition: GeoPos?): String? {
+    val pos = stationPosition ?: return null
+    val lat = pos.latitude
+    val lon = pos.longitude
+    val fieldLat = ((lat + 90.0) / 10.0).toInt().coerceIn(0, 17)
+    val fieldLon = ((lon + 180.0) / 20.0).toInt().coerceIn(0, 17)
+    val subLat = ((lat + 90.0) % 10.0).toInt()
+    val subLon = ((lon + 180.0) % 20.0 / 2.0).toInt()
+    return "${'A' + fieldLon}${'A' + fieldLat}$subLon$subLat"
 }
 
 private fun setStationPosition(stationPos: GeoPos, mapView: MapView) {

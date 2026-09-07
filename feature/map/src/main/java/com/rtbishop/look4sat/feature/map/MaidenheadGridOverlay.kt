@@ -56,6 +56,11 @@ class MaidenheadGridOverlay : Overlay() {
         style = android.graphics.Paint.Style.FILL
         color = Color.argb(90, 76, 217, 100)
     }
+    private val ownLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        strokeWidth = 4.5f
+        style = Paint.Style.STROKE
+        color = Color.argb(255, 90, 200, 255)
+    }
 
     /** Worked gridsquares (4-char, uppercase) to highlight, e.g. {"OL62", "PM95"}. */
     var workedGrids: Set<String> = emptySet()
@@ -63,10 +68,14 @@ class MaidenheadGridOverlay : Overlay() {
     /** The station's own 4-char gridsquare, drawn with a distinct outline. */
     var ownGrid: String? = null
 
+    /** Viewport width, refreshed each draw; used by projectionToX bounds. */
+    private var canvasWidthPx = 1080f
+
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow || !isEnabled) return
         val projection = mapView.projection
         val zoom = mapView.zoomLevelDouble
+        canvasWidthPx = canvas.width.toFloat()
         val cellLat = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LAT else FIELD_LAT
         val cellLon = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LON else FIELD_LON
 
@@ -85,6 +94,9 @@ class MaidenheadGridOverlay : Overlay() {
         val firstCol = floor(leftLon / cellLon).toInt()
         val lastCol = ceil(rightLon / cellLon).toInt()
         val centerLon = (leftLon + rightLon) / 2.0
+
+        // The station's own grid square (4-char, only meaningful at sub-square zoom)
+        val ownCell = ownGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
 
         // Worked-grid highlight fills (only meaningful at sub-square zoom)
         if (workedGrids.isNotEmpty() && zoom >= GRID_ZOOM_SUB) {
@@ -122,6 +134,27 @@ class MaidenheadGridOverlay : Overlay() {
             val y = projectionToY(projection, lat)
             if (y == null) continue
             canvas.drawLine(0f, y, canvas.width.toFloat(), y, linePaint)
+        }
+
+        // The station's own grid square: redraw its four borders thicker on top.
+        if (ownCell != null) {
+            val ownColIdx = firstCol..lastCol
+            for (row in firstRow..lastRow) {
+                val lat = row * cellLat
+                if (lat < -90.0 || lat >= 90.0) continue
+                for (col in ownColIdx) {
+                    val lon = col * cellLon
+                    if (cellLabel(lat, lon, zoom) != ownCell) continue
+                    val yTop = projectionToY(projection, lat + cellLat) ?: continue
+                    val yBottom = projectionToY(projection, lat) ?: continue
+                    val xLeft = projectionToX(projection, lon, centerLon) ?: continue
+                    val xRight = projectionToX(projection, lon + cellLon, centerLon) ?: continue
+                    canvas.drawLine(xLeft, yTop, xRight, yTop, ownLinePaint)
+                    canvas.drawLine(xLeft, yBottom, xRight, yBottom, ownLinePaint)
+                    canvas.drawLine(xLeft, yTop, xLeft, yBottom, ownLinePaint)
+                    canvas.drawLine(xRight, yTop, xRight, yBottom, ownLinePaint)
+                }
+            }
         }
 
         // Labels: centered in each cell, only when the cell is large enough on
@@ -175,7 +208,11 @@ class MaidenheadGridOverlay : Overlay() {
         while (normalized > centerLon + 180.0) normalized -= 360.0
         val geo = org.osmdroid.util.GeoPoint(0.0, normalized)
         val p = projection.toPixels(geo, null)
-        return if (p.x in -MAX_OVERSHOOT_PX..MAX_OVERSHOOT_PX + 4096) p.x.toFloat() else null
+        // Accept generous horizontal overshoot: at low zoom the world repeats and
+        // a meridian just off-screen may still be projected; rejecting too early
+        // makes lines vanish while panning. 2x viewport width is plenty.
+        val limit = canvasWidthPx * 2f + MAX_OVERSHOOT_PX
+        return if (p.x >= -limit && p.x <= limit) p.x.toFloat() else null
     }
 
     /** Y pixel for a latitude, or null when outside the viewport. */

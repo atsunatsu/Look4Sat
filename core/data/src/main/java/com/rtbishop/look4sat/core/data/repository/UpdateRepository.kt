@@ -58,6 +58,14 @@ class UpdateRepository(
         val title = Regex("<title>(.*?)</title>", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1)?.trim()
             ?.substringBefore("·")?.removePrefix("Release")?.trim() ?: tag
+        // Release notes live in the page's markdown-body section (first occurrence
+        // is the release description). Strip HTML tags for plain-text display.
+        val raw = Regex("<div[^>]*class=\"[^\"]*markdown-body[^\"]*\"[^>]*>(.*?)</div>", RegexOption.DOT_MATCHES_ALL)
+            .find(html)?.groupValues?.get(1) ?: ""
+        val body = raw.replace(Regex("<[^>]+>"), "")
+            .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+            .replace("&quot;", "\"").replace("&#39;", "'")
+            .trim()
         // The release APK asset follows the fixed naming scheme used by the build:
         // Look4Sat-<tag without leading v>-release.apk. When the page was fetched
         // through an accelerator mirror (https://<mirror>/https://github.com/...),
@@ -72,7 +80,7 @@ class UpdateRepository(
         return LatestRelease(
             versionTag = tag,
             title = title,
-            body = "",
+            body = body,
             apkUrl = apkUrl
         )
     }
