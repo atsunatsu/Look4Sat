@@ -315,10 +315,6 @@ class MaidenheadGridOverlay : Overlay() {
         // the sub-square grid is too dense to read; 6 roughly doubles the
         // on-screen size of each square.
         const val GRID_ZOOM_SUB = 6.0
-        // Zoom at which cell name labels appear.
-        // 3.0 → 4.0: fields were still cramped at zoom 3; 4 gives each 2-char
-        // field label comfortable room.
-        const val FIELD_ZOOM_LABELS = 4.0
         const val MIN_LABEL_CELL_PX = 48f
         const val MAX_OVERSHOOT_PX = 64
     }
