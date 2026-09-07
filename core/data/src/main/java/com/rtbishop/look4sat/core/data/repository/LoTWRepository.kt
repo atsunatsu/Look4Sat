@@ -45,20 +45,24 @@ import javax.net.ssl.SSLException
 class LoTWRepository : ILoTWRepository {
 
     override suspend fun fetchConfirmedGrids(callsign: String, password: String): LoTWResult =
+        withContext(Dispatchers.IO) {
+            fetchReportBody(callsign, password).fold(
+                onSuccess = { body -> parseBoth(body)?.let { LoTWResult.Success(it.first, it.second) }
+                    ?: LoTWResult.RateLimited },
+                onFailure = { toResult(it) }
+            )
+        }
+
+    override suspend fun fetchConfirmedGridQsos(
+        callsign: String,
+        password: String
+    ): LoTWResult = withContext(Dispatchers.IO) {
         fetchReportBody(callsign, password).fold(
             onSuccess = { body -> parseBoth(body)?.let { LoTWResult.Success(it.first, it.second) }
                 ?: LoTWResult.RateLimited },
             onFailure = { toResult(it) }
         )
-
-    override suspend fun fetchConfirmedGridQsos(
-        callsign: String,
-        password: String
-    ): LoTWResult = fetchReportBody(callsign, password).fold(
-        onSuccess = { body -> parseBoth(body)?.let { LoTWResult.Success(it.first, it.second) }
-            ?: LoTWResult.RateLimited },
-        onFailure = { toResult(it) }
-    )
+    }
 
     internal fun toResult(e: Throwable): LoTWResult = when (e) {
         is CredentialsException -> LoTWResult.BadCredentials
