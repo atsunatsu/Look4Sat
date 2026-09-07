@@ -503,10 +503,14 @@ private fun setGridMode(
             val pos = stationPosition ?: return
             val lat = pos.latitude
             val lon = pos.longitude
+            // Maidenhead field indices: field 0 spans -90..-80° lat and
+            // -180..-160° lon, so the field-center must be offset by those
+            // bases — omitting them maps e.g. OL62's field center to
+            // 115°N/290°E (an ocean a hemisphere away) instead of 25°N/110°E.
             val fieldLat = ((lat + 90.0) / 10.0).toInt().coerceIn(0, 17)
             val fieldLon = ((lon + 180.0) / 20.0).toInt().coerceIn(0, 17)
-            val centerLat = fieldLat * 10.0 + 5.0
-            val centerLon = fieldLon * 20.0 + 10.0
+            val centerLat = fieldLat * 10.0 + 5.0 - 90.0
+            val centerLon = fieldLon * 20.0 + 10.0 - 180.0
             mapView.post { mapView.controller.setCenter(GeoPoint(centerLat, centerLon)) }
         }
     } catch (e: Exception) {
