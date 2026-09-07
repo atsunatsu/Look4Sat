@@ -56,6 +56,13 @@ class MaidenheadGridOverlay : Overlay() {
         style = android.graphics.Paint.Style.FILL
         color = Color.argb(90, 76, 217, 100)
     }
+    // Sub-square zoom shows the same 2°x1° cell much larger on screen; the
+    // full-strength fill that looks fine as a small field-zoom patch becomes
+    // glaring when it covers half the viewport. Soften it there.
+    private val workedPaintSub = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.FILL
+        color = Color.argb(50, 76, 217, 100)
+    }
     private val ownLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeWidth = 4.5f
         style = Paint.Style.STROKE
@@ -146,7 +153,7 @@ class MaidenheadGridOverlay : Overlay() {
                         val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
                         if (xRight < 0f || xLeft > canvas.width) continue
                         if (cellLabel(lat, lon, zoom) in workedGrids) {
-                            canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
+                            canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaintSub)
                         }
                     }
                 }
@@ -273,11 +280,6 @@ class MaidenheadGridOverlay : Overlay() {
                 val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
                 if (xRight < 0f || xLeft > canvas.width) continue
                 val label = cellLabel(lat, lon, zoom)
-                // Worked cells stay label-free: a bright-yellow 4-char label
-                // centered on a green fill reads as "the green got brighter"
-                // and breaks consistency with field zoom, where 2-char labels
-                // sit at field centers and almost never overlap a worked cell.
-                if (label in workedGrids) continue
                 canvas.drawText(label, (xLeft + xRight) / 2f, yCenter, labelPaint)
             }
         }
