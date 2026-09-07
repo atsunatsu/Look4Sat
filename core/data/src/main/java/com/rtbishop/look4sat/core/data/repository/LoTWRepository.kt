@@ -94,14 +94,33 @@ class LoTWRepository : ILoTWRepository {
         // (LoTW writes it lowercase). Match case-insensitively to be safe.
         if (!body.contains("<eoh>", ignoreCase = true)) return null
         val grids = mutableSetOf<String>()
+        // ADIF fields of one QSO record span multiple lines and are terminated by
+        // <EOR>. Satellite QSOs carry <PROP_MODE:3>SAT (plus <SAT_NAME>); ground
+        // QSOs omit it. Grid fields (GRIDSQUARE / VUCC_GRIDS) must only be
+        // collected for records whose PROP_MODE is SAT, otherwise the map mixes
+        // in terrestrial contacts.
+        var propMode: String? = null
         for (raw in body.lineSequence()) {
             val line = raw.trim()
-            val value = when {
-                line.startsWith("<GRIDSQUARE:") -> line.substringAfter('>')
-                line.startsWith("<VUCC_GRIDS:") -> line.substringAfter('>')
-                else -> continue
-            }.substringBefore("E<").trim().uppercase()
-            if (value.length >= 4) grids.add(value.take(4))
+            when {
+                line.equals("<EOR>", ignoreCase = true) -> propMode = null
+                line.startsWith("<PROP_MODE:") -> {
+                    propMode = line.substringAfter('>').substringBefore("E<").trim().uppercase()
+                }
+                line.startsWith("<GRIDSQUARE:") || line.startsWith("<VUCC_GRIDS:") -> {
+                    if (propMode == "SAT") {
+                        // VUCC_GRIDS holds a comma-separated PAIR of grids
+                        // ("EN52en,EN53fa") for contacts spanning two squares —
+                        // split on ',' and take the 4-char field of each, or the
+                        // second grid is silently dropped.
+                        val value = line.substringAfter('>').substringBefore("E<")
+                        value.split(',').forEach { grid ->
+                            val field = grid.trim().uppercase()
+                            if (field.length >= 4) grids.add(field.take(4))
+                        }
+                    }
+                }
+            }
         }
         return grids
     }

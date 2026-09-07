@@ -214,7 +214,10 @@ private class FakeSettingsRepo(dataSources: DataSourcesSettings = defaultDataSou
     )
 
     override val otherSettings: StateFlow<OtherSettings> = MutableStateFlow(
-        OtherSettings(false, false, false, false, false, false, false, false)
+        OtherSettings(
+            false, false, false, false, false, false, false,
+            shouldSeeWarning = false, shouldSeeWhatsNew = false
+        )
     )
 
     override val dataSourcesSettings: MutableStateFlow<DataSourcesSettings> = MutableStateFlow(dataSources)
@@ -270,6 +273,24 @@ private class FakeSettingsRepo(dataSources: DataSourcesSettings = defaultDataSou
     override fun getAmSatCallsign(): String = ""
 
     override fun setAmSatCallsign(callsign: String) = Unit
+
+    override val wavelogSettings: StateFlow<com.rtbishop.look4sat.core.domain.model.WavelogSettings> =
+        MutableStateFlow(com.rtbishop.look4sat.core.domain.model.WavelogSettings())
+
+    override fun updateWavelogSettings(settings: com.rtbishop.look4sat.core.domain.model.WavelogSettings) = Unit
+
+    override fun getWorkedGrids(): Set<String> = emptySet()
+
+    private val workedGrids = MutableStateFlow(emptySet<String>())
+
+    override fun setWorkedGrids(grids: Set<String>) {
+        workedGrids.value = grids
+    }
+
+    override val lotwSettings: StateFlow<com.rtbishop.look4sat.core.domain.model.LoTWSettings> =
+        MutableStateFlow(com.rtbishop.look4sat.core.domain.model.LoTWSettings())
+
+    override fun updateLoTWSettings(settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings) = Unit
 }
 
 private fun defaultDataSourcesSettings(): DataSourcesSettings {
