@@ -102,24 +102,44 @@ class MaidenheadGridOverlay : Overlay() {
         // The station's own grid square (4-char, only meaningful at sub-square zoom)
         val ownCell = ownGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
 
-        // Worked-grid highlight fills (only meaningful at sub-square zoom)
-        if (workedGrids.isNotEmpty() && zoom >= GRID_ZOOM_SUB) {
-            for (row in firstRow..lastRow) {
-                val lat = row * cellLat
-                if (lat < -90.0 || lat >= 90.0) continue
-                val topLatCell = lat + cellLat
-                if (topLatCell > 90.0) continue
-                val yTop = projectionToY(projection, topLatCell)
-                val yBottom = projectionToY(projection, lat)
-                if (yTop == null || yBottom == null) continue
-                for (col in firstCol..lastCol) {
-                    val lon = col * cellLon
-                    val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
-                    val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
-                    if (xRight < 0f || xLeft > canvas.width) continue
-                    if (cellLabel(lat, lon, zoom) in workedGrids) {
-                        canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
+        // Worked-grid highlight fills.
+        //  - Sub-square zoom: fill each worked 4-char cell directly.
+        //  - Field zoom (two-char labels): do NOT fill whole fields; instead fill
+        //    the individual 2°x1° squares that were worked, without drawing the
+        //    square grid lines — so you see green patches inside the field.
+        if (workedGrids.isNotEmpty()) {
+            if (zoom >= GRID_ZOOM_SUB) {
+                for (row in firstRow..lastRow) {
+                    val lat = row * cellLat
+                    if (lat < -90.0 || lat >= 90.0) continue
+                    val topLatCell = lat + cellLat
+                    if (topLatCell > 90.0) continue
+                    val yTop = projectionToY(projection, topLatCell)
+                    val yBottom = projectionToY(projection, lat)
+                    if (yTop == null || yBottom == null) continue
+                    for (col in firstCol..lastCol) {
+                        val lon = col * cellLon
+                        val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                        val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                        if (xRight < 0f || xLeft > canvas.width) continue
+                        if (cellLabel(lat, lon, zoom) in workedGrids) {
+                            canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
+                        }
                     }
+                }
+            } else {
+                for (grid in workedGrids) {
+                    val cell = gridCellBounds(grid) ?: continue
+                    if (cell.lonRight <= leftLon || cell.lonLeft >= rightLon ||
+                        cell.latTop <= bottomLat || cell.latBottom >= topLat
+                    ) continue
+                    val yTop = projectionToY(projection, cell.latTop) ?: continue
+                    val yBottom = projectionToY(projection, cell.latBottom) ?: continue
+                    val xLeft = projectionToX(projection, cell.lonLeft, centerLon, worldWidthPx) ?: continue
+                    val xRight = projectionToX(projection, cell.lonRight, centerLon, worldWidthPx) ?: continue
+                    if (xRight < 0f || xLeft > canvas.width) continue
+                    if (yBottom < 0f || yTop > canvas.height) continue
+                    canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
                 }
             }
         }
@@ -236,6 +256,30 @@ class MaidenheadGridOverlay : Overlay() {
         val squareLat = (((latNorm + 90.0) % FIELD_LAT) / SUB_SQUARE_LAT).toInt()
         return "$field$squareLon$squareLat"
     }
+
+    /**
+     * Geographic bounds of a 4-char Maidenhead square (e.g. "OL62"):
+     * 2° wide in longitude, 1° tall in latitude.
+     */
+    private fun gridCellBounds(grid: String): CellBounds? {
+        val g = grid.trim().uppercase()
+        if (g.length < 4) return null
+        val fieldLon = g[0] - 'A'
+        val fieldLat = g[1] - 'A'
+        val sqLon = g[2] - '0'
+        val sqLat = g[3] - '0'
+        if (fieldLon !in 0..17 || fieldLat !in 0..17 || sqLon !in 0..9 || sqLat !in 0..9) return null
+        val lonLeft = -180.0 + fieldLon * FIELD_LON + sqLon * SUB_SQUARE_LON
+        val latBottom = -90.0 + fieldLat * FIELD_LAT + sqLat * SUB_SQUARE_LAT
+        return CellBounds(lonLeft, lonLeft + SUB_SQUARE_LON, latBottom, latBottom + SUB_SQUARE_LAT)
+    }
+
+    private data class CellBounds(
+        val lonLeft: Double,
+        val lonRight: Double,
+        val latBottom: Double,
+        val latTop: Double
+    )
 
     private fun normalizeLon(lon: Double): Double {
         var l = lon % 360.0
