@@ -273,6 +273,11 @@ class MaidenheadGridOverlay : Overlay() {
                 val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
                 if (xRight < 0f || xLeft > canvas.width) continue
                 val label = cellLabel(lat, lon, zoom)
+                // Worked cells stay label-free: a bright-yellow 4-char label
+                // centered on a green fill reads as "the green got brighter"
+                // and breaks consistency with field zoom, where 2-char labels
+                // sit at field centers and almost never overlap a worked cell.
+                if (label in workedGrids) continue
                 canvas.drawText(label, (xLeft + xRight) / 2f, yCenter, labelPaint)
             }
         }
