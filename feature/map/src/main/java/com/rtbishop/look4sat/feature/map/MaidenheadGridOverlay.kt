@@ -87,36 +87,32 @@ class MaidenheadGridOverlay : Overlay() {
         val cellLat = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LAT else FIELD_LAT
         val cellLon = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LON else FIELD_LON
 
-        // Visible bounding box in geographic coordinates
+        // Visible bounding box. Do NOT derive longitude bounds from the left/
+        // right edge pixels: osmdroid normalizes them to [-180,180), which both
+        // garbles antimeridian-crossing views AND makes any global view (span
+        // > 180°) look like an antimeridian crossing — unwrapping then produced
+        // an inverted range and ALL meridians vanished at low zoom. Instead
+        // anchor on the view-center longitude and expand by the half-width in
+        // degrees; the range is continuous (may exceed ±180) and cell indices
+        // beyond 18 wrap correctly via normalizeLon().
         val north = projection.fromPixels(0, 0)
         val south = projection.fromPixels(canvas.width, canvas.height)
         val topLat = max(north.latitude, south.latitude).coerceIn(-90.0, 90.0)
         val bottomLat = min(north.latitude, south.latitude).coerceIn(-90.0, 90.0)
-        // Longitude: osmdroid normalizes to [-180, 180), so when the view
-        // straddles the antimeridian (e.g. left edge 170°E, right edge 170°W)
-        // the raw min/max swap sides and the bounding box spans the wrong way
-        // (center on the Pacific → grid painted 180° off-screen). Unwrap by
-        // shifting one edge by +360° so left < right again.
-        var lonA = north.longitude
-        var lonB = south.longitude
-        if (lonA > lonB) {
-            val t = lonA; lonA = lonB; lonB = t
-        }
-        if (lonB - lonA > 180.0) lonA += 360.0
-        val leftLon = lonA
-        val rightLon = lonB
+        val worldWidthPx = 256.0 * Math.pow(2.0, zoom)
+        val viewCenter = projection.fromPixels(canvas.width / 2, canvas.height / 2)
+        val centerLon = viewCenter.longitude
+        val halfSpanDeg = (canvas.width / 2.0) / worldWidthPx * 360.0
+        val leftLon = centerLon - halfSpanDeg
+        val rightLon = centerLon + halfSpanDeg
 
         val firstRow = floor(bottomLat / cellLat).toInt()
         val lastRow = ceil(topLat / cellLat).toInt()
-        // Longitude cell indices may exceed the [-180, 180) range when the view
-        // crosses the antimeridian; index arithmetic still works (PMxx at 360° == same grid)
+        // Longitude cell indices are in the continuous unwrapped space and may
+        // exceed the [-180, 180) range when the view crosses the antimeridian
+        // or spans world repeats; labels normalize each cell back.
         val firstCol = floor(leftLon / cellLon).toInt()
         val lastCol = ceil(rightLon / cellLon).toInt()
-        val centerLon = (leftLon + rightLon) / 2.0
-        // World width in screen pixels for the current zoom (256 px per tile,
-        // 2^zoom tiles across the whole 360° world). Used by the custom
-        // Mercator-X computation in projectionToX.
-        val worldWidthPx = 256.0 * Math.pow(2.0, zoom)
         // At low zoom the world is narrower than the viewport and osmdroid shows
         // repeating copies on both sides. The visible bounding box spans more
         // than 360° of longitude there; extend the column range by whole world
