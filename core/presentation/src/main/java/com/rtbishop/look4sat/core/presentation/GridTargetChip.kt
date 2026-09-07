@@ -53,7 +53,8 @@ fun GridTargetChip(
     modifier: Modifier = Modifier
 ) {
     val configured = grid != null && distanceKm != null && bearingDeg != null
-    val accent = MaterialTheme.colorScheme.tertiaryContainer
+    // The app's signature accent yellow (MaterialTheme primary in both themes).
+    val accent = MaterialTheme.colorScheme.primary
     val placeholder = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -83,13 +84,8 @@ fun GridTargetChip(
         Text(
             text = distanceKm?.let { "${"%,.0f".format(it)} km" } ?: "-- km",
             fontSize = 14.sp,
-            color = if (configured) Color.White else placeholder,
-            modifier = Modifier
-                .background(
-                    color = if (configured) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
         )
     }
 }

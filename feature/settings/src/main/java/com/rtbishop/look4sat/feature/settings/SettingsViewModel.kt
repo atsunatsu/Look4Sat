@@ -206,10 +206,10 @@ class SettingsViewModel(
                 if (lotwGrids == null) {
                     state.copy(lotwSyncing = false, lotwMessage = "LoTW sync failed — check callsign/password/network")
                 } else {
-                    // Merge with Wavelog grids: union of both sources, all confirmed/worked
-                    val merged = settingsRepo.getWorkedGrids() + lotwGrids
-                    settingsRepo.setWorkedGrids(merged)
-                    state.copy(lotwSyncing = false, workedGridsCount = merged.size, lotwMessage = null)
+                    // Wavelog entry removed: LoTW is now the only source, so the
+                    // synced set fully replaces the stored worked grids.
+                    settingsRepo.setWorkedGrids(lotwGrids)
+                    state.copy(lotwSyncing = false, workedGridsCount = lotwGrids.size, lotwMessage = null)
                 }
             }
         }

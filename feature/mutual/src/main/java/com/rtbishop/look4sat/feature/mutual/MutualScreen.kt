@@ -89,7 +89,8 @@ fun MutualScreen(
                     Text(
                         text = stringResource(R.string.mutual_title),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 12.dp)
                     )
                 },
                 bottomInfo = {
@@ -99,7 +100,9 @@ fun MutualScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 12.dp)
                     )
                 },
                 endAction = {

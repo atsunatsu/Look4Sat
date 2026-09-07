@@ -203,18 +203,6 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
             onSave = { onAction(SettingsAction.UpdateRadioControl(it)) }
         )
     }
-    if (dialogs.wavelog) {
-        WavelogDialog(
-            initialSettings = uiState.wavelogSettings,
-            workedGridsCount = uiState.workedGridsCount,
-            isSyncing = uiState.wavelogSyncing,
-            message = uiState.wavelogMessage,
-            dismiss = { dialogs.wavelog = false },
-            onSave = { onAction(SettingsAction.UpdateWavelog(it)) },
-            onSync = { onAction(SettingsAction.SyncWorkedGrids(it)) }
-        )
-    }
-
     if (dialogs.lotw) {
         LoTWDialog(
             initialSettings = uiState.lotwSettings,
@@ -328,13 +316,6 @@ private fun SettingsScreen(uiState: SettingsState, onAction: (SettingsAction) ->
                     onNetworkClick = permissions.launchNetwork,
                     onBluetoothClick = permissions.launchBluetooth,
                     onRadioControlClick = { dialogs.radioControl = true }
-                )
-            }
-            item {
-                WavelogCard(
-                    settings = uiState.wavelogSettings,
-                    workedGridsCount = uiState.workedGridsCount,
-                    showWavelogDialog = { dialogs.wavelog = true }
                 )
             }
             item {
@@ -578,44 +559,6 @@ private fun SwitchRow(labelResId: Int, checked: Boolean, onCheckedChange: (Boole
     ) {
         Text(text = stringResource(id = labelResId))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun WavelogCardPreview() = MainTheme {
-    WavelogCard(settings = WavelogSettings("http://192.168.1.10", "wl2_demo"), workedGridsCount = 42) {}
-}
-
-@Composable
-private fun WavelogCard(
-    settings: WavelogSettings,
-    workedGridsCount: Int,
-    showWavelogDialog: () -> Unit
-) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-            Text(
-                text = stringResource(id = R.string.prefs_wavelog_title),
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = if (settings.isConfigured) {
-                    stringResource(R.string.prefs_wavelog_configured, workedGridsCount)
-                } else {
-                    stringResource(R.string.prefs_wavelog_not_configured)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 2
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            CardButton(
-                onClick = showWavelogDialog,
-                text = stringResource(id = R.string.prefs_wavelog_configure),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
     }
 }
 

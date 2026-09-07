@@ -94,6 +94,10 @@ class MaidenheadGridOverlay : Overlay() {
         val firstCol = floor(leftLon / cellLon).toInt()
         val lastCol = ceil(rightLon / cellLon).toInt()
         val centerLon = (leftLon + rightLon) / 2.0
+        // World width in screen pixels for the current zoom (256 px per tile,
+        // 2^zoom tiles across the whole 360° world). Used by the custom
+        // Mercator-X computation in projectionToX.
+        val worldWidthPx = 256.0 * Math.pow(2.0, zoom)
 
         // The station's own grid square (4-char, only meaningful at sub-square zoom)
         val ownCell = ownGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
@@ -110,8 +114,8 @@ class MaidenheadGridOverlay : Overlay() {
                 if (yTop == null || yBottom == null) continue
                 for (col in firstCol..lastCol) {
                     val lon = col * cellLon
-                    val xLeft = projectionToX(projection, lon, centerLon) ?: continue
-                    val xRight = projectionToX(projection, lon + cellLon, centerLon) ?: continue
+                    val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                    val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
                     if (xRight < 0f || xLeft > canvas.width) continue
                     if (cellLabel(lat, lon, zoom) in workedGrids) {
                         canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
@@ -123,7 +127,7 @@ class MaidenheadGridOverlay : Overlay() {
         // Vertical lines (meridians)
         for (col in firstCol..lastCol) {
             val lon = col * cellLon
-            val x = projectionToX(projection, lon, centerLon)
+            val x = projectionToX(projection, lon, centerLon, worldWidthPx)
             if (x == null) continue
             canvas.drawLine(x, 0f, x, canvas.height.toFloat(), linePaint)
         }
@@ -147,8 +151,8 @@ class MaidenheadGridOverlay : Overlay() {
                     if (cellLabel(lat, lon, zoom) != ownCell) continue
                     val yTop = projectionToY(projection, lat + cellLat) ?: continue
                     val yBottom = projectionToY(projection, lat) ?: continue
-                    val xLeft = projectionToX(projection, lon, centerLon) ?: continue
-                    val xRight = projectionToX(projection, lon + cellLon, centerLon) ?: continue
+                    val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                    val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
                     canvas.drawLine(xLeft, yTop, xRight, yTop, ownLinePaint)
                     canvas.drawLine(xLeft, yBottom, xRight, yBottom, ownLinePaint)
                     canvas.drawLine(xLeft, yTop, xLeft, yBottom, ownLinePaint)
@@ -187,8 +191,8 @@ class MaidenheadGridOverlay : Overlay() {
             if (yBottom < 0f || yTop > canvas.height) continue
             for (col in firstCol..lastCol) {
                 val lon = col * cellLon
-                val xLeft = projectionToX(projection, lon, centerLon) ?: continue
-                val xRight = projectionToX(projection, lon + cellLon, centerLon) ?: continue
+                val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
                 if (xRight < 0f || xLeft > canvas.width) continue
                 val label = cellLabel(lat, lon, zoom)
                 canvas.drawText(label, (xLeft + xRight) / 2f, yCenter, labelPaint)
@@ -197,22 +201,18 @@ class MaidenheadGridOverlay : Overlay() {
     }
 
     /** X pixel for a longitude (meridians are vertical in Web Mercator). */
-    private fun projectionToX(projection: Projection, lon: Double, centerLon: Double): Float? {
-        // osmdroid clips Mercator X to [0, mapSize], which destroys the projection of
-        // longitudes outside the [0, 360) window of the current view (visible at low
-        // zoom where the whole world is narrower than the viewport). Normalizing the
-        // longitude to the equivalent value closest to the view center keeps every
-        // meridian's X near the center, safely inside the clip window.
-        var normalized = lon
-        while (normalized < centerLon - 180.0) normalized += 360.0
-        while (normalized > centerLon + 180.0) normalized -= 360.0
-        val geo = org.osmdroid.util.GeoPoint(0.0, normalized)
+    private fun projectionToX(projection: Projection, lon: Double, centerLon: Double, worldWidthPx: Double): Float? {
+        // Do NOT use osmdroid's toPixels() here: at low zoom its wrap-around
+        // logic (getCloserPixel) mis-projects longitudes far from the view
+        // center, which makes meridians vanish while panning. Mercator X is
+        // linear in longitude, so compute it directly:
+        //   x = screenCenterX + (lon - centerLon) / 360 * worldWidthPx
+        var delta = lon - centerLon
+        while (delta > 180.0) delta -= 360.0
+        while (delta < -180.0) delta += 360.0
+        val geo = org.osmdroid.util.GeoPoint(0.0, centerLon)
         val p = projection.toPixels(geo, null)
-        // Accept generous horizontal overshoot: at low zoom the world repeats and
-        // a meridian just off-screen may still be projected; rejecting too early
-        // makes lines vanish while panning. 2x viewport width is plenty.
-        val limit = canvasWidthPx * 2f + MAX_OVERSHOOT_PX
-        return if (p.x >= -limit && p.x <= limit) p.x.toFloat() else null
+        return (p.x + delta / 360.0 * worldWidthPx).toFloat()
     }
 
     /** Y pixel for a latitude, or null when outside the viewport. */
