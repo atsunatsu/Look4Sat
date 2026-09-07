@@ -347,12 +347,13 @@ private fun WorkedGridCallRow(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 3.dp)
         )
-        // Subsequent QSOs in this grid, revealed on expand.
+        // Subsequent QSOs in this grid, revealed on expand. No ordinal prefix;
+        // each line carries its own date (the first QSO's date already sits in
+        // the header row).
         if (expanded && callQsos.size > 1) {
-            callQsos.drop(1).forEachIndexed { index, qso ->
-                val ordinal = "${index + 2}"
+            callQsos.drop(1).forEach { qso ->
                 Text(
-                    text = "$ordinal " + qsoSummary(qso, isUtc),
+                    text = formatDate(qso.epochMs, isUtc) + " · " + qsoSummary(qso, isUtc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 3.dp)
