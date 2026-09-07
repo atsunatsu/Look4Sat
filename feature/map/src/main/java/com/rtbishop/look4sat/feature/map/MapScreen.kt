@@ -139,6 +139,10 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
     val isTimeAos = uiState.mapData?.isTimeAos ?: true
 
     LaunchedEffect(uiState.track) {
+        // In grid mode the map is centered on the local grid square; following
+        // the satellite subpoint here would override that centering on every
+        // track update, so skip the tracking animation entirely.
+        if (uiState.isGridMode) return@LaunchedEffect
         val firstPos = uiState.track?.firstOrNull()?.firstOrNull() ?: return@LaunchedEffect
         mapView.controller.animateTo(GeoPoint(firstPos.latitude, firstPos.longitude))
     }
