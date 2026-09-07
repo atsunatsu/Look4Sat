@@ -314,7 +314,10 @@ private fun setGridMode(
             mapView.overlays.getOrNull(index)?.isEnabled = !gridMode
         }
         // Entering grid mode: center on the station's current grid square,
-        // keeping the current zoom level unchanged.
+        // keeping the current zoom level unchanged. post{} is essential: on the
+        // first composition this runs before MapView's first layout, and a
+        // setCenter issued pre-layout is discarded when the view lays out —
+        // the map then keeps its default center forever.
         if (gridMode) {
             val pos = stationPosition ?: return
             val lat = pos.latitude
@@ -323,7 +326,7 @@ private fun setGridMode(
             val fieldLon = ((lon + 180.0) / 20.0).toInt().coerceIn(0, 17)
             val centerLat = fieldLat * 10.0 + 5.0
             val centerLon = fieldLon * 20.0 + 10.0
-            mapView.controller.setCenter(GeoPoint(centerLat, centerLon))
+            mapView.post { mapView.controller.setCenter(GeoPoint(centerLat, centerLon)) }
         }
     } catch (e: Exception) {
         println(e)

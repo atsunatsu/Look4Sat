@@ -84,8 +84,19 @@ class MaidenheadGridOverlay : Overlay() {
         val south = projection.fromPixels(canvas.width, canvas.height)
         val topLat = max(north.latitude, south.latitude).coerceIn(-90.0, 90.0)
         val bottomLat = min(north.latitude, south.latitude).coerceIn(-90.0, 90.0)
-        val leftLon = min(north.longitude, south.longitude)
-        val rightLon = max(north.longitude, south.longitude)
+        // Longitude: osmdroid normalizes to [-180, 180), so when the view
+        // straddles the antimeridian (e.g. left edge 170°E, right edge 170°W)
+        // the raw min/max swap sides and the bounding box spans the wrong way
+        // (center on the Pacific → grid painted 180° off-screen). Unwrap by
+        // shifting one edge by +360° so left < right again.
+        var lonA = north.longitude
+        var lonB = south.longitude
+        if (lonA > lonB) {
+            val t = lonA; lonA = lonB; lonB = t
+        }
+        if (lonB - lonA > 180.0) lonA += 360.0
+        val leftLon = lonA
+        val rightLon = lonB
 
         val firstRow = floor(bottomLat / cellLat).toInt()
         val lastRow = ceil(topLat / cellLat).toInt()
@@ -98,6 +109,12 @@ class MaidenheadGridOverlay : Overlay() {
         // 2^zoom tiles across the whole 360° world). Used by the custom
         // Mercator-X computation in projectionToX.
         val worldWidthPx = 256.0 * Math.pow(2.0, zoom)
+        // At low zoom the world is narrower than the viewport and osmdroid shows
+        // repeating copies on both sides. The visible bounding box spans more
+        // than 360° of longitude there; extend the column range by whole world
+        // turns so meridians, fills and labels tile across the repeats too.
+        val worldTurns = ceil(((rightLon - leftLon) / 360.0) - 1e-9).toInt().coerceAtLeast(0)
+        val colRepeats = if (worldTurns > 0) worldTurns else 0
 
         // The station's own grid square (4-char, only meaningful at sub-square zoom)
         val ownCell = ownGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
@@ -117,7 +134,7 @@ class MaidenheadGridOverlay : Overlay() {
                     val yTop = projectionToY(projection, topLatCell)
                     val yBottom = projectionToY(projection, lat)
                     if (yTop == null || yBottom == null) continue
-                    for (col in firstCol..lastCol) {
+                    for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
                         val lon = col * cellLon
                         val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
                         val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
@@ -130,22 +147,24 @@ class MaidenheadGridOverlay : Overlay() {
             } else {
                 for (grid in workedGrids) {
                     val cell = gridCellBounds(grid) ?: continue
-                    if (cell.lonRight <= leftLon || cell.lonLeft >= rightLon ||
-                        cell.latTop <= bottomLat || cell.latBottom >= topLat
-                    ) continue
-                    val yTop = projectionToY(projection, cell.latTop) ?: continue
-                    val yBottom = projectionToY(projection, cell.latBottom) ?: continue
-                    val xLeft = projectionToX(projection, cell.lonLeft, centerLon, worldWidthPx) ?: continue
-                    val xRight = projectionToX(projection, cell.lonRight, centerLon, worldWidthPx) ?: continue
-                    if (xRight < 0f || xLeft > canvas.width) continue
-                    if (yBottom < 0f || yTop > canvas.height) continue
-                    canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
+                    for (turn in -colRepeats..colRepeats) {
+                        // Shift the cell by whole world turns to cover repeats.
+                        val dLon = turn * 360.0
+                        if (cell.lonRight + dLon <= leftLon || cell.lonLeft + dLon >= rightLon) continue
+                        val yTop = projectionToY(projection, cell.latTop) ?: continue
+                        val yBottom = projectionToY(projection, cell.latBottom) ?: continue
+                        val xLeft = projectionToX(projection, cell.lonLeft + dLon, centerLon, worldWidthPx) ?: continue
+                        val xRight = projectionToX(projection, cell.lonRight + dLon, centerLon, worldWidthPx) ?: continue
+                        if (xRight < 0f || xLeft > canvas.width) continue
+                        if (yBottom < 0f || yTop > canvas.height) continue
+                        canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
+                    }
                 }
             }
         }
 
         // Vertical lines (meridians)
-        for (col in firstCol..lastCol) {
+        for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
             val lon = col * cellLon
             val x = projectionToX(projection, lon, centerLon, worldWidthPx)
             if (x == null) continue
@@ -209,7 +228,7 @@ class MaidenheadGridOverlay : Overlay() {
             val yBottom = projectionToY(projection, lat) ?: continue
             val yCenter = (yTop + yBottom) / 2f - textHalfHeight
             if (yBottom < 0f || yTop > canvas.height) continue
-            for (col in firstCol..lastCol) {
+            for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
                 val lon = col * cellLon
                 val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
                 val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
