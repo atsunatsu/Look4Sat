@@ -186,8 +186,8 @@
     <string name="prefs_lotw_title">LoTW confirmed grids</string>
     <string name="prefs_lotw_callsign">LoTW callsign</string>
     <string name="prefs_lotw_password">LoTW password</string>
-    <string name="prefs_lotw_hint">Fetch confirmed-QSO grids directly from ARRL LoTW and merge them with Wavelog grids (currently %1$d). The password is stored on this device only. Just tap Sync — credentials are saved automatically.</string>
-    <string name="prefs_lotw_sync">Sync now</string>
+    <string name="prefs_lotw_hint">Fetch confirmed-QSO grids directly from ARRL LoTW for this callsign and replace the stored set (currently %1$d). The password is stored on this device only. Tapping Sync saves the credentials and fetches in one step.</string>
+    <string name="prefs_lotw_sync">Sync</string>
     <string name="prefs_lotw_syncing">Syncing…</string>
     <string name="prefs_lotw_configured">Synced from LoTW — %1$d grids total</string>
     <string name="prefs_lotw_not_configured">Not configured — pull confirmed grids directly from ARRL LoTW, no self-hosted server needed</string>

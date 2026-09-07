@@ -238,10 +238,13 @@ fun LoTWDialog(
     SharedDialog(
         title = stringResource(R.string.prefs_lotw_title),
         onCancel = dismiss,
+        // The confirm button IS the sync action: saving credentials and
+        // fetching confirmed grids happen in one step.
         onAccept = {
-            onSave(com.rtbishop.look4sat.core.domain.model.LoTWSettings(call.value, pass.value))
-            dismiss()
-        }
+            onSync(com.rtbishop.look4sat.core.domain.model.LoTWSettings(call.value, pass.value))
+        },
+        acceptText = stringResource(if (isSyncing) R.string.prefs_lotw_syncing else R.string.prefs_lotw_sync),
+        acceptEnabled = !isSyncing
     ) {
         OutlinedTextField(
             value = call.value,
@@ -272,20 +275,6 @@ fun LoTWDialog(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
             )
-        }
-        // Sync uses the values typed in the fields directly — saving and syncing
-        // happen in one step, no need to close and reopen the dialog.
-        Row(
-            horizontalArrangement = Arrangement.End,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large)
-        ) {
-            TextButton(
-                onClick = { onSync(com.rtbishop.look4sat.core.domain.model.LoTWSettings(call.value, pass.value)) },
-                enabled = !isSyncing
-            ) {
-                Text(text = if (isSyncing) stringResource(R.string.prefs_lotw_syncing)
-                else stringResource(R.string.prefs_lotw_sync))
-            }
         }
         Spacer(modifier = Modifier.height(0.dp))
     }

@@ -210,12 +210,20 @@ fun RowScope.NextPassRow(pass: OrbitalPass, modifier: Modifier = Modifier, isUtc
 }
 
 @Composable
-fun CardButton(onClick: () -> Unit, text: String, modifier: Modifier = Modifier) {
+fun CardButton(
+    onClick: () -> Unit,
+    text: String,
+    modifier: Modifier = Modifier,
+    isEnabled: Boolean = true
+) {
     ElevatedButton(
         onClick = onClick,
+        enabled = isEnabled,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
         ),
         shape = MaterialTheme.shapes.small,
         modifier = modifier,
@@ -316,9 +324,21 @@ fun InfoDialog(
 
 @Composable
 fun SharedDialog(
-    title: String, onCancel: () -> Unit, onAccept: () -> Unit, content: @Composable () -> Unit
+    title: String,
+    onCancel: () -> Unit,
+    onAccept: () -> Unit,
+    acceptText: String? = null,
+    acceptEnabled: Boolean = true,
+    content: @Composable () -> Unit
 ) {
-    SharedDialog(title = title, onDismissRequest = onCancel, onCancel = onCancel, onAccept = onAccept) { _ ->
+    SharedDialog(
+        title = title,
+        onDismissRequest = onCancel,
+        onCancel = onCancel,
+        onAccept = onAccept,
+        acceptText = acceptText,
+        acceptEnabled = acceptEnabled
+    ) { _ ->
         content()
     }
 }
@@ -329,6 +349,8 @@ fun SharedDialog(
     onDismissRequest: () -> Unit,
     onCancel: (() -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
+    acceptText: String? = null,
+    acceptEnabled: Boolean = true,
     titleFontSize: Int = 16,
     titleTextAlign: TextAlign = if (onCancel != null && onAccept != null) TextAlign.Center else TextAlign.Start,
     content: @Composable (padding: Dp) -> Unit
@@ -356,7 +378,11 @@ fun SharedDialog(
                     .padding(horizontal = if (onCancel != null && onAccept != null) padding else 0.dp)
             )
             if (onAccept != null) {
-                CardButton(onClick = onAccept, text = stringResource(R.string.btn_accept))
+                CardButton(
+                    onClick = onAccept,
+                    text = acceptText ?: stringResource(R.string.btn_accept),
+                    isEnabled = acceptEnabled
+                )
             }
         }
         content(padding)
