@@ -535,19 +535,8 @@ private fun AwardChipsRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        item {
-            FilterChip(
-                selected = selected == null,
-                onClick = { onSelect(null) },
-                label = {
-                    Text(
-                        text = stringResource(R.string.map_award_all),
-                        fontSize = 12.sp
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors()
-            )
-        }
+        // No "All" chip: it was redundant with VUCC — both show the plain
+        // worked-grid map (VUCC never enters the boundary-overlay mode).
         items(progress) { p ->
             FilterChip(
                 selected = selected == p.type,
