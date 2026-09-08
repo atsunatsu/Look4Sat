@@ -182,12 +182,10 @@ class MaidenheadGridOverlay : Overlay() {
             }
         }
 
-        // Vertical lines (meridians), segmented per sub-square row so that
-        // worked grid cells stay line-free at BOTH zoom levels. At sub-square
-        // zoom cellLat == SUB_SQUARE_LAT so each segment is one cell edge; at
-        // field zoom a single 10° cell row spans ten 1° sub-rows, and the
-        // worked cells are 2°x1° squares, so we must iterate the finer
-        // sub-square grid to decide which field-line segments to skip.
+        // Vertical lines (meridians). Worked-grid cells are NOT excluded:
+        // the boundary lines between adjacent worked squares must stay visible
+        // so the grid structure remains readable (reverted 2026-09-09 — the
+        // earlier skip logic removed those shared edges entirely).
         for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
             val lon = col * cellLon
             // World-repeat copies: keep the turn offset in pixels, otherwise
@@ -202,33 +200,10 @@ class MaidenheadGridOverlay : Overlay() {
                 if (topLatCell > 90.0) continue
                 val yTop = projectionToY(projection, topLatCell) ?: continue
                 val yBottom = projectionToY(projection, lat) ?: continue
-                if (cellLon == SUB_SQUARE_LON && cellLat == SUB_SQUARE_LAT) {
-                    // Sub-square zoom: one segment == one cell edge.
-                    val workedHere =
-                        cellLabel(lat, lon, zoom) in workedGrids ||
-                            cellLabel(lat, lon - cellLon, zoom) in workedGrids
-                    if (workedHere) continue
-                    canvas.drawLine(x, yTop, x, yBottom, linePaint)
-                } else {
-                    // Field zoom: split the 10° row into 1° sub-rows and skip
-                    // the segments bordering a worked 2°x1° square.
-                    for (sub in 0 until (cellLat / SUB_SQUARE_LAT).toInt()) {
-                        val subLat = lat + sub * SUB_SQUARE_LAT
-                        val ySubTop = projectionToY(projection, subLat + SUB_SQUARE_LAT) ?: continue
-                        val ySubBottom = projectionToY(projection, subLat) ?: continue
-                        // Force 4-char labels: at field zoom cellLabel(zoom)
-                        // returns 2-char fields which never match workedGrids.
-                        val workedHere =
-                            cellLabel(subLat, lon, GRID_ZOOM_SUB) in workedGrids ||
-                                cellLabel(subLat, lon - SUB_SQUARE_LON, GRID_ZOOM_SUB) in workedGrids
-                        if (workedHere) continue
-                        canvas.drawLine(x, ySubTop, x, ySubBottom, linePaint)
-                    }
-                }
+                canvas.drawLine(x, yTop, x, yBottom, linePaint)
             }
         }
-        // Horizontal lines (parallels), segmented per sub-square column so
-        // worked cells have no lines through them at either zoom level.
+        // Horizontal lines (parallels).
         for (row in firstRow..lastRow) {
             val lat = row * cellLat
             if (lat <= -90.0 || lat >= 90.0) continue
@@ -243,31 +218,7 @@ class MaidenheadGridOverlay : Overlay() {
                 val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
                 val xRight = xRightBase + turn * worldWidthPx.toFloat()
                 if (xRight < 0f || xLeft > canvas.width) continue
-                if (cellLon == SUB_SQUARE_LON && cellLat == SUB_SQUARE_LAT) {
-                    // Sub-square zoom: one segment == one cell edge.
-                    val workedHere =
-                        cellLabel(lat, lon, zoom) in workedGrids ||
-                            cellLabel(lat - cellLat, lon, zoom) in workedGrids
-                    if (workedHere) continue
-                    canvas.drawLine(xLeft, y, xRight, y, linePaint)
-                } else {
-                    // Field zoom: split the 20° field column into 2° sub-columns
-                    // and skip the segments bordering a worked 2°x1° square.
-                    for (sub in 0 until (cellLon / SUB_SQUARE_LON).toInt()) {
-                        val subLon = lon + sub * SUB_SQUARE_LON
-                        val xSubLeftBase = projectionToX(projection, subLon, centerLon, worldWidthPx) ?: continue
-                        val xSubRightBase = projectionToX(projection, subLon + SUB_SQUARE_LON, centerLon, worldWidthPx) ?: continue
-                        val xSubLeft = xSubLeftBase + turn * worldWidthPx.toFloat()
-                        val xSubRight = xSubRightBase + turn * worldWidthPx.toFloat()
-                        if (xSubRight < 0f || xSubLeft > canvas.width) continue
-                        // Force 4-char labels (see vertical lines above).
-                        val workedHere =
-                            cellLabel(lat, subLon, GRID_ZOOM_SUB) in workedGrids ||
-                                cellLabel(lat - SUB_SQUARE_LAT, subLon, GRID_ZOOM_SUB) in workedGrids
-                        if (workedHere) continue
-                        canvas.drawLine(xSubLeft, y, xSubRight, y, linePaint)
-                    }
-                }
+                canvas.drawLine(xLeft, y, xRight, y, linePaint)
             }
         }
 
