@@ -135,7 +135,7 @@ object AwardCalculator {
     private fun entityOf(q: GridQso): Entity = when (q.dxcc) {
         318 -> Entity.CHINA
         321 -> Entity.HONG_KONG
-        330 -> Entity.MACAO
+        152 -> Entity.MACAO
         386 -> Entity.TAIWAN
         339 -> Entity.JAPAN
         291 -> Entity.USA
@@ -161,7 +161,7 @@ object AwardCalculator {
         return when (prefixEntity(call)) {
             Entity.CHINA -> 318
             Entity.HONG_KONG -> 321
-            Entity.MACAO -> 330
+            Entity.MACAO -> 152
             Entity.TAIWAN -> 386
             Entity.JAPAN -> 339
             Entity.USA -> 291

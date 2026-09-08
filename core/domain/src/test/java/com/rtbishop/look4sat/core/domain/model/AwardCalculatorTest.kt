@@ -65,10 +65,10 @@ class AwardCalculatorTest {
 
     @Test
     fun `dxcc falls back to prefix when dxcc missing`() {
-        val all = listOf(qso("JH0ABC"), qso("BG7XYZ"), qso("VR2XYZ"))
+        val all = listOf(qso("JH0ABC"), qso("BG7XYZ"), qso("VR2XYZ"), qso("XX9A"))
         val progress = AwardCalculator.calculate(byGrid(*all.toTypedArray())).first { it.type == AwardType.DXCC }
-        assertEquals(3, progress.count)
-        assertTrue(progress.workedKeys.containsAll(setOf("339", "318", "321")))
+        assertEquals(4, progress.count)
+        assertTrue(progress.workedKeys.containsAll(setOf("339", "318", "321", "152")))
     }
 
     @Test
@@ -78,7 +78,7 @@ class AwardCalculatorTest {
             qso("BD5ABC", dxcc = 318, state = "ZJ"),   // Zhejiang
             qso("BD5ABC", dxcc = 318, state = "ZJ"),   // dup
             qso("VR2X", dxcc = 321),                   // Hong Kong
-            qso("XX9A", dxcc = 330),                   // Macao
+            qso("XX9A", dxcc = 152),                   // Macao
             qso("BM4X", dxcc = 386)                    // Taiwan
         )
         val progress = AwardCalculator.calculate(byGrid(*all.toTypedArray())).first { it.type == AwardType.WAPC }

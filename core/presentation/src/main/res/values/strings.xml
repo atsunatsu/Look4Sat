@@ -194,6 +194,7 @@
     <string name="prefs_lotw_callsign">LoTW callsign</string>
     <string name="prefs_lotw_password">LoTW password</string>
     <string name="prefs_lotw_hint">Fetch confirmed-QSO grids directly from ARRL LoTW for this callsign and replace the stored set (currently %1$d). The password is stored on this device only. Tapping Sync saves the credentials and fetches in one step.</string>
+    <string name="prefs_lotw_sync_duration_hint">A sync usually takes about 3–10 seconds; the first one or a busy ARRL server can take longer.</string>
     <string name="prefs_lotw_sync">Sync</string>
     <string name="prefs_lotw_syncing">Syncing…</string>
     <string name="prefs_lotw_configured">Synced from LoTW — %1$d grids total</string>

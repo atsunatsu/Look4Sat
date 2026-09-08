@@ -268,6 +268,12 @@ fun LoTWDialog(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
         )
+        Text(
+            text = stringResource(R.string.prefs_lotw_sync_duration_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
+        )
         if (message != null) {
             Text(
                 text = message,

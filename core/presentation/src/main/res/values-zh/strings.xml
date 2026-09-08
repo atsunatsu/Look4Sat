@@ -159,6 +159,7 @@
     <string name="prefs_lotw_callsign">LoTW 呼号</string>
     <string name="prefs_lotw_password">LoTW 密码</string>
     <string name="prefs_lotw_hint">直接从 ARRL LoTW 拉取该呼号已确认 QSO 的网格并覆盖本地已存集合（当前 %1$d 个）。密码仅保存在手机本地。点"同步"会自动保存凭据并拉取。</string>
+    <string name="prefs_lotw_sync_duration_hint">同步通常约需 3–10 秒；首次同步或 ARRL 服务器繁忙时可能更久。</string>
     <string name="prefs_lotw_sync">同步</string>
     <string name="prefs_lotw_syncing">同步中…</string>
     <string name="prefs_lotw_configured">已从 LoTW 同步 — 共 %1$d 个网格</string>

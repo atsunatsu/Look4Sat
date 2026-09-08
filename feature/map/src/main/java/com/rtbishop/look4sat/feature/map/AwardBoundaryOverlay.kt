@@ -45,7 +45,8 @@ data class AwardRegion(
     val name: String,
     val labelLon: Double,
     val labelLat: Double,
-    val rings: List<List<DoubleArray>>
+    val rings: List<List<DoubleArray>>,
+    val forceLabel: Boolean = false
 )
 
 /**
@@ -94,7 +95,8 @@ object AwardBoundaryData {
                         name = o.optString("name"),
                         labelLon = o.optDouble("label_lon", 0.0),
                         labelLat = o.optDouble("label_lat", 0.0),
-                        rings = rings
+                        rings = rings,
+                        forceLabel = o.optBoolean("force_label", false)
                     )
                 )
             }
@@ -204,9 +206,16 @@ class AwardBoundaryOverlay : Overlay() {
                 // per-segment longitude offset (in whole 360° turns) chosen to
                 // sit closest to the view center, so vertices far from the
                 // center are not folded to ±180 the wrong way at low zoom.
-                for (segment in splitRingAtAntimeridian(ring)) {
+                // A ring that was NOT split keeps implicit closure (close());
+                // a SPLIT ring must NOT be closed per segment — each close()
+                // would draw a straight chord across the map between the two
+                // cut ends (visible as a bogus Russia border line), so the
+                // cut edges are left open.
+                val segments = splitRingAtAntimeridian(ring)
+                val closeRing = segments.size == 1
+                for (segment in segments) {
                     if (segment.isEmpty()) continue
-                    pathHasPoints = traceSegment(path, segment, projection, centerLon, worldWidthPx) || pathHasPoints
+                    pathHasPoints = traceSegment(path, segment, projection, centerLon, worldWidthPx, closeRing) || pathHasPoints
                 }
             }
             if (!pathHasPoints) continue
@@ -222,8 +231,11 @@ class AwardBoundaryOverlay : Overlay() {
             val lx = projectionToX(projection, labelLonNorm, centerLon, worldWidthPx) ?: continue
             val ly = projectionToY(projection, region.labelLat) ?: continue
             // Screen-size gate: the label only when the region spans enough px.
+            // force_label regions (HK / Macau) always draw — their tiny land
+            // bbox would otherwise stay below the gate forever, and their label
+            // anchor sits out on the sea where there is room for the text.
             val regionH = (projectionToY(projection, b[3]) ?: 0f) - (projectionToY(projection, b[1]) ?: 0f)
-            if (abs(regionH) < MIN_LABEL_REGION_PX) continue
+            if (abs(regionH) < MIN_LABEL_REGION_PX && !region.forceLabel) continue
             canvas.drawText(region.name, lx, ly - textHalfHeight, labelPaint)
         }
     }
@@ -285,7 +297,8 @@ class AwardBoundaryOverlay : Overlay() {
         segment: List<DoubleArray>,
         projection: Projection,
         centerLon: Double,
-        worldWidthPx: Double
+        worldWidthPx: Double,
+        closeRing: Boolean
     ): Boolean {
         if (segment.isEmpty()) return false
         val anchorLon = segment[0][0]
@@ -295,9 +308,14 @@ class AwardBoundaryOverlay : Overlay() {
         for (i in segment.indices) {
             val pt = segment[i]
             // Continuous longitude difference from the anchor — no per-vertex
-            // fold. The segment spans < 180° (guaranteed by the antimeridian
-            // split), so delta stays within a single turn of the anchor.
-            val delta = pt[0] - anchorLon
+            // fold. For ordinary segments (span < 180° after the antimeridian
+            // split) the raw delta is already correct. For full-circle rings
+            // (e.g. Antarctica, which runs from -180° eastward to +178° and
+            // relies on close() to seal a ~1.7° gap at the antimeridian) the
+            // raw delta approaches ±360°, which threw the path a full world
+            // turn off-screen and drew a spurious line across the map. Normal
+            //ising to [-180,180] keeps every vertex on the nearest turn.
+            val delta = normalizeLon(pt[0] - anchorLon)
             val x = anchorX + (delta / 360.0 * worldWidthPx).toFloat()
             val y = projectionToY(projection, pt[1]) ?: continue
             if (!penDown) {
@@ -308,7 +326,7 @@ class AwardBoundaryOverlay : Overlay() {
             }
             any = true
         }
-        if (penDown) path.close()
+        if (penDown && closeRing) path.close()
         return any
     }
 
