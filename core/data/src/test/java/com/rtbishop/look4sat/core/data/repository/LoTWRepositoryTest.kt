@@ -156,11 +156,13 @@ class LoTWRepositoryTest {
     @Test
     fun parseQsosExtractsAwardFields() {
         // Award statistics rely on the DXCC/CQZ/STATE fields coming straight
-        // from LoTW's qso_qsldetail report (STATE depends on DXCC).
+        // from LoTW's qso_qsldetail report (STATE depends on DXCC). LoTW
+        // writes STATE as "CODE // NAME" (verified with a real report 2026-09);
+        // the parser must strip the name suffix and keep the bare code.
         val qso = "<CALL:5>BG7XYZ\n" +
             "<QSO_DATE:8>20260820\n<TIME_ON:4>1130\n" +
             "<PROP_MODE:3>SAT\n<SAT_NAME:5>FO-29\n<MODE:2>CW\n" +
-            "<DXCC:3>318\n<COUNTRY:5>CHINA\n<CQZ:2>24\n<STATE:2>GD\n" +
+            "<DXCC:3>318\n<COUNTRY:5>CHINA\n<CQZ:2>24\n<STATE:13>GD // Guangdong\n" +
             "<GRIDSQUARE:4>OL62\n<EOR>\n"
         val result = repo.parseConfirmedGridQsos(report(qso))!!
         val parsed = result["OL62"]!!.first()
@@ -168,6 +170,21 @@ class LoTWRepositoryTest {
         assertEquals("CHINA", parsed.country)
         assertEquals(24, parsed.cqz)
         assertEquals("GD", parsed.state)
+    }
+
+    @Test
+    fun parseQsosStripsStateNameSuffixForAllEntities() {
+        // Japan prefecture: "34 // Tottori-ken" -> "34" (WAJA matching needs
+        // the 2-digit code). US states also arrive as "CODE // Name".
+        val jp = "<CALL:5>JH0ABC\n<QSO_DATE:8>20260820\n<TIME_ON:4>1130\n" +
+            "<PROP_MODE:3>SAT\n<SAT_NAME:5>RS-44\n<DXCC:3>339\n<COUNTRY:7>JAPAN\n" +
+            "<STATE:18>34 // Tottori-ken\n<GRIDSQUARE:4>PM95\n<EOR>\n"
+        val us = "<CALL:5>K1ABC\n<QSO_DATE:8>20260820\n<TIME_ON:4>1130\n" +
+            "<PROP_MODE:3>SAT\n<SAT_NAME:5>AO-07\n<DXCC:3>291\n<COUNTRY:12>UNITED STATES\n" +
+            "<STATE:22>CA // California\n<GRIDSQUARE:4>EM40\n<EOR>\n"
+        val result = repo.parseConfirmedGridQsos(report(jp, us))!!
+        assertEquals("34", result["PM95"]!!.first().state)
+        assertEquals("CA", result["EM40"]!!.first().state)
     }
 
     @Test

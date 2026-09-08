@@ -212,7 +212,7 @@ class LoTWRepository : ILoTWRepository {
                 line.startsWith("<CQZ:") ->
                     cqz = adifValue(line).toIntOrNull()
                 line.startsWith("<STATE:") ->
-                    state = adifValue(line).trim().ifBlank { null }
+                    state = adifValue(line).trim().ifBlank { null }?.let { normalizeState(it) }
                 line.startsWith("<GRIDSQUARE:") || line.startsWith("<VUCC_GRIDS:") -> {
                     // VUCC_GRIDS holds a comma-separated list of grids
                     // ("EN52en,EN53fa"), up to four for contacts spanning
@@ -230,6 +230,16 @@ class LoTWRepository : ILoTWRepository {
     /** ADIF field value: "<GRIDSQUARE:4>OL62" -> "OL62". */
     private fun adifValue(line: String): String =
         line.substringAfter('>').substringBefore("E<").trim()
+
+    /**
+     * LoTW returns STATE as "CODE // NAME" (e.g. "HB // Hubei" for China,
+     * "34 // Tottori-ken" for Japan, "CA // California" for the US). The award
+     * statistics match on the short CODE only (China 2-letter province pinyin,
+     * Japan 2-digit prefecture, US 2-letter state), so strip the " // NAME"
+     * suffix here once, storing the clean code for every downstream consumer
+     * (persistence, AwardCalculator).
+     */
+    private fun normalizeState(raw: String): String = raw.substringBefore(" // ").trim()
 
     /** "20260820" + "1130" (or "113000") -> UTC epoch ms; 0 when unparseable. */
     private fun adifTimestampToEpoch(date: String, time: String): Long = try {
