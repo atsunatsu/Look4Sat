@@ -158,8 +158,6 @@ class AwardBoundaryOverlay : Overlay() {
     /** Bounding boxes (computed on region assignment) for cheap culling. */
     private val regionBounds = mutableListOf<DoubleArray>() // [minLon,minLat,maxLon,maxLat]
 
-    private var canvasWidthPx = 1080f
-
     override fun setEnabled(on: Boolean) {
         super.setEnabled(on)
     }
@@ -168,7 +166,6 @@ class AwardBoundaryOverlay : Overlay() {
         if (shadow || !isEnabled || regions.isEmpty()) return
         val projection = mapView.projection
         val zoom = mapView.zoomLevelDouble
-        canvasWidthPx = canvas.width.toFloat()
         val worldWidthPx = 256.0 * Math.pow(2.0, zoom)
 
         // Visible bounding box (same anchor-on-center approach as the grid overlay).
@@ -197,29 +194,20 @@ class AwardBoundaryOverlay : Overlay() {
             val path = Path()
             var pathHasPoints = false
             for (ring in region.rings) {
-                var penDown = false
-                var prevX = 0f
-                var prevY = 0f
-                var lastLon = Double.NaN
-                for (pt in ring) {
-                    val lon = pt[0]
-                    val lat = pt[1]
-                    // Split rings crossing the antimeridian (|dLon| > 180°).
-                    if (penDown && !lastLon.isNaN() && abs(lon - lastLon) > 180.0) {
-                        penDown = false
-                    }
-                    val x = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
-                    val y = projectionToY(projection, lat) ?: continue
-                    if (!penDown) {
-                        path.moveTo(x, y)
-                        penDown = true
-                    } else {
-                        path.lineTo(x, y)
-                    }
-                    prevX = x; prevY = y; lastLon = lon
-                    pathHasPoints = true
+                // Split each ring into consecutive segments at the antimeridian
+                // (±180°) and draw each as its own sub-path. Naively normalizing
+                // every vertex to [-180,180) folds vertices that sit on the
+                // "far" side of ±180 onto the opposite screen edge, drawing a
+                // spurious line that sweeps across the whole map (Russia/Fiji/
+                // Antarctica for DXCC, the Pacific CQ zones for WAZ). Splitting
+                // keeps each segment contiguous. Each segment then gets ONE
+                // per-segment longitude offset (in whole 360° turns) chosen to
+                // sit closest to the view center, so vertices far from the
+                // center are not folded to ±180 the wrong way at low zoom.
+                for (segment in splitRingAtAntimeridian(ring)) {
+                    if (segment.isEmpty()) continue
+                    pathHasPoints = traceSegment(path, segment, projection, centerLon, worldWidthPx) || pathHasPoints
                 }
-                if (penDown) path.close()
             }
             if (!pathHasPoints) continue
 
@@ -238,6 +226,90 @@ class AwardBoundaryOverlay : Overlay() {
             if (abs(regionH) < MIN_LABEL_REGION_PX) continue
             canvas.drawText(region.name, lx, ly - textHalfHeight, labelPaint)
         }
+    }
+
+    /**
+     * Splits a ring's vertices into consecutive segments that do NOT cross the
+     * antimeridian. Vertices are first normalized to [-180,180); whenever two
+     * consecutive vertices differ by more than 180° in longitude (the ring
+     * wraps over ±180), the segment is closed there and a new segment starts.
+     *
+     * A ring that crosses the antimeridian (e.g. Russia's eastern tip, or the
+     * Pacific CQ zones whose raw lon runs past ±180) becomes two segments, each
+     * kept geometrically contiguous so no spurious long edge is drawn.
+     */
+    private fun splitRingAtAntimeridian(ring: List<DoubleArray>): List<List<DoubleArray>> {
+        val n = ring.size
+        if (n == 0) return emptyList()
+        val pts = Array(n) { doubleArrayOf(normalizeLon(ring[it][0]), ring[it][1]) }
+        val segments = mutableListOf<MutableList<DoubleArray>>()
+        var cur = mutableListOf<DoubleArray>()
+        cur.add(pts[0])
+        for (i in 1 until n) {
+            val prevLon = pts[i - 1][0]
+            val lon = pts[i][0]
+            if (abs(lon - prevLon) > 180.0) {
+                // Crossed the antimeridian: start a fresh segment.
+                if (cur.size >= 2) segments.add(cur)
+                cur = mutableListOf()
+            }
+            cur.add(pts[i])
+        }
+        if (cur.size >= 2) segments.add(cur)
+        // A fully-winding ring may have collapsed into a single segment after
+        // normalization (no actual crossing between consecutive vertices); in
+        // that case fall back to the whole ring as one segment.
+        if (segments.isEmpty()) segments.add(mutableListOf<DoubleArray>().also { it.addAll(pts) })
+        return segments
+    }
+
+    /**
+     * Projects [segment] into [path], keeping the segment's geometry
+     * contiguous on screen.
+     *
+     * Longitudes are normalized once when the ring is split, and every vertex
+     * of a segment lies within 180° of its neighbours (a segment never crosses
+     * the antimeridian). We anchor on the segment's FIRST vertex: its screen x
+     * comes from [projectionToX] (correctly placed relative to the view
+     * center), and every other vertex is offset by the *continuous* longitude
+     * difference from that anchor, scaled by worldWidthPx. Because the whole
+     * segment stays on the "near" side of ±180 relative to its anchor, no
+     * vertex is folded to the opposite screen edge — that fold is what drew
+     * the spurious long lines across the map (Russia/Fiji/Antarctica for
+     * DXCC, the Pacific CQ zones for WAZ).
+     *
+     * @return true if at least one point was placed in the path
+     */
+    private fun traceSegment(
+        path: Path,
+        segment: List<DoubleArray>,
+        projection: Projection,
+        centerLon: Double,
+        worldWidthPx: Double
+    ): Boolean {
+        if (segment.isEmpty()) return false
+        val anchorLon = segment[0][0]
+        val anchorX = projectionToX(projection, anchorLon, centerLon, worldWidthPx) ?: return false
+        var penDown = false
+        var any = false
+        for (i in segment.indices) {
+            val pt = segment[i]
+            // Continuous longitude difference from the anchor — no per-vertex
+            // fold. The segment spans < 180° (guaranteed by the antimeridian
+            // split), so delta stays within a single turn of the anchor.
+            val delta = pt[0] - anchorLon
+            val x = anchorX + (delta / 360.0 * worldWidthPx).toFloat()
+            val y = projectionToY(projection, pt[1]) ?: continue
+            if (!penDown) {
+                path.moveTo(x, y)
+                penDown = true
+            } else {
+                path.lineTo(x, y)
+            }
+            any = true
+        }
+        if (penDown) path.close()
+        return any
     }
 
     /** X pixel for a longitude (Mercator X is linear in longitude). */
