@@ -199,7 +199,12 @@ class SettingsRepo(
                         satName = o.optString("s"),
                         mode = o.optString("m"),
                         bandUp = o.optString("bu"),
-                        bandDown = o.optString("bd")
+                        bandDown = o.optString("bd"),
+                        // New award fields: absent in pre-award data -> null.
+                        dxcc = o.optInt("dx", 0).takeIf { it > 0 },
+                        country = o.optString("cty").ifBlank { null },
+                        cqz = o.optInt("cq", 0).takeIf { it > 0 },
+                        state = o.optString("st").ifBlank { null }
                     )
                 }
                 if (list.isNotEmpty()) result[grid] = list
@@ -223,6 +228,10 @@ class SettingsRepo(
                         .put("m", q.mode)
                         .put("bu", q.bandUp)
                         .put("bd", q.bandDown)
+                        .put("dx", q.dxcc ?: 0)
+                        .put("cty", q.country ?: "")
+                        .put("cq", q.cqz ?: 0)
+                        .put("st", q.state ?: "")
                 )
             }
             root.put(grid, array)

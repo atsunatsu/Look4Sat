@@ -131,6 +131,9 @@
     <string name="map_prev">Prev</string>
     <string name="map_next">Next</string>
     <string name="map_copyright" translatable="false">© OpenStreetMap contributors</string>
+    <string name="map_grid_mode">Grid mode</string>
+    <string name="map_satellite_mode">Satellite mode</string>
+    <string name="map_award_all">All</string>
     <string name="map_azimuth">Azimuth: %.1f°</string>
     <string name="map_elevation">Elevation: %.1f°</string>
     <string name="map_altitude">Altitude: %.0f km</string>

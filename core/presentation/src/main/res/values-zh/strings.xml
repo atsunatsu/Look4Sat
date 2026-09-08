@@ -107,6 +107,9 @@
     <!-- Map screen -->
     <string name="map_prev">上一个</string>
     <string name="map_next">下一个</string>
+    <string name="map_grid_mode">网格模式</string>
+    <string name="map_satellite_mode">卫星模式</string>
+    <string name="map_award_all">全部</string>
     <string name="map_azimuth">方位角：%.1f°</string>
     <string name="map_elevation">仰角：%.1f°</string>
     <string name="map_altitude">高度：%.0f km</string>

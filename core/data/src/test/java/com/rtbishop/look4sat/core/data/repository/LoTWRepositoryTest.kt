@@ -152,5 +152,48 @@ class LoTWRepositoryTest {
         assertEquals(LoTWResult.NetworkError("HTTP 500"), net)
     }
 
+
+    @Test
+    fun parseQsosExtractsAwardFields() {
+        // Award statistics rely on the DXCC/CQZ/STATE fields coming straight
+        // from LoTW's qso_qsldetail report (STATE depends on DXCC).
+        val qso = "<CALL:5>BG7XYZ\n" +
+            "<QSO_DATE:8>20260820\n<TIME_ON:4>1130\n" +
+            "<PROP_MODE:3>SAT\n<SAT_NAME:5>FO-29\n<MODE:2>CW\n" +
+            "<DXCC:3>318\n<COUNTRY:5>CHINA\n<CQZ:2>24\n<STATE:2>GD\n" +
+            "<GRIDSQUARE:4>OL62\n<EOR>\n"
+        val result = repo.parseConfirmedGridQsos(report(qso))!!
+        val parsed = result["OL62"]!!.first()
+        assertEquals(318, parsed.dxcc)
+        assertEquals("CHINA", parsed.country)
+        assertEquals(24, parsed.cqz)
+        assertEquals("GD", parsed.state)
+    }
+
+    @Test
+    fun parseQsosLeavesAwardFieldsNullWhenAbsent() {
+        val qso = "<CALL:5>JH0ABC\n<QSO_DATE:8>20260820\n<TIME_ON:4>1130\n" +
+            "<PROP_MODE:3>SAT\n<SAT_NAME:5>RS-44\n<GRIDSQUARE:4>PM95\n<EOR>\n"
+        val result = repo.parseConfirmedGridQsos(report(qso))!!
+        val parsed = result["PM95"]!!.first()
+        assertNull(parsed.dxcc)
+        assertNull(parsed.country)
+        assertNull(parsed.cqz)
+        assertNull(parsed.state)
+    }
+
+    @Test
+    fun parseQsosAwardFieldsDoNotLeakAcrossRecords() {
+        val withFields = "<CALL:5>BG7AAA\n<QSO_DATE:8>20260820\n<TIME_ON:4>1130\n" +
+            "<PROP_MODE:3>SAT\n<SAT_NAME:5>FO-29\n<DXCC:3>318\n<CQZ:2>24\n<STATE:2>GD\n" +
+            "<GRIDSQUARE:4>OL62\n<EOR>\n"
+        val withoutFields = "<CALL:5>JH0BBB\n<QSO_DATE:8>20260821\n<TIME_ON:4>1130\n" +
+            "<PROP_MODE:3>SAT\n<SAT_NAME:5>RS-44\n<GRIDSQUARE:4>PM95\n<EOR>\n"
+        val result = repo.parseConfirmedGridQsos(report(withFields, withoutFields))!!
+        assertNull(result["PM95"]!!.first().dxcc)
+        assertNull(result["PM95"]!!.first().cqz)
+        assertNull(result["PM95"]!!.first().state)
+    }
+
     // endregion
 }

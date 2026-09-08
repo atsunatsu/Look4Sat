@@ -156,6 +156,10 @@ class LoTWRepository : ILoTWRepository {
         var mode = ""
         var bandUp = ""
         var bandDown = ""
+        var dxcc: Int? = null
+        var country: String? = null
+        var cqz: Int? = null
+        var state: String? = null
         val gridsInRecord = mutableListOf<String>()
 
         fun emitRecord() {
@@ -163,7 +167,8 @@ class LoTWRepository : ILoTWRepository {
             val epochMs = adifTimestampToEpoch(qsoDate, timeOn)
             val qso = com.rtbishop.look4sat.core.domain.model.GridQso(
                 call = call, epochMs = epochMs, satName = satName,
-                mode = mode, bandUp = bandUp, bandDown = bandDown
+                mode = mode, bandUp = bandUp, bandDown = bandDown,
+                dxcc = dxcc, country = country, cqz = cqz, state = state
             )
             for (grid in gridsInRecord) {
                 result.getOrPut(grid) { mutableListOf() }.add(qso)
@@ -173,6 +178,7 @@ class LoTWRepository : ILoTWRepository {
         fun resetRecord() {
             propMode = null; call = ""; qsoDate = ""; timeOn = ""
             satName = ""; mode = ""; bandUp = ""; bandDown = ""
+            dxcc = null; country = null; cqz = null; state = null
             gridsInRecord.clear()
         }
 
@@ -199,6 +205,14 @@ class LoTWRepository : ILoTWRepository {
                     bandUp = adifValue(line).uppercase()
                 line.startsWith("<BAND:") && !line.startsWith("<BAND_RX:") ->
                     bandDown = adifValue(line).uppercase()
+                line.startsWith("<DXCC:") ->
+                    dxcc = adifValue(line).toIntOrNull()
+                line.startsWith("<COUNTRY:") ->
+                    country = adifValue(line).ifBlank { null }
+                line.startsWith("<CQZ:") ->
+                    cqz = adifValue(line).toIntOrNull()
+                line.startsWith("<STATE:") ->
+                    state = adifValue(line).trim().ifBlank { null }
                 line.startsWith("<GRIDSQUARE:") || line.startsWith("<VUCC_GRIDS:") -> {
                     // VUCC_GRIDS holds a comma-separated list of grids
                     // ("EN52en,EN53fa"), up to four for contacts spanning

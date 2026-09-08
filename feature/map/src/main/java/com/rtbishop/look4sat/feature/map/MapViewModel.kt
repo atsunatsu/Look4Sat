@@ -98,6 +98,7 @@ class MapViewModel(
             MapAction.SelectNext -> scrollSelection(false)
             is MapAction.SelectItem -> selectSatellite(action.item)
             is MapAction.SelectDefaultItem -> selectDefaultSatellite(action.catnum)
+            is MapAction.ToggleGridMode -> settingsRepo.updateOtherSettings { it.copy(stateOfMapGrid = action.value) }
         }
     }
 

@@ -29,6 +29,14 @@ package com.rtbishop.look4sat.core.domain.model
  * @param bandUp    uplink band as reported by LoTW (BAND_RX: "70CM", "2M", "10M"...)
  * @param bandDown  downlink band (BAND: "2M", "70CM"...) — may be empty when
  *                  LoTW did not include it
+ * @param dxcc      ARRL DXCC entity code of the opposite station (from ADIF
+ *                  <DXCC>), or null when LoTW omitted it
+ * @param country   DXCC entity name (ADIF <COUNTRY>), or null
+ * @param cqz       CQ zone of the opposite station (ADIF <CQZ>), or null
+ * @param state     Primary administrative subdivision of the opposite station
+ *                  (ADIF <STATE>). Interpretation depends on the DXCC entity:
+ *                  China -> province code ("GD"), Japan -> prefecture number
+ *                  ("34"), USA -> state abbreviation ("CA"). Null when absent.
  */
 data class GridQso(
     val call: String,
@@ -36,7 +44,11 @@ data class GridQso(
     val satName: String,
     val mode: String,
     val bandUp: String,
-    val bandDown: String
+    val bandDown: String,
+    val dxcc: Int? = null,
+    val country: String? = null,
+    val cqz: Int? = null,
+    val state: String? = null
 ) {
     /** Short uplink/downlink band label ("U/V", "V/A"), or "" when unknown. */
     val bandLabel: String
