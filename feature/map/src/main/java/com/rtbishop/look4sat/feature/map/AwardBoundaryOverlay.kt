@@ -261,9 +261,23 @@ class AwardBoundaryOverlay : Overlay() {
             val prevLon = pts[i - 1][0]
             val lon = pts[i][0]
             if (abs(lon - prevLon) > 180.0) {
-                // Crossed the antimeridian: start a fresh segment.
+                // Crossed the antimeridian. Do NOT drop this edge — that would
+                // leave a visible gap in the outline (WAZ Pacific zones 1/19/
+                // 31/32, e.g. zone 31's 40°N boundary from 130°W to 160°E).
+                // Split the edge IN TWO at ±180 instead: each half stays in its
+                // own segment, so the outline closes across the map's left and
+                // right edges. The crossing latitude is interpolated along the
+                // edge (constant for latitude-aligned edges).
+                val a = pts[i - 1]
+                val b = pts[i]
+                val span = 360.0 - abs(lon - prevLon) // shortest angular distance
+                val edgeLon = if (prevLon < lon) -180.0 else 180.0 // side being crossed
+                val t = abs(edgeLon - prevLon) / span
+                val latAt = a[1] + (b[1] - a[1]) * t
+                cur.add(doubleArrayOf(edgeLon, latAt))
                 if (cur.size >= 2) segments.add(cur)
                 cur = mutableListOf()
+                cur.add(doubleArrayOf(-edgeLon, latAt))
             }
             cur.add(pts[i])
         }
@@ -378,8 +392,12 @@ class AwardBoundaryOverlay : Overlay() {
 
     private fun normalizeLon(lon: Double): Double {
         var l = lon % 360.0
-        if (l >= 180.0) l -= 360.0
-        if (l < -180.0) l += 360.0
+        // Normalize into (-180, 180] — +180, not -180. An edge whose endpoint
+        // sits ON the antimeridian (e.g. a ring starting at -180°) must not be
+        // seen as a >180° jump away from a nearby 165° vertex; keeping the
+        // antimeridian value as +180 makes such edges short and un-split.
+        if (l <= -180.0) l += 360.0
+        if (l > 180.0) l -= 360.0
         return l
     }
 
