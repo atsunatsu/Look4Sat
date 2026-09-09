@@ -305,6 +305,11 @@ class AwardBoundaryOverlay : Overlay() {
         val anchorX = projectionToX(projection, anchorLon, centerLon, worldWidthPx) ?: return false
         var penDown = false
         var any = false
+        var firstX = 0f
+        var firstY = 0f
+        var lastX = 0f
+        var lastY = 0f
+        var prevDelta = 0.0
         for (i in segment.indices) {
             val pt = segment[i]
             // Continuous longitude difference from the anchor — no per-vertex
@@ -312,21 +317,40 @@ class AwardBoundaryOverlay : Overlay() {
             // split) the raw delta is already correct. For full-circle rings
             // (e.g. Antarctica, which runs from -180° eastward to +178° and
             // relies on close() to seal a ~1.7° gap at the antimeridian) the
-            // raw delta approaches ±360°, which threw the path a full world
-            // turn off-screen and drew a spurious line across the map. Normal
-            //ising to [-180,180] keeps every vertex on the nearest turn.
-            val delta = normalizeLon(pt[0] - anchorLon)
+            // raw delta approaches ±360°. Unwrapping keeps each vertex within
+            // 180° of its neighbours (a spurious fold would throw the path a
+            // full world turn and draw a line across the map).
+            val delta = if (i == 0) 0.0 else {
+                var d = pt[0] - anchorLon
+                while (d - prevDelta > 180.0) d -= 360.0
+                while (prevDelta - d > 180.0) d += 360.0
+                d
+            }
             val x = anchorX + (delta / 360.0 * worldWidthPx).toFloat()
             val y = projectionToY(projection, pt[1]) ?: continue
             if (!penDown) {
                 path.moveTo(x, y)
+                firstX = x
+                firstY = y
                 penDown = true
             } else {
                 path.lineTo(x, y)
             }
+            lastX = x
+            lastY = y
+            prevDelta = delta
             any = true
         }
-        if (penDown && closeRing) path.close()
+        if (penDown && closeRing) {
+            // Closing chord: take the SHORT way around. A full-circle ring
+            // (Antarctica) unwraps to ~360° so a plain close() would draw a
+            // chord across the whole map; folding the first point onto the
+            // adjacent world copy keeps the seal at the antimeridian tiny.
+            var fx = firstX
+            while (fx - lastX > worldWidthPx / 2f) fx -= worldWidthPx.toFloat()
+            while (lastX - fx > worldWidthPx / 2f) fx += worldWidthPx.toFloat()
+            path.lineTo(fx, firstY)
+        }
         return any
     }
 
@@ -340,9 +364,14 @@ class AwardBoundaryOverlay : Overlay() {
         return (p.x + delta / 360.0 * worldWidthPx).toFloat()
     }
 
-    /** Y pixel for a latitude. */
+    /** Y pixel for a latitude. Mercator blows up at the poles (lat ±90 → ±∞),
+     *  so clamp to the Web-Mercator maximum (~±85.05113°) — the rendered map
+     *  edge. Raw data points AT the poles (e.g. WAZ zones and Antarctica rings
+     *  with [-90, ...] vertices) otherwise project far outside the canvas and
+     *  draw long spurious lines from the pole to the map edge. */
     private fun projectionToY(projection: Projection, lat: Double): Float? {
-        val geo = org.osmdroid.util.GeoPoint(lat, 0.0)
+        val clamped = lat.coerceIn(-MAX_MERCATOR_LAT, MAX_MERCATOR_LAT)
+        val geo = org.osmdroid.util.GeoPoint(clamped, 0.0)
         val p = projection.toPixels(geo, null)
         return p.y.toFloat()
     }
@@ -356,5 +385,6 @@ class AwardBoundaryOverlay : Overlay() {
 
     private companion object {
         const val MIN_LABEL_REGION_PX = 42f
+        const val MAX_MERCATOR_LAT = 85.05113 // Web Mercator latitude limit
     }
 }

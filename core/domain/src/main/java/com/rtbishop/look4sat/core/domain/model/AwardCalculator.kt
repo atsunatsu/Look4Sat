@@ -67,13 +67,13 @@ object AwardCalculator {
     fun calculate(qsosByGrid: Map<String, List<GridQso>>): List<AwardProgress> {
         val all = qsosByGrid.values.flatten()
         return listOf(
+            calculateDxcc(all),
             AwardProgress(
                 AwardType.VUCC,
                 workedKeys = qsosByGrid.keys,
                 count = qsosByGrid.size,
                 target = AwardTargets.VUCC
             ),
-            calculateDxcc(all),
             calculateWapc(all),
             calculateWaja(all),
             calculateWaz(all),
