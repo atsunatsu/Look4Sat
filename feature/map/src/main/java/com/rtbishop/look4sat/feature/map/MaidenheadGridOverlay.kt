@@ -201,9 +201,10 @@ class MaidenheadGridOverlay : Overlay() {
         // Roamed/activated grid stripes: blue 45° zebra (GridMaster style) over
         // every cell the station operated from. Drawn AFTER the worked fills so
         // a worked+roamed cell shows blue stripes with green between them — the
-        // stripe paint is nearly opaque, so the two colors never alpha-blend
+        // stripe paint is fully opaque, so the two colors never alpha-blend
         // into a teal/green mix. Same geometry as the worked fills (per-4-char
-        // cell at both zoom levels).
+        // cell at both zoom levels). The station's OWN grid is excluded: it
+        // already carries the bold outline and must not be striped (user req).
         if (roamedGrids.isNotEmpty()) {
             if (zoom >= GRID_ZOOM_SUB) {
                 for (row in firstRow..lastRow) {
@@ -220,13 +221,16 @@ class MaidenheadGridOverlay : Overlay() {
                         val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
                         val xRight = xRightBase + turn * worldWidthPx.toFloat()
                         if (xRight < 0f || xLeft > canvas.width) continue
-                        if (cellLabel(lat, lon, zoom) in roamedGrids) {
+                        val label = cellLabel(lat, lon, zoom)
+                        if (label in roamedGrids && label != ownGrid) {
                             drawStripes(canvas, xLeft, yTop, xRight, yBottom)
                         }
                     }
                 }
             } else {
                 for (grid in roamedGrids) {
+                    // The own grid keeps only its bold outline — no stripes.
+                    if (grid == ownGrid) continue
                     val cell = gridCellBounds(grid) ?: continue
                     for (turn in -colRepeats..colRepeats) {
                         val dLon = turn * 360.0
