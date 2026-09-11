@@ -296,6 +296,14 @@ private class FakeSettingsRepo(dataSources: DataSourcesSettings = defaultDataSou
     override fun getWorkedGridQsos(): Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>> = emptyMap()
 
     override fun setWorkedGridQsos(qsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>) = Unit
+
+    override fun getRoamedGrids(): Set<String> = emptySet()
+
+    private val roamedGrids = MutableStateFlow(emptySet<String>())
+
+    override fun setRoamedGrids(grids: Set<String>) {
+        roamedGrids.value = grids
+    }
 }
 
 private fun defaultDataSourcesSettings(): DataSourcesSettings {

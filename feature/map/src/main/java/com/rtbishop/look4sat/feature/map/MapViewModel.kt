@@ -82,7 +82,8 @@ class MapViewModel(
                 _uiState.update {
                     it.copy(
                         workedGrids = settingsRepo.getWorkedGrids(),
-                        workedGridQsos = settingsRepo.getWorkedGridQsos()
+                        workedGridQsos = settingsRepo.getWorkedGridQsos(),
+                        roamedGrids = settingsRepo.getRoamedGrids()
                     )
                 }
             }

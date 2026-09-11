@@ -157,8 +157,9 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
     // Tapped worked grid -> centered QSO dialog. Local UI state: the map is the
     // only consumer and it resets when leaving the page.
     var selectedGrid by remember { mutableStateOf<String?>(null) }
-    // Selected award filter (null = "All" = plain worked-grid view).
-    var selectedAward by remember { mutableStateOf<AwardType?>(null) }
+    // Selected award filter. Entering grid mode defaults to VUCC (the plain
+    // worked-grid view); the reset effect below re-asserts that on every entry.
+    var selectedAward by remember { mutableStateOf<AwardType?>(AwardType.VUCC) }
     // Six-award progress derived from the confirmed QSO store; recomputed when
     // the store changes (LoTW/Wavelog sync).
     val awardProgress: List<AwardProgress> = remember(uiState.workedGridQsos) {
@@ -191,6 +192,11 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
     LaunchedEffect(selectedGrid) {
         (mapView.overlays.getOrNull(OVERLAY_GRID) as? MaidenheadGridOverlay)?.selectedGrid = selectedGrid
         mapView.invalidate()
+    }
+    // Re-assert the VUCC default each time grid mode is entered; while already
+    // in grid mode the user's chip choice is preserved.
+    LaunchedEffect(uiState.isGridMode) {
+        if (uiState.isGridMode) selectedAward = AwardType.VUCC
     }
 
     LaunchedEffect(uiState.track) {
@@ -249,7 +255,7 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
                         // stationPosition would swallow the centering forever.
                         val shouldCenter = uiState.isGridMode && !prevGridMode
                         setGridMode(
-                            uiState.isGridMode, uiState.workedGrids, view,
+                            uiState.isGridMode, uiState.workedGrids, uiState.roamedGrids, view,
                             if (shouldCenter) uiState.stationPosition else null
                         )
                         if (!shouldCenter || uiState.stationPosition != null) {
@@ -631,6 +637,7 @@ private fun setAwardMode(award: AwardType, workedCodes: Set<String>, mapView: Ma
 private fun setGridMode(
     gridMode: Boolean,
     workedGrids: Set<String>,
+    roamedGrids: Set<String>,
     mapView: MapView,
     stationPosition: GeoPos?
 ) {
@@ -639,11 +646,13 @@ private fun setGridMode(
         if (gridOverlay is MaidenheadGridOverlay) {
             gridOverlay.isEnabled = gridMode
             gridOverlay.workedGrids = workedGrids
+            gridOverlay.roamedGrids = roamedGrids
             gridOverlay.ownGrid = ownGridOf(stationPosition)
         } else {
             mapView.overlays[OVERLAY_GRID] = MaidenheadGridOverlay().apply {
                 isEnabled = gridMode
                 this.workedGrids = workedGrids
+                this.roamedGrids = roamedGrids
                 this.ownGrid = ownGridOf(stationPosition)
             }
         }

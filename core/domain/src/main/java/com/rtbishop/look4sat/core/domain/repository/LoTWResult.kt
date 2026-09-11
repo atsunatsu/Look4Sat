@@ -23,7 +23,10 @@ sealed class LoTWResult {
     /** Report downloaded and parsed successfully. */
     data class Success(
         val grids: Set<String>,
-        val qsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>
+        val qsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>,
+        /** Distinct 4-char gridsquares the account itself operated from
+         *  (ADIF <MY_GRIDSQUARE>, satellite QSOs only) — "roamed/activated" grids. */
+        val roamedGrids: Set<String> = emptySet()
     ) : LoTWResult()
 
     /** HTTP 200 but LoTW replied with its login-error page (bad callsign/password). */

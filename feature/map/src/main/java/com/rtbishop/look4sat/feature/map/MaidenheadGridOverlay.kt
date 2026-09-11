@@ -56,8 +56,16 @@ class MaidenheadGridOverlay : Overlay() {
         style = android.graphics.Paint.Style.FILL
         color = Color.argb(90, 76, 217, 100)
     }
+    private val roamStripePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 7f
+        // Fully opaque blue: stripe bands stay pure blue even over a green
+        // worked fill — no alpha blend into a teal/green mix (user requirement:
+        // the two colors must never stack into a single mixed color).
+        color = Color.argb(255, 66, 133, 244)
+    }
     private val ownLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        strokeWidth = 4.5f
+        strokeWidth = 6f
         style = Paint.Style.STROKE
         color = Color.argb(255, 90, 200, 255)
     }
@@ -69,6 +77,12 @@ class MaidenheadGridOverlay : Overlay() {
 
     /** Worked gridsquares (4-char, uppercase) to highlight, e.g. {"OL62", "PM95"}. */
     var workedGrids: Set<String> = emptySet()
+
+    /**
+     * Gridsquares the station operated from (4-char, uppercase) — drawn with
+     * blue 45° stripes (GridMaster-style zebra), e.g. {"OL62", "PM95"}.
+     */
+    var roamedGrids: Set<String> = emptySet()
 
     /** The station's own 4-char gridsquare, drawn with a distinct outline. */
     var ownGrid: String? = null
@@ -120,8 +134,10 @@ class MaidenheadGridOverlay : Overlay() {
         val worldTurns = ceil(((rightLon - leftLon) / 360.0) - 1e-9).toInt().coerceAtLeast(0)
         val colRepeats = if (worldTurns > 0) worldTurns else 0
 
-        // The station's own grid square (4-char, only meaningful at sub-square zoom)
-        val ownCell = ownGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
+        // The station's own grid: 4-char square at sub-square zoom, 2-char
+        // field at field zoom. Always marked so the "you are here" outline is
+        // visible even at the default entry zoom (below GRID_ZOOM_SUB).
+        val ownCell = ownGrid?.let { if (zoom >= GRID_ZOOM_SUB) it else it.take(2) }
         // The tapped worked grid gets a distinct outline (same zoom gate).
         val selectedCell = selectedGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
 
@@ -177,6 +193,53 @@ class MaidenheadGridOverlay : Overlay() {
                         if (xRight < 0f || xLeft > canvas.width) continue
                         if (yBottom < 0f || yTop > canvas.height) continue
                         canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
+                    }
+                }
+            }
+        }
+
+        // Roamed/activated grid stripes: blue 45° zebra (GridMaster style) over
+        // every cell the station operated from. Drawn AFTER the worked fills so
+        // a worked+roamed cell shows blue stripes with green between them — the
+        // stripe paint is nearly opaque, so the two colors never alpha-blend
+        // into a teal/green mix. Same geometry as the worked fills (per-4-char
+        // cell at both zoom levels).
+        if (roamedGrids.isNotEmpty()) {
+            if (zoom >= GRID_ZOOM_SUB) {
+                for (row in firstRow..lastRow) {
+                    val lat = row * cellLat
+                    if (lat < -90.0 || lat >= 90.0) continue
+                    val topLatCell = lat + cellLat
+                    if (topLatCell > 90.0) continue
+                    val yTop = projectionToY(projection, topLatCell) ?: continue
+                    val yBottom = projectionToY(projection, lat) ?: continue
+                    for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
+                        val lon = col * cellLon
+                        val xLeftBase = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                        val xRightBase = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                        val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
+                        val xRight = xRightBase + turn * worldWidthPx.toFloat()
+                        if (xRight < 0f || xLeft > canvas.width) continue
+                        if (cellLabel(lat, lon, zoom) in roamedGrids) {
+                            drawStripes(canvas, xLeft, yTop, xRight, yBottom)
+                        }
+                    }
+                }
+            } else {
+                for (grid in roamedGrids) {
+                    val cell = gridCellBounds(grid) ?: continue
+                    for (turn in -colRepeats..colRepeats) {
+                        val dLon = turn * 360.0
+                        if (cell.lonRight + dLon <= leftLon || cell.lonLeft + dLon >= rightLon) continue
+                        val yTop = projectionToY(projection, cell.latTop) ?: continue
+                        val yBottom = projectionToY(projection, cell.latBottom) ?: continue
+                        val xLeftBase = projectionToX(projection, cell.lonLeft, centerLon, worldWidthPx) ?: continue
+                        val xRightBase = projectionToX(projection, cell.lonRight, centerLon, worldWidthPx) ?: continue
+                        val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
+                        val xRight = xRightBase + turn * worldWidthPx.toFloat()
+                        if (xRight < 0f || xLeft > canvas.width) continue
+                        if (yBottom < 0f || yTop > canvas.height) continue
+                        drawStripes(canvas, xLeft, yTop, xRight, yBottom)
                     }
                 }
             }
@@ -287,6 +350,26 @@ class MaidenheadGridOverlay : Overlay() {
         }
     }
 
+    /**
+     * Draws 45° diagonal stripes (GridMaster-style zebra) clipped to the cell
+     * rectangle, from top-left to bottom-right. The paint is nearly opaque so
+     * stripes stay blue even over a green worked fill underneath.
+     */
+    private fun drawStripes(canvas: Canvas, xLeft: Float, yTop: Float, xRight: Float, yBottom: Float) {
+        if (xRight <= xLeft || yBottom <= yTop) return
+        canvas.save()
+        canvas.clipRect(xLeft, yTop, xRight, yBottom)
+        val height = yBottom - yTop
+        // Start one stripe-width left of the cell so the top-left corner is
+        // always covered; each stripe runs from (x, top) to (x+height, bottom).
+        var x = xLeft - height
+        while (x < xRight) {
+            canvas.drawLine(x, yTop, x + height, yBottom, roamStripePaint)
+            x += STRIPE_SPACING_PX
+        }
+        canvas.restore()
+    }
+
     /** X pixel for a longitude (meridians are vertical in Web Mercator). */
     private fun projectionToX(projection: Projection, lon: Double, centerLon: Double, worldWidthPx: Double): Float? {
         // Do NOT use osmdroid's toPixels() here: at low zoom its wrap-around
@@ -370,5 +453,7 @@ class MaidenheadGridOverlay : Overlay() {
         const val LABEL_ZOOM_SUB = 6.5
         const val MIN_LABEL_CELL_PX = 48f
         const val MAX_OVERSHOOT_PX = 64
+        /** Center-to-center spacing of the roamed-grid zebra stripes, in px. */
+        const val STRIPE_SPACING_PX = 16f
     }
 }

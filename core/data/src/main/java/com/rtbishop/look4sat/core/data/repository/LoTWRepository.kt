@@ -47,8 +47,11 @@ class LoTWRepository : ILoTWRepository {
     override suspend fun fetchConfirmedGrids(callsign: String, password: String): LoTWResult =
         withContext(Dispatchers.IO) {
             fetchReportBody(callsign, password).fold(
-                onSuccess = { body -> parseBoth(body)?.let { LoTWResult.Success(it.first, it.second) }
-                    ?: LoTWResult.RateLimited },
+                onSuccess = { body ->
+                    parseBoth(body)?.let { (grids, _, roamed) ->
+                        LoTWResult.Success(grids, emptyMap(), roamed)
+                    } ?: LoTWResult.RateLimited
+                },
                 onFailure = { toResult(it) }
             )
         }
@@ -58,8 +61,11 @@ class LoTWRepository : ILoTWRepository {
         password: String
     ): LoTWResult = withContext(Dispatchers.IO) {
         fetchReportBody(callsign, password).fold(
-            onSuccess = { body -> parseBoth(body)?.let { LoTWResult.Success(it.first, it.second) }
-                ?: LoTWResult.RateLimited },
+            onSuccess = { body ->
+                parseBoth(body)?.let { (grids, qsos, roamed) ->
+                    LoTWResult.Success(grids, qsos, roamed)
+                } ?: LoTWResult.RateLimited
+            },
             onFailure = { toResult(it) }
         )
     }
@@ -71,11 +77,14 @@ class LoTWRepository : ILoTWRepository {
         else -> LoTWResult.NetworkError(e.message ?: e.javaClass.simpleName)
     }
 
-    /** Single report fetch feeding both the grid set and the per-QSO detail. */
-    private fun parseBoth(body: String): Pair<Set<String>, Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>>? {
+    /** Single report fetch feeding the grid set, the per-QSO detail and the roamed set. */
+    private fun parseBoth(
+        body: String
+    ): Triple<Set<String>, Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>, Set<String>>? {
         val grids = parseConfirmedGrids(body) ?: return null
         val qsos = parseConfirmedGridQsos(body) ?: return null
-        return grids to qsos
+        val roamed = parseRoamedGrids(body) ?: return null
+        return Triple(grids, qsos, roamed)
     }
 
     private fun fetchReportBody(callsign: String, password: String): Result<String> {
@@ -287,6 +296,39 @@ class LoTWRepository : ILoTWRepository {
                             val field = grid.trim().uppercase()
                             if (field.length >= 4) grids.add(field.take(4))
                         }
+                    }
+                }
+            }
+        }
+        return grids
+    }
+
+    /**
+     * Distinct 4-char gridsquares the account itself operated from, taken from
+     * ADIF <MY_GRIDSQUARE> of satellite QSO records only. This is the
+     * "roamed / activated" set shown as blue stripes on the map — the grids
+     * where the operator's own station was located during confirmed QSOs (a
+     * rover may log several distinct grids; the home grid is included too).
+     * Returns null when the body is not an ADIF report (mirrors the other parsers).
+     */
+    internal fun parseRoamedGrids(body: String): Set<String>? {
+        if (!body.contains("<eoh>", ignoreCase = true)) return null
+        val grids = mutableSetOf<String>()
+        var propMode: String? = null
+        for (raw in body.lineSequence()) {
+            val line = raw.trim()
+            when {
+                line.equals("<EOR>", ignoreCase = true) -> propMode = null
+                line.startsWith("<PROP_MODE:") -> {
+                    propMode = line.substringAfter('>').substringBefore("E<").trim().uppercase()
+                }
+                line.startsWith("<MY_GRIDSQUARE:") -> {
+                    // MY_GRIDSQUARE must not be mistaken for GRIDSQUARE (the
+                    // opposite station's grid) — only own-station grids count.
+                    if (propMode == "SAT") {
+                        val value = line.substringAfter('>').substringBefore("E<")
+                        val field = value.trim().uppercase()
+                        if (field.length >= 4) grids.add(field.take(4))
                     }
                 }
             }

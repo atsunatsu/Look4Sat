@@ -130,6 +130,46 @@ class LoTWRepositoryTest {
 
     // endregion
 
+    // region parseRoamedGrids (MY_GRIDSQUARE = grids the account operated from)
+
+    @Test
+    fun parseRoamedGridsCollectsOwnStationGrids() {
+        // Satellite QSOs carry MY_GRIDSQUARE = the grid the account itself
+        // operated from (the "roamed/activated" set shown as blue stripes).
+        val qso1 = "<CALL:6>BA7OPF\n<QSO_DATE:8>20260820\n<PROP_MODE:3>SAT\n<SAT_NAME:5>IO-86\n" +
+            "<MY_GRIDSQUARE:4>OL62\n<GRIDSQUARE:4>PM95\n<EOR>\n"
+        val qso2 = "<CALL:6>BA7OPF\n<QSO_DATE:8>20260901\n<PROP_MODE:3>SAT\n<SAT_NAME:5>IO-86\n" +
+            "<MY_GRIDSQUARE:4>OL72\n<GRIDSQUARE:4>NL47\n<EOR>\n"
+        assertEquals(setOf("OL62", "OL72"), repo.parseRoamedGrids(report(qso1, qso2)))
+    }
+
+    @Test
+    fun parseRoamedGridsIgnoresGroundQsos() {
+        val ground = "<CALL:6>BA7OPF\n<QSO_DATE:8>20260821\n<MY_GRIDSQUARE:4>OL72\n<EOR>\n"
+        assertEquals(emptySet<String>(), repo.parseRoamedGrids(report(ground)))
+    }
+
+    @Test
+    fun parseRoamedGridsDoesNotConfuseGridsquareWithMyGridsquare() {
+        // GRIDSQUARE (opposite station's grid) must never leak into the roamed set.
+        val qso = "<PROP_MODE:3>SAT\n<SAT_NAME:5>SO-50\n<MY_GRIDSQUARE:4>OL62\n" +
+            "<GRIDSQUARE:6>OM60IL\n<EOR>\n"
+        assertEquals(setOf("OL62"), repo.parseRoamedGrids(report(qso)))
+    }
+
+    @Test
+    fun parseRoamedGridsTruncatesSixCharToFour() {
+        val qso = "<PROP_MODE:3>SAT\n<SAT_NAME:5>IO-86\n<MY_GRIDSQUARE:6>OL62AA\n<EOR>\n"
+        assertEquals(setOf("OL62"), repo.parseRoamedGrids(report(qso)))
+    }
+
+    @Test
+    fun parseRoamedGridsRejectsBodyWithoutEoh() {
+        assertNull(repo.parseRoamedGrids("<HTML>Username/password incorrect</HTML>"))
+    }
+
+    // endregion
+
     // region failure classification (fetchReportBody -> LoTWResult mapping)
 
     @Test

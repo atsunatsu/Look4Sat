@@ -239,6 +239,29 @@ class SettingsRepo(
         preferences.edit { putString(keyWorkedGridQsos, root.toString()) }
     }
 
+    // Distinct 4-char gridsquares the account operated from (LoTW <MY_GRIDSQUARE>,
+    // satellite QSOs only). Stored as a JSONArray like workedGrids.
+    private val keyRoamedGrids = "roamedGrids"
+
+    override fun getRoamedGrids(): Set<String> {
+        val json = preferences.getString(keyRoamedGrids, null).orEmpty()
+        if (json.isBlank()) return emptySet()
+        return try {
+            val array = org.json.JSONArray(json)
+            (0 until array.length()).mapNotNull { i ->
+                array.optString(i).takeIf { it.isNotBlank() }
+            }.toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+
+    override fun setRoamedGrids(grids: Set<String>) {
+        val array = org.json.JSONArray()
+        grids.sorted().forEach { array.put(it) }
+        preferences.edit { putString(keyRoamedGrids, array.toString()) }
+    }
+
     // LoTW credentials (stored locally on the device only)
     private val keyLoTWCall = "lotwCallsign"
     private val keyLoTWPass = "lotwPassword"

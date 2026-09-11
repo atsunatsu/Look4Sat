@@ -207,6 +207,7 @@ class SettingsViewModel(
                     // synced set fully replaces the stored worked grids.
                     settingsRepo.setWorkedGrids(result.grids)
                     settingsRepo.setWorkedGridQsos(result.qsos)
+                    settingsRepo.setRoamedGrids(result.roamedGrids)
                     _uiState.update { state ->
                         state.copy(
                             lotwSyncing = false, workedGridsCount = result.grids.size,

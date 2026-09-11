@@ -29,6 +29,8 @@ data class MapState(
     val isGridMode: Boolean = false,
     val workedGrids: Set<String> = emptySet(),
     val workedGridQsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>> = emptyMap(),
+    /** 4-char gridsquares the station operated from (LoTW MY_GRIDSQUARE) — blue stripes. */
+    val roamedGrids: Set<String> = emptySet(),
     val stationPosition: GeoPos? = null,
     val orbitalPass: OrbitalPass,
     val track: List<List<GeoPos>>? = null,

@@ -102,6 +102,9 @@ interface ISettingsRepo {
     /** Confirmed satellite QSOs grouped by worked 4-char gridsquare (map tap detail). */
     fun getWorkedGridQsos(): Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>
     fun setWorkedGridQsos(qsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>)
+    /** Distinct 4-char gridsquares the account operated from (LoTW <MY_GRIDSQUARE>). */
+    fun getRoamedGrids(): Set<String>
+    fun setRoamedGrids(grids: Set<String>)
     //endregion
 
     //region # LoTW confirmed-grids settings
