@@ -62,6 +62,28 @@ class LoTWRepositoryTest {
     }
 
     @Test
+    fun parseHandlesAlphabeticalFieldOrder() {
+        // Real lotwreport.adi emits fields in ALPHABETICAL order: GRIDSQUARE (G)
+        // and VUCC_GRIDS come BEFORE PROP_MODE (P) inside each record. The old
+        // sequential gate (add only while propMode == SAT) dropped every grid on
+        // real reports — the buffered parser must collect them regardless of
+        // field order and filter at <EOR>.
+        val satQso = "<CALL:6>BA7OPF\n" +
+            "<GRIDSQUARE:4>NL47\n" +
+            "<MODE:3>FM\n" +
+            "<PROP_MODE:3>SAT\n" +
+            "<SAT_NAME:5>FO-29\n" +
+            "<VUCC_GRIDS:11>EN52en,EN53fa\n" +
+            "<EOR>\n"
+        val groundQso = "<CALL:6>BA7OPF\n" +
+            "<GRIDSQUARE:4>PM95\n" +
+            "<QSO_DATE:8>20260821\n" +
+            "<EOR>\n"
+        val result = repo.parseConfirmedGrids(report(satQso, groundQso))
+        assertEquals(setOf("NL47", "EN52", "EN53"), result)
+    }
+
+    @Test
     fun parseReturnsEmptySetForReportWithoutGrids() {
         val satQso = "<PROP_MODE:3>SAT\n<SAT_NAME:5>AO-07\n<EOR>\n"
         assertEquals(emptySet<String>(), repo.parseConfirmedGrids(report(satQso)))
@@ -161,6 +183,21 @@ class LoTWRepositoryTest {
     fun parseRoamedGridsTruncatesSixCharToFour() {
         val qso = "<PROP_MODE:3>SAT\n<SAT_NAME:5>IO-86\n<MY_GRIDSQUARE:6>OL62AA\n<EOR>\n"
         assertEquals(setOf("OL62"), repo.parseRoamedGrids(report(qso)))
+    }
+
+    @Test
+    fun parseRoamedGridsHandlesAlphabeticalFieldOrder() {
+        // Real lotwreport.adi emits fields alphabetically, so <MY_GRIDSQUARE>
+        // (M) arrives BEFORE <PROP_MODE> (P). The old sequential gate (add only
+        // while propMode == SAT) silently returned an EMPTY set on real reports —
+        // this is the exact bug that made the blue roamed stripes never appear.
+        val qso = "<CALL:6>BA7OPF\n" +
+            "<GRIDSQUARE:4>PM95\n" +
+            "<MY_GRIDSQUARE:6>OL72XX\n" +
+            "<PROP_MODE:3>SAT\n" +
+            "<SAT_NAME:5>IO-86\n" +
+            "<EOR>\n"
+        assertEquals(setOf("OL72"), repo.parseRoamedGrids(report(qso)))
     }
 
     @Test

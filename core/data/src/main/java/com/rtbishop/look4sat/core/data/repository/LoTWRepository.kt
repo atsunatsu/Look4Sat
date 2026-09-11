@@ -264,9 +264,6 @@ class LoTWRepository : ILoTWRepository {
     }
 
     internal fun parseConfirmedGrids(body: String): Set<String>? {
-        // LoTW answers with ADIF text; on bad credentials it returns a short error page
-        // containing "password=?" or an <eoh>-less block. Treat anything without a header
-        // marker as failure so the caller can show a sensible message.
         // LoTW answers with ADIF text; on bad credentials it returns a short error
         // page without an <eoh> header terminator. Real reports always carry <eoh>
         // (LoTW writes it lowercase). Match case-insensitively to be safe.
@@ -277,25 +274,34 @@ class LoTWRepository : ILoTWRepository {
         // QSOs omit it. Grid fields (GRIDSQUARE / VUCC_GRIDS) must only be
         // collected for records whose PROP_MODE is SAT, otherwise the map mixes
         // in terrestrial contacts.
+        //
+        // Buffered per-record pattern (same as parseConfirmedGridQsos): field order
+        // is NOT reliable — ADIF producers (incl. LoTW) emit fields alphabetically,
+        // so <GRIDSQUARE> (G) arrives BEFORE <PROP_MODE> (P) within a record. A
+        // sequential gate ("only add while propMode == SAT") silently drops every
+        // grid on real reports. Buffer the record and decide at <EOR> instead.
         var propMode: String? = null
+        var pendingGrids = mutableListOf<String>()
         for (raw in body.lineSequence()) {
             val line = raw.trim()
             when {
-                line.equals("<EOR>", ignoreCase = true) -> propMode = null
+                line.equals("<EOR>", ignoreCase = true) -> {
+                    if (propMode == "SAT") grids.addAll(pendingGrids)
+                    propMode = null
+                    pendingGrids = mutableListOf()
+                }
                 line.startsWith("<PROP_MODE:") -> {
-                    propMode = line.substringAfter('>').substringBefore("E<").trim().uppercase()
+                    propMode = adifValue(line).uppercase()
                 }
                 line.startsWith("<GRIDSQUARE:") || line.startsWith("<VUCC_GRIDS:") -> {
-                    if (propMode == "SAT") {
-                        // VUCC_GRIDS holds a comma-separated PAIR of grids
-                        // ("EN52en,EN53fa") for contacts spanning two squares —
-                        // split on ',' and take the 4-char field of each, or the
-                        // second grid is silently dropped.
-                        val value = line.substringAfter('>').substringBefore("E<")
-                        value.split(',').forEach { grid ->
-                            val field = grid.trim().uppercase()
-                            if (field.length >= 4) grids.add(field.take(4))
-                        }
+                    // VUCC_GRIDS holds a comma-separated PAIR of grids
+                    // ("EN52en,EN53fa") for contacts spanning two squares —
+                    // split on ',' and take the 4-char field of each, or the
+                    // second grid is silently dropped.
+                    val value = adifValue(line)
+                    value.split(',').forEach { grid ->
+                        val field = grid.trim().uppercase()
+                        if (field.length >= 4) pendingGrids.add(field.take(4))
                     }
                 }
             }
@@ -314,22 +320,30 @@ class LoTWRepository : ILoTWRepository {
     internal fun parseRoamedGrids(body: String): Set<String>? {
         if (!body.contains("<eoh>", ignoreCase = true)) return null
         val grids = mutableSetOf<String>()
+        // Buffered per-record pattern (same as parseConfirmedGridQsos): field
+        // order is NOT reliable — ADIF producers (incl. LoTW) emit fields
+        // alphabetically, so <MY_GRIDSQUARE> (M) arrives BEFORE <PROP_MODE> (P)
+        // within a record. A sequential gate ("only add while propMode == SAT")
+        // would silently drop every own grid on real reports; buffer the record
+        // and decide at <EOR> instead.
         var propMode: String? = null
+        var myGrid: String? = null
         for (raw in body.lineSequence()) {
             val line = raw.trim()
             when {
-                line.equals("<EOR>", ignoreCase = true) -> propMode = null
+                line.equals("<EOR>", ignoreCase = true) -> {
+                    if (propMode == "SAT" && myGrid != null) grids.add(myGrid)
+                    propMode = null
+                    myGrid = null
+                }
                 line.startsWith("<PROP_MODE:") -> {
-                    propMode = line.substringAfter('>').substringBefore("E<").trim().uppercase()
+                    propMode = adifValue(line).uppercase()
                 }
                 line.startsWith("<MY_GRIDSQUARE:") -> {
                     // MY_GRIDSQUARE must not be mistaken for GRIDSQUARE (the
                     // opposite station's grid) — only own-station grids count.
-                    if (propMode == "SAT") {
-                        val value = line.substringAfter('>').substringBefore("E<")
-                        val field = value.trim().uppercase()
-                        if (field.length >= 4) grids.add(field.take(4))
-                    }
+                    val value = adifValue(line)
+                    if (value.length >= 4) myGrid = value.take(4)
                 }
             }
         }
