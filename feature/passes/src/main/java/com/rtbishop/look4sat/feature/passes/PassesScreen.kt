@@ -156,7 +156,7 @@ private fun PassesScreen(
             TopBar(
                 isVerticalLayout = isVerticalLayout,
                 startAction = {
-                    IconCard(action = { onAction(PassesAction.ToggleRadiosDialog) }, resId = R.drawable.ic_radios)
+                    IconCard(action = { onAction(PassesAction.TogglePassesDialog) }, resId = R.drawable.ic_filter)
                 },
                 topInfo = {
                     TimerRow(timeString = uiState.nextTime, isTimeAos = uiState.isNextTimeAos)
@@ -165,7 +165,19 @@ private fun PassesScreen(
                     NextPassRow(pass = uiState.nextPass, isUtc = uiState.isUtc)
                 },
                 endAction = {
-                    IconCard(action = { onAction(PassesAction.TogglePassesDialog) }, resId = R.drawable.ic_filter)
+                    // 日程功能: 把下个过境写入系统日历 (原仓库雷达页的 addToCalendar).
+                    IconCard(
+                        action = {
+                            onAction(
+                                PassesAction.AddToCalendar(
+                                    uiState.nextPass.name,
+                                    uiState.nextPass.aosTime,
+                                    uiState.nextPass.losTime
+                                )
+                            )
+                        },
+                        resId = R.drawable.ic_calendar
+                    )
                 }
             )
         }

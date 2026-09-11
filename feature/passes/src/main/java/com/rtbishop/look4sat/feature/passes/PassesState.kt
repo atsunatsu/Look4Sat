@@ -61,4 +61,6 @@ sealed interface PassesAction {
     data object ToggleRadiosDialog : PassesAction
     data class FocusCatNum(val catNum: Int) : PassesAction
     data object ClearFocus : PassesAction
+    /** 日程功能: 把下个过境写入系统日历 (ic_calendar 按钮). */
+    data class AddToCalendar(val name: String, val aosTime: Long, val losTime: Long) : PassesAction
 }

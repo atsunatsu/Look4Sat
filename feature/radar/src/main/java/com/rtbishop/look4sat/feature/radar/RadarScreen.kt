@@ -84,7 +84,7 @@ private enum class RadarPage(val title: String) {
 }
 
 @Composable
-fun RadarDestination(navigateUp: () -> Unit, navigateToMap: () -> Unit) {
+fun RadarDestination(navigateUp: () -> Unit) {
     val context = LocalContext.current
     val container = (context.applicationContext as IContainerProvider).getMainContainer()
     val viewModel: RadarViewModel = viewModel(factory = RadarViewModel.factory(container))
@@ -95,12 +95,6 @@ fun RadarDestination(navigateUp: () -> Unit, navigateToMap: () -> Unit) {
             container.setMutualPassData(MutualPassData())
         }
         navigateUp()
-    }
-    val navigateToMapAndClearMutual = {
-        if (container.mutualPassData.value.endTime > 0L) {
-            container.setMutualPassData(MutualPassData())
-        }
-        navigateToMap()
     }
     LaunchedEffect(mutualData.endTime) {
         if (mutualData.endTime <= 0L) return@LaunchedEffect
@@ -127,7 +121,7 @@ fun RadarDestination(navigateUp: () -> Unit, navigateToMap: () -> Unit) {
         viewModel.onAction(RadarAction.SstvPermissionResult(granted))
         viewModel.onAction(RadarAction.CwPermissionResult(granted))
     }
-    RadarScreen(uiState, viewModel::onAction, navigateUpAndClearMutual, navigateToMapAndClearMutual, mutualData, requestMicPermission = {
+    RadarScreen(uiState, viewModel::onAction, navigateUpAndClearMutual, mutualData, requestMicPermission = {
         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     })
 }
@@ -137,11 +131,14 @@ private fun RadarScreen(
     uiState: RadarState,
     onAction: (RadarAction) -> Unit,
     navigateUp: () -> Unit,
-    navigateToMap: () -> Unit,
     mutualData: MutualPassData,
     requestMicPermission: () -> Unit
 ) {
     val upcomingPass = uiState.currentPass ?: getDefaultPass()
+    // 日程功能: 把当前过境写入系统日历(原仓库的 addToCalendar, ic_calendar 按钮)
+    val addToCalendar: () -> Unit = {
+        uiState.currentPass?.let { onAction(RadarAction.AddToCalendar(it.name, it.aosTime, it.losTime)) }
+    }
     // Station-B overlay: full track line (only where B's elevation > 0) + live position dot
     // at the current moment, same display mode as the local station.
     val trackB = remember(mutualData.trackSamples) {
@@ -177,7 +174,7 @@ private fun RadarScreen(
             TopBar {
                 IconCard(action = navigateUp, resId = R.drawable.ic_back)
                 TimerRow(timeString = uiState.currentTime, isTimeAos = uiState.isTimeAos)
-                IconCard(action = navigateToMap, resId = R.drawable.ic_map)
+                IconCard(action = addToCalendar, resId = R.drawable.ic_calendar)
             }
             TopBar { NextPassRow(pass = upcomingPass, isUtc = uiState.isUtc) }
         } else {
@@ -185,7 +182,7 @@ private fun RadarScreen(
                 IconCard(action = navigateUp, resId = R.drawable.ic_back)
                 TimerRow(timeString = uiState.currentTime, isTimeAos = uiState.isTimeAos)
                 NextPassRow(pass = upcomingPass, modifier = Modifier.weight(1f), isUtc = uiState.isUtc)
-                IconCard(action = navigateToMap, resId = R.drawable.ic_map)
+                IconCard(action = addToCalendar, resId = R.drawable.ic_calendar)
             }
         }
         if (isVertical) {
