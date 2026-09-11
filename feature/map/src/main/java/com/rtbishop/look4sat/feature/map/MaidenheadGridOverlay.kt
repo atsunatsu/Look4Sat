@@ -135,10 +135,9 @@ class MaidenheadGridOverlay : Overlay() {
         val worldTurns = ceil(((rightLon - leftLon) / 360.0) - 1e-9).toInt().coerceAtLeast(0)
         val colRepeats = if (worldTurns > 0) worldTurns else 0
 
-        // The station's own grid: 4-char square at sub-square zoom, 2-char
-        // field at field zoom. Always marked so the "you are here" outline is
-        // visible even at the default entry zoom (below GRID_ZOOM_SUB).
-        val ownCell = ownGrid?.let { if (zoom >= GRID_ZOOM_SUB) it else it.take(2) }
+        // The station's own grid: bold outline only at sub-square zoom — at
+        // field zoom (2-char labels) the current grid is NOT marked (user req).
+        val ownCell = ownGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
         // The tapped worked grid gets a distinct outline (same zoom gate).
         val selectedCell = selectedGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
 
@@ -338,8 +337,14 @@ class MaidenheadGridOverlay : Overlay() {
             if (topLatCell > 90.0) continue
             val yTop = projectionToY(projection, topLatCell) ?: continue
             val yBottom = projectionToY(projection, lat) ?: continue
-            val yCenter = (yTop + yBottom) / 2f - textHalfHeight
-            if (yBottom < 0f || yTop > canvas.height) continue
+            // Polar bands (80..90 / -90..-80) extend beyond the map's latitude
+            // limit, so their geometric center falls off-screen and the label
+            // would never be visible. Center the label in the VISIBLE part of
+            // the cell instead; fully off-screen cells are still skipped.
+            val visTop = maxOf(yTop, 0f)
+            val visBottom = minOf(yBottom, canvas.height.toFloat())
+            if (visBottom < 0f || visTop > canvas.height) continue
+            val yCenter = (visTop + visBottom) / 2f - textHalfHeight
             for (turn in -colRepeats..colRepeats) for (col in firstCol..lastCol) {
                 val lon = col * cellLon
                 // World-repeat copies: keep the turn offset in pixels (same
