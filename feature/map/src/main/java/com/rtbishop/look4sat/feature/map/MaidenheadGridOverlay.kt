@@ -58,11 +58,11 @@ class MaidenheadGridOverlay : Overlay() {
     }
     private val roamStripePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 7f
-        // Fully opaque blue: stripe bands stay pure blue even over a green
-        // worked fill — no alpha blend into a teal/green mix (user requirement:
-        // the two colors must never stack into a single mixed color).
-        color = Color.argb(255, 66, 133, 244)
+        strokeWidth = 14f
+        // Same alpha as the green worked fill (90) — user req: stripe opacity
+        // must match the green grid. Wide 14f stripes at 44f spacing read as a
+        // sparse GridMaster-style zebra (user picked spacing 44 / width 14).
+        color = Color.argb(90, 66, 133, 244)
     }
     private val ownLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeWidth = 6f
@@ -495,6 +495,8 @@ class MaidenheadGridOverlay : Overlay() {
         const val MIN_LABEL_CELL_PX = 48f
         const val MAX_OVERSHOOT_PX = 64
         /** Center-to-center spacing of the roamed-grid zebra stripes, in px. */
-        const val STRIPE_SPACING_PX = 16f
+        // 44f spacing (was 16f — too dense per user) with 14f-wide stripes;
+        // sparse GridMaster-style zebra.
+        const val STRIPE_SPACING_PX = 44f
     }
 }
