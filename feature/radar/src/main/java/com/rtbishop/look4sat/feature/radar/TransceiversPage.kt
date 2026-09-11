@@ -48,6 +48,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -78,6 +80,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -123,7 +126,21 @@ fun TransceiversPage(
                 }
             }
         }
-        LazyColumn(modifier = modifier.fillMaxSize(), state = listState) {
+        // contentPadding for the system navigation bar: the radar page is a
+        // full-screen destination, so on gesture-nav devices the translucent
+        // nav bar floats over the list bottom and covers the CW decoder's
+        // decoded-text output when the panel is scrolled to the end. Padding
+        // the last item above the bar fixes it (three-button nav already
+        // resizes the window, where this padding is a harmless no-op).
+        LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(
+                bottom = with(LocalDensity.current) {
+                    (WindowInsets.navigationBars.getBottom(this) / density).dp
+                }
+            )
+        ) {
             itemsIndexed(items = transceivers, key = { _, radio -> radio.uuid }) { _, radio ->
                 val isExpanded = radio.uuid == selectedUuid
                 TransceiverItem(
