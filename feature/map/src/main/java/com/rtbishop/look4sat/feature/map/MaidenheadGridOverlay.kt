@@ -135,10 +135,13 @@ class MaidenheadGridOverlay : Overlay() {
         val worldTurns = ceil(((rightLon - leftLon) / 360.0) - 1e-9).toInt().coerceAtLeast(0)
         val colRepeats = if (worldTurns > 0) worldTurns else 0
 
-        // The station's own grid: bold outline only at sub-square zoom — at
-        // field zoom (2-char labels) the current grid is NOT marked (user req).
-        val ownCell = ownGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
-        // The tapped worked grid gets a distinct outline (same zoom gate).
+        // The station's own grid: always keep a bold outline of the 4-char
+        // square. At sub-square zoom it matches the visible cell grid; at field
+        // zoom (2-char labels) the own 2°x1° square is drawn on top of the
+        // field grid so the operator still sees exactly where they are (user
+        // req: "field zoom must also draw the own 4-char grid, bolded").
+        val ownCell = ownGrid
+        // The tapped worked grid gets a distinct outline (sub-square zoom only).
         val selectedCell = selectedGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
 
         // Worked-grid highlight fills.
@@ -292,22 +295,50 @@ class MaidenheadGridOverlay : Overlay() {
         // The station's own grid square: redraw its four borders thicker on top.
         // The tapped worked grid gets the same treatment in a different color.
         if (ownCell != null || selectedCell != null) {
-            for (row in firstRow..lastRow) {
-                val lat = row * cellLat
-                if (lat < -90.0 || lat >= 90.0) continue
-                for (col in firstCol..lastCol) {
-                    val lon = col * cellLon
-                    val label = cellLabel(lat, lon, zoom)
-                    if (label != ownCell && label != selectedCell) continue
-                    val yTop = projectionToY(projection, lat + cellLat) ?: continue
-                    val yBottom = projectionToY(projection, lat) ?: continue
-                    val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
-                    val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
-                    val paint = if (label == selectedCell) selectedLinePaint else ownLinePaint
-                    canvas.drawLine(xLeft, yTop, xRight, yTop, paint)
-                    canvas.drawLine(xLeft, yBottom, xRight, yBottom, paint)
-                    canvas.drawLine(xLeft, yTop, xLeft, yBottom, paint)
-                    canvas.drawLine(xRight, yTop, xRight, yBottom, paint)
+            if (zoom >= GRID_ZOOM_SUB) {
+                for (row in firstRow..lastRow) {
+                    val lat = row * cellLat
+                    if (lat < -90.0 || lat >= 90.0) continue
+                    for (col in firstCol..lastCol) {
+                        val lon = col * cellLon
+                        val label = cellLabel(lat, lon, zoom)
+                        if (label != ownCell && label != selectedCell) continue
+                        val yTop = projectionToY(projection, lat + cellLat) ?: continue
+                        val yBottom = projectionToY(projection, lat) ?: continue
+                        val xLeft = projectionToX(projection, lon, centerLon, worldWidthPx) ?: continue
+                        val xRight = projectionToX(projection, lon + cellLon, centerLon, worldWidthPx) ?: continue
+                        val paint = if (label == selectedCell) selectedLinePaint else ownLinePaint
+                        canvas.drawLine(xLeft, yTop, xRight, yTop, paint)
+                        canvas.drawLine(xLeft, yBottom, xRight, yBottom, paint)
+                        canvas.drawLine(xLeft, yTop, xLeft, yBottom, paint)
+                        canvas.drawLine(xRight, yTop, xRight, yBottom, paint)
+                    }
+                }
+            } else {
+                // Field zoom: the visible grid shows 2-char fields only, but the
+                // station's own 2°x1° square still gets its bold outline drawn
+                // on top of the field grid (user req). selectedCell is null here.
+                val grid = ownCell
+                if (grid != null) {
+                    val cell = gridCellBounds(grid)
+                    if (cell != null) {
+                        for (turn in -colRepeats..colRepeats) {
+                            val dLon = turn * 360.0
+                            if (cell.lonRight + dLon <= leftLon || cell.lonLeft + dLon >= rightLon) continue
+                            val yTop = projectionToY(projection, cell.latTop) ?: continue
+                            val yBottom = projectionToY(projection, cell.latBottom) ?: continue
+                            val xLeftBase = projectionToX(projection, cell.lonLeft, centerLon, worldWidthPx) ?: continue
+                            val xRightBase = projectionToX(projection, cell.lonRight, centerLon, worldWidthPx) ?: continue
+                            val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
+                            val xRight = xRightBase + turn * worldWidthPx.toFloat()
+                            if (xRight < 0f || xLeft > canvas.width) continue
+                            if (yBottom < 0f || yTop > canvas.height) continue
+                            canvas.drawLine(xLeft, yTop, xRight, yTop, ownLinePaint)
+                            canvas.drawLine(xLeft, yBottom, xRight, yBottom, ownLinePaint)
+                            canvas.drawLine(xLeft, yTop, xLeft, yBottom, ownLinePaint)
+                            canvas.drawLine(xRight, yTop, xRight, yBottom, ownLinePaint)
+                        }
+                    }
                 }
             }
         }
