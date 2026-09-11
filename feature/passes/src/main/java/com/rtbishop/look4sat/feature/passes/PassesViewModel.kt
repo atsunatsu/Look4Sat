@@ -28,7 +28,6 @@ import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
 import com.rtbishop.look4sat.core.domain.repository.ISatelliteRepo
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
-import com.rtbishop.look4sat.core.domain.usecase.IAddToCalendar
 import com.rtbishop.look4sat.core.domain.utility.round
 import com.rtbishop.look4sat.core.domain.utility.toTimerString
 import com.rtbishop.look4sat.core.presentation.getDefaultPass
@@ -47,8 +46,7 @@ import java.util.TimeZone
 
 class PassesViewModel(
     private val satelliteRepo: ISatelliteRepo,
-    private val settingsRepo: ISettingsRepo,
-    private val addToCalendar: IAddToCalendar
+    private val settingsRepo: ISettingsRepo
 ) : ViewModel() {
 
     private val defaultPass = getDefaultPass()
@@ -153,8 +151,6 @@ class PassesViewModel(
                 _uiState.update { it.copy(isRadiosDialogShown = !it.isRadiosDialogShown) }
             is PassesAction.FocusCatNum -> _uiState.update { it.copy(focusedCatNum = action.catNum) }
             PassesAction.ClearFocus -> _uiState.update { it.copy(focusedCatNum = null) }
-            is PassesAction.AddToCalendar ->
-                addToCalendar(action.name, action.aosTime, action.losTime)
         }
     }
 
@@ -349,8 +345,7 @@ class PassesViewModel(
             initializer {
                 PassesViewModel(
                     satelliteRepo = container.satelliteRepo,
-                    settingsRepo = container.settingsRepo,
-                    addToCalendar = container.provideAddToCalendar()
+                    settingsRepo = container.settingsRepo
                 )
             }
         }

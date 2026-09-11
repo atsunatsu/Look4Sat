@@ -67,7 +67,8 @@ class MaidenheadGridOverlay : Overlay() {
     private val ownLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeWidth = 6f
         style = Paint.Style.STROKE
-        color = Color.argb(255, 90, 200, 255)
+        // 与普通网格线同色(淡黄), 仅加粗 — 用户要求当前网格框线不换色
+        color = Color.argb(160, 255, 224, 130)
     }
     private val selectedLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeWidth = 4.5f
