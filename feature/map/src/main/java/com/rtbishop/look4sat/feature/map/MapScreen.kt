@@ -389,7 +389,7 @@ private fun WorkedGridCallRow(
             )
             Text(
                 text = if (expanded) " ▴" else " ▾",
-                style = MaterialTheme.typography.bodySmall,
+                fontSize = 18.sp,
                 color = MaterialTheme.colorScheme.primary
             )
         }
