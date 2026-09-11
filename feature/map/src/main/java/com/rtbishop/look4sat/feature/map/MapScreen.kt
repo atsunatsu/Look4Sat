@@ -927,6 +927,11 @@ private fun rememberMapViewWithLifecycle(): MapView {
         MapView(context).apply {
             setMultiTouchControls(true)
             setUseDataConnection(false)
+            // Vertical map repetition wraps points below the viewport up to the
+            // top edge (osmdroid Y-wrap). Antarctica's full-circle ring then
+            // draws a full-height artifact line whenever its X range crosses
+            // the screen at low zoom. The map must never repeat vertically.
+            setVerticalMapRepetitionEnabled(false)
             setTileSource(tileSource)
             minZoomLevel = getMinZoom(resources.displayMetrics.heightPixels, isVertical)
             maxZoomLevel = 7.0
