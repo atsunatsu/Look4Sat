@@ -18,7 +18,12 @@ android {
     namespace = libs.versions.packageName.get()
     defaultConfig {
         applicationId = "cn.ba7opf.look4sat"
-        ndk { abiFilters.add("armeabi-v7a") }
+        // CW decoder ships for both ABIs (see feature/cw jniLibs); the APK must
+        // not be pinned to 32-bit only or 64-bit devices fall back to ARM32.
+        ndk {
+            abiFilters.add("armeabi-v7a")
+            abiFilters.add("arm64-v8a")
+        }
     }
     signingConfigs {
         create("release") {

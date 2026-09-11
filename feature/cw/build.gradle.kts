@@ -10,10 +10,11 @@ android {
     compileOptions {
         encoding = "UTF-8"
     }
-    // 照搬 Morse Expert 1.15: native 解码器仅 armeabi-v7a
+    // Morse Expert 1.15 官方 Play 分包提供 ARM32/ARM64 原生解码器
+    // (jniLibs/armeabi-v7a + arm64-v8a), 两个 ABI 都打进 APK
     defaultConfig {
         ndk {
-            abiFilters += listOf("armeabi-v7a")
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
     }
 }
