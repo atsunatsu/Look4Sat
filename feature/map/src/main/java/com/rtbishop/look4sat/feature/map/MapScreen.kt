@@ -256,7 +256,8 @@ private fun MapScreen(uiState: MapState, onAction: (MapAction) -> Unit, mapView:
                         val shouldCenter = uiState.isGridMode && !prevGridMode
                         setGridMode(
                             uiState.isGridMode, uiState.workedGrids, uiState.roamedGrids, view,
-                            if (shouldCenter) uiState.stationPosition else null
+                            uiState.stationPosition,
+                            centerOnStation = shouldCenter
                         )
                         if (!shouldCenter || uiState.stationPosition != null) {
                             prevGridMode = uiState.isGridMode
@@ -639,7 +640,8 @@ private fun setGridMode(
     workedGrids: Set<String>,
     roamedGrids: Set<String>,
     mapView: MapView,
-    stationPosition: GeoPos?
+    stationPosition: GeoPos?,
+    centerOnStation: Boolean = false
 ) {
     try {
         val gridOverlay = mapView.overlays[OVERLAY_GRID]
@@ -647,6 +649,9 @@ private fun setGridMode(
             gridOverlay.isEnabled = gridMode
             gridOverlay.workedGrids = workedGrids
             gridOverlay.roamedGrids = roamedGrids
+            // ownGrid must be set on EVERY update — the position is available
+            // regardless of whether this frame centers (centering happens only
+            // on entry, but passing null here would wipe the bold outline).
             gridOverlay.ownGrid = ownGridOf(stationPosition)
         } else {
             mapView.overlays[OVERLAY_GRID] = MaidenheadGridOverlay().apply {
@@ -666,7 +671,7 @@ private fun setGridMode(
         // first composition this runs before MapView's first layout, and a
         // setCenter issued pre-layout is discarded when the view lays out —
         // the map then keeps its default center forever.
-        if (gridMode) {
+        if (gridMode && centerOnStation) {
             val pos = stationPosition ?: return
             val lat = pos.latitude
             val lon = pos.longitude
