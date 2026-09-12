@@ -35,7 +35,8 @@ import kotlin.math.min
  * One administrative/boundary region loaded from the award GeoJSON assets.
  *
  * @param code     match key against award statistics (e.g. "GD", "34", "24", "CA", "318")
- * @param name     display label (province/prefecture/state/country name)
+ * @param name     display label in the source language (province/prefecture/state/country name)
+ * @param nameEn   optional English display label (null when the source already is English)
  * @param labelLon/labelLat preferred label anchor (usually the region centroid)
  * @param rings    polygon exterior rings as lon/lat pairs; the overlay projects
  *                 them per frame with the same projection helpers as the grid overlay
@@ -43,6 +44,7 @@ import kotlin.math.min
 data class AwardRegion(
     val code: String,
     val name: String,
+    val nameEn: String? = null,
     val labelLon: Double,
     val labelLat: Double,
     val rings: List<List<DoubleArray>>,
@@ -93,6 +95,7 @@ object AwardBoundaryData {
                     AwardRegion(
                         code = o.optString("code"),
                         name = o.optString("name"),
+                        nameEn = o.optString("name_en").takeIf { it.isNotEmpty() },
                         labelLon = o.optDouble("label_lon", 0.0),
                         labelLat = o.optDouble("label_lat", 0.0),
                         rings = rings,
@@ -184,6 +187,10 @@ class AwardBoundaryOverlay : Overlay() {
         labelPaint.textAlign = Paint.Align.CENTER
         val fontMetrics = labelPaint.fontMetrics
         val textHalfHeight = (fontMetrics.descent + fontMetrics.ascent) / 2f
+        // Label language follows the system: Chinese UI keeps the source
+        // (Chinese/Japanese) names; any other UI language uses the English
+        // name when the asset provides one (falls back to the source name).
+        val useEnglishLabels = mapView.context.resources.configuration.locales[0].language != "zh"
 
         for (i in regions.indices) {
             val region = regions[i]
@@ -236,7 +243,8 @@ class AwardBoundaryOverlay : Overlay() {
             // anchor sits out on the sea where there is room for the text.
             val regionH = (projectionToY(projection, b[3]) ?: 0f) - (projectionToY(projection, b[1]) ?: 0f)
             if (abs(regionH) < MIN_LABEL_REGION_PX && !region.forceLabel) continue
-            canvas.drawText(region.name, lx, ly - textHalfHeight, labelPaint)
+            val label = if (useEnglishLabels) region.nameEn ?: region.name else region.name
+            canvas.drawText(label, lx, ly - textHalfHeight, labelPaint)
         }
     }
 
