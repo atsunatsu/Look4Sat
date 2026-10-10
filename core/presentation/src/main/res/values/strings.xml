@@ -93,6 +93,10 @@
 
     <!-- Radar screen -->
     <string name="radar_back">Back</string>
+    <string name="radar_use_large">Use large radar</string>
+    <string name="radar_use_small">Use small radar</string>
+    <string name="radar_size_large_short">L</string>
+    <string name="radar_size_small_short">S</string>
     <string name="radar_notify">Notify</string>
     <string name="radar_az_text">Azimuth</string>
     <string name="radar_az_value" translatable="false">%.1f°</string>

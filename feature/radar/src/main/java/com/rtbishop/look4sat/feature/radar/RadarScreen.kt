@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ElevatedCard
@@ -62,6 +63,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -284,6 +287,7 @@ private fun RadarScreen(
         // row, the radar keeps the largest square it can, the pager yields (reserved block when
         // the window is tall enough, overlaid tab strip + panel when it is not).
         val fillRadar = useFillRadarLayout(isVertical, maxWidth, maxHeight)
+        var useLargeRadar by remember(fillRadar) { mutableStateOf(fillRadar) }
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -297,7 +301,15 @@ private fun RadarScreen(
                     TimerRow(timeString = uiState.currentTime, isTimeAos = uiState.isTimeAos)
                     IconCard(action = addToCalendar, resId = R.drawable.ic_calendar)
                 }
-                TopBar { NextPassRow(pass = upcomingPass, isUtc = uiState.isUtc) }
+                TopBar {
+                    NextPassRow(pass = upcomingPass, isUtc = uiState.isUtc)
+                    if (fillRadar) {
+                        RadarSizeToggle(
+                            showingLargeRadar = useLargeRadar,
+                            onToggle = { useLargeRadar = !useLargeRadar }
+                        )
+                    }
+                }
             } else {
                 TopBar {
                     IconCard(action = navigateUp, resId = R.drawable.ic_back)
@@ -307,7 +319,7 @@ private fun RadarScreen(
                 }
             }
             if (isVertical) {
-                if (fillRadar) {
+                if (fillRadar && useLargeRadar) {
                     RadarFillArea(
                         uiState = uiState,
                         trackB = trackB,
@@ -328,6 +340,32 @@ private fun RadarScreen(
                     PagerCard(uiState, onAction, logViewModel, requestMicPermission, Modifier.weight(1f), onFixGrid = onFixGrid)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RadarSizeToggle(showingLargeRadar: Boolean, onToggle: () -> Unit) {
+    val label = stringResource(
+        if (showingLargeRadar) R.string.radar_use_small else R.string.radar_use_large
+    )
+    ElevatedCard(
+        modifier = Modifier.size(48.dp),
+        onClick = onToggle
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics { contentDescription = label },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = stringResource(
+                    if (showingLargeRadar) R.string.radar_size_small_short
+                    else R.string.radar_size_large_short
+                ),
+                fontSize = 16.sp
+            )
         }
     }
 }
