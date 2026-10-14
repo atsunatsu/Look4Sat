@@ -1,0 +1,368 @@
+/*
+ * Look4Sat. Amateur radio satellite tracker and pass predictor.
+ * Copyright (C) 2019-2026 Arty Bishop and contributors.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+package com.rtbishop.look4sat.feature.passes
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.rtbishop.look4sat.core.domain.model.PassesSettings
+import com.rtbishop.look4sat.core.domain.predict.CelestialComputer
+import com.rtbishop.look4sat.core.domain.predict.GeoPos
+import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
+import com.rtbishop.look4sat.core.domain.repository.IMainContainer
+import com.rtbishop.look4sat.core.domain.repository.ISatelliteRepo
+import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
+import com.rtbishop.look4sat.core.domain.utility.round
+import com.rtbishop.look4sat.core.domain.utility.toTimerString
+import com.rtbishop.look4sat.core.presentation.getDefaultPass
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+
+class PassesViewModel(
+    private val satelliteRepo: ISatelliteRepo,
+    private val settingsRepo: ISettingsRepo
+) : ViewModel() {
+
+    private val defaultPass = getDefaultPass()
+    private val _uiState = MutableStateFlow(
+        PassesState(
+            isUtc = settingsRepo.otherSettings.value.stateOfUtc,
+            nextPass = defaultPass,
+            hours = settingsRepo.passesSettings.value.hoursAhead,
+            hoursBefore = settingsRepo.passesSettings.value.hoursBefore,
+            elevation = settingsRepo.passesSettings.value.minElevation,
+            lowElevation = settingsRepo.otherSettings.value.lowElevation,
+            highElevation = settingsRepo.otherSettings.value.highElevation,
+            aosStartMinute = settingsRepo.passesSettings.value.aosStartMinute,
+            aosEndMinute = settingsRepo.passesSettings.value.aosEndMinute,
+            invertAosTimeWindow = settingsRepo.passesSettings.value.invertAosTimeWindow,
+            showDeepSpace = settingsRepo.passesSettings.value.showDeepSpace,
+            modes = settingsRepo.passesSettings.value.selectedModes,
+            shouldSeeWhatsNew = settingsRepo.otherSettings.value.shouldSeeWhatsNew
+        )
+    )
+    val uiState: StateFlow<PassesState> = _uiState
+
+    init {
+        // Refresh indicator: mirrors the repo's isCalculating state
+        viewModelScope.launch {
+            satelliteRepo.isCalculating.collect { calculating ->
+                _uiState.update { it.copy(isRefreshing = calculating) }
+            }
+        }
+        // React to settings changes: update UTC flag and whatsNew
+        viewModelScope.launch {
+            settingsRepo.otherSettings.collectLatest { settings ->
+                _uiState.update {
+                    it.copy(
+                        isUtc = settings.stateOfUtc,
+                        shouldSeeWhatsNew = settings.shouldSeeWhatsNew,
+                        lowElevation = settings.lowElevation,
+                        highElevation = settings.highElevation
+                    )
+                }
+            }
+        }
+        // Main tick loop: reacts to new passes, then ticks every second
+        viewModelScope.launch {
+            satelliteRepo.passes.collectLatest { allPasses ->
+                while (isActive) {
+                    val timeNow = System.currentTimeMillis()
+                    val isUtc = _uiState.value.isUtc
+                    val showDeepSpace = _uiState.value.showDeepSpace
+                    // 历史过境窗口: 已结束的过境保留到超过 hoursBefore 小时后消失;
+                    // DeepSpace 保持原行为(始终显示). hoursBefore=0 时过境一结束即消失.
+                    val historyCutoff = timeNow - _uiState.value.hoursBefore * 3600_000L
+                    val filtered = allPasses
+                        .let { if (showDeepSpace) it else it.filter { pass -> !pass.isDeepSpace } }
+                        .filter { pass -> pass.isDeepSpace || pass.losTime >= historyCutoff }
+                    val processed = computePassProgress(filtered, timeNow)
+                    val (nextPass, nextTime, isAos) = resolveNextPass(processed, timeNow)
+                    val sunTimes = computeSunTimes(processed, isUtc)
+                    val grouped = groupPasses(processed, isUtc)
+                    _uiState.update {
+                        it.copy(
+                            itemsList = processed,
+                            groupedPasses = grouped,
+                            sunTimes = sunTimes,
+                            nextPass = nextPass,
+                            nextTime = nextTime,
+                            isNextTimeAos = isAos
+                        )
+                    }
+                    delay(1000)
+                }
+            }
+        }
+    }
+
+    fun onAction(action: PassesAction) {
+        when (action) {
+            PassesAction.DismissWhatsNew -> settingsRepo.setWhatsNewDismissed()
+            is PassesAction.FilterPasses ->
+                applyFilter(
+                    hoursAhead = action.hoursAhead,
+                    hoursBefore = action.hoursBefore,
+                    minElevation = action.minElevation,
+                    lowElevation = action.lowElevation,
+                    highElevation = action.highElevation,
+                    aosStartMinute = action.aosStartMinute,
+                    aosEndMinute = action.aosEndMinute,
+                    invertAosTimeWindow = action.invertAosTimeWindow,
+                    showDeepSpace = action.showDeepSpace,
+                    modes = _uiState.value.modes
+                )
+            is PassesAction.FilterRadios ->
+                applyFilter(
+                    hoursAhead = _uiState.value.hours,
+                    hoursBefore = _uiState.value.hoursBefore,
+                    minElevation = _uiState.value.elevation,
+                    lowElevation = _uiState.value.lowElevation,
+                    highElevation = _uiState.value.highElevation,
+                    aosStartMinute = _uiState.value.aosStartMinute,
+                    aosEndMinute = _uiState.value.aosEndMinute,
+                    invertAosTimeWindow = _uiState.value.invertAosTimeWindow,
+                    showDeepSpace = _uiState.value.showDeepSpace,
+                    modes = action.modes
+                )
+            PassesAction.RefreshPasses -> refreshPasses()
+            PassesAction.TogglePassesDialog ->
+                _uiState.update { it.copy(isPassesDialogShown = !it.isPassesDialogShown) }
+            PassesAction.ToggleRadiosDialog ->
+                _uiState.update { it.copy(isRadiosDialogShown = !it.isRadiosDialogShown) }
+            is PassesAction.FocusCatNum -> _uiState.update { it.copy(focusedCatNum = action.catNum) }
+            PassesAction.ClearFocus -> _uiState.update { it.copy(focusedCatNum = null) }
+        }
+    }
+
+    /** Returns a locale-appropriate date format for pass grouping headers. */
+    private fun dateFormat(tz: TimeZone): SimpleDateFormat {
+        val pattern = if (Locale.getDefault().language == "zh") {
+            "yyyy'年'M'月'd'日' EEEE"
+        } else {
+            "EEE, dd MMM yyyy"
+        }
+        return SimpleDateFormat(pattern, Locale.getDefault()).also { it.timeZone = tz }
+    }
+
+    // Computes sunrise/sunset strings for each unique calendar day in the pass list, plus today for DeepSpace.
+    // CelestialComputer.findSunRiseSet() returns the next rise/set after the supplied time, so pass
+    // the calendar day's 00:00 in the same timezone used by the visible date group. Passing a pass's
+    // AOS time can jump to the following day's sunrise/sunset when that AOS is after the local event.
+    // For white nights / polar day edge cases, we fall back to searching from the previous day.
+    private fun computeSunTimes(passes: List<OrbitalPass>, isUtc: Boolean): Map<String, Pair<String, String>> {
+        val stationPos = settingsRepo.stationPosition.value
+        val tz = if (isUtc) TimeZone.getTimeZone("UTC") else TimeZone.getDefault()
+        val sdfDate = dateFormat(tz)
+        val sdfTime = SimpleDateFormat("HH:mm", Locale.getDefault()).also { it.timeZone = tz }
+        val result = LinkedHashMap<String, Pair<String, String>>()
+        // DeepSpace group always shows today's sun times.
+        // The natural-day anchor is the DEVICE timezone, not the display timezone:
+        // UTC midnight is 08:00 local for UTC+8 stations, when the sun is already
+        // up — that would trip the white-night guard and render "--:--".
+        if (passes.any { it.isDeepSpace }) {
+            val riseSet = findTodaySunRiseSet(stationPos, startOfDayMillis(System.currentTimeMillis(), TimeZone.getDefault()))
+            val rise = if (riseSet.riseTimeMillis > 0) sdfTime.format(Date(riseSet.riseTimeMillis)) else "--:--"
+            val set = if (riseSet.setTimeMillis > 0) sdfTime.format(Date(riseSet.setTimeMillis)) else "--:--"
+            result["DeepSpace (period >225min)"] = rise to set
+        }
+        for (pass in passes) {
+            if (pass.isDeepSpace) continue
+            val label = sdfDate.format(Date(pass.aosTime))
+            if (label in result) continue
+            val riseSet = findTodaySunRiseSet(stationPos, startOfDayMillis(pass.aosTime, TimeZone.getDefault()))
+            val rise = if (riseSet.riseTimeMillis > 0) sdfTime.format(Date(riseSet.riseTimeMillis)) else "--:--"
+            val set = if (riseSet.setTimeMillis > 0) sdfTime.format(Date(riseSet.setTimeMillis)) else "--:--"
+            result[label] = rise to set
+        }
+        return result
+    }
+
+    /**
+     * Find today's sunrise and sunset by starting from local midnight.
+     * Handles the white nights / polar day edge case where the sun is still above
+     * the -0.8333° threshold at midnight: in that case we search from the previous
+     * day's midnight to find a valid sunrise/sunset pair within the target day.
+     */
+    private fun findTodaySunRiseSet(observer: GeoPos, localMidnightMillis: Long): CelestialComputer.RiseSetTimes {
+        val threshold = 0.8333
+        val sunPos = CelestialComputer.getSunPosition(observer, localMidnightMillis)
+        if (sunPos.elevation > -threshold) {
+            // White nights / polar day: the sun is too high at midnight.
+            // Search from earlier days so the algorithm goes through a full
+            // sunset → sunrise → sunset cycle, landing in the target day.
+            val dayEnd = localMidnightMillis + 86400000L
+            for (offset in 1..3) {
+                val result = CelestialComputer.findSunRiseSet(observer, localMidnightMillis - offset * 86400000L)
+                if (result.riseTimeMillis in localMidnightMillis..dayEnd &&
+                    result.setTimeMillis in localMidnightMillis..dayEnd) {
+                    return result
+                }
+            }
+            // No valid pair found (midnight sun / polar day)
+            return CelestialComputer.RiseSetTimes(0L, 0L)
+        }
+        return CelestialComputer.findSunRiseSet(observer, localMidnightMillis)
+    }
+
+    private fun startOfDayMillis(timeMillis: Long, tz: TimeZone): Long {
+        return Calendar.getInstance(tz, Locale.getDefault()).apply {
+            timeInMillis = timeMillis
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    private fun groupPasses(passes: List<OrbitalPass>, isUtc: Boolean): Map<String, List<OrbitalPass>> {
+        val tz = if (isUtc) TimeZone.getTimeZone("UTC") else TimeZone.getDefault()
+        val sdfDate = dateFormat(tz)
+        val ordered = LinkedHashMap<String, List<OrbitalPass>>()
+        val deepSpace = passes.filter { it.isDeepSpace }
+        if (deepSpace.isNotEmpty()) ordered["DeepSpace (period >225min)"] = deepSpace
+        passes.filter { !it.isDeepSpace }
+            .groupByTo(LinkedHashMap()) { sdfDate.format(Date(it.aosTime)) }
+            .forEach { (k, v) -> ordered[k] = v }
+        return ordered
+    }
+
+    /** Computes live progress while retaining completed passes in the requested history window. */
+    private fun computePassProgress(passList: List<OrbitalPass>, time: Long): List<OrbitalPass> {
+        val result = ArrayList<OrbitalPass>(passList.size)
+        for (pass in passList) {
+            if (!pass.isDeepSpace && time > pass.aosTime) {
+                val deltaNow = time.minus(pass.aosTime).toFloat()
+                val deltaTotal = pass.losTime.minus(pass.aosTime).toFloat()
+                val newProgress = (deltaNow / deltaTotal).round(2)
+                val boundedProgress = newProgress.coerceIn(0f, 1f)
+                if (boundedProgress != pass.progress) {
+                    result.add(pass.copy(progress = boundedProgress))
+                } else {
+                    result.add(pass)
+                }
+            } else {
+                result.add(pass)
+            }
+        }
+        return result
+    }
+
+    /** Resolves the next upcoming or active pass and its countdown timer. */
+    private fun resolveNextPass(
+        passes: List<OrbitalPass>,
+        timeNow: Long
+    ): Triple<OrbitalPass, String, Boolean> {
+        val upcoming = passes.firstOrNull { it.aosTime > timeNow }
+        if (upcoming != null) {
+            return Triple(upcoming, (upcoming.aosTime - timeNow).toTimerString(), true)
+        }
+        if (passes.isNotEmpty()) {
+            val lastPass = passes.last()
+            return Triple(lastPass, (lastPass.losTime - timeNow).toTimerString(), false)
+        }
+        return Triple(defaultPass, "00:00:00", true)
+    }
+
+    private fun applyFilter(
+        hoursAhead: Int,
+        hoursBefore: Int,
+        minElevation: Double,
+        lowElevation: Double,
+        highElevation: Double,
+        aosStartMinute: Int,
+        aosEndMinute: Int,
+        invertAosTimeWindow: Boolean,
+        showDeepSpace: Boolean,
+        modes: List<String>
+    ) = viewModelScope.launch {
+        settingsRepo.setPassesSettings(
+            PassesSettings(
+                showDeepSpace,
+                hoursAhead,
+                minElevation,
+                aosStartMinute,
+                aosEndMinute,
+                invertAosTimeWindow,
+                modes,
+                hoursBefore
+            )
+        )
+        settingsRepo.updateOtherSettings { it.copy(lowElevation = lowElevation, highElevation = highElevation) }
+        _uiState.update {
+            it.copy(
+                hours = hoursAhead,
+                hoursBefore = hoursBefore,
+                elevation = minElevation,
+                lowElevation = lowElevation,
+                highElevation = highElevation,
+                aosStartMinute = aosStartMinute,
+                aosEndMinute = aosEndMinute,
+                invertAosTimeWindow = invertAosTimeWindow,
+                showDeepSpace = showDeepSpace,
+                modes = modes
+            )
+        }
+        val now = System.currentTimeMillis()
+        satelliteRepo.calculatePasses(
+            time = now - hoursBefore * 60L * 60L * 1000L,
+            hoursAhead = hoursBefore + hoursAhead,
+            minElevation = minElevation,
+            aosStartMinute = aosStartMinute,
+            aosEndMinute = aosEndMinute,
+            invertAosTimeWindow = invertAosTimeWindow,
+            modes = modes
+        )
+    }
+
+    private fun refreshPasses() = viewModelScope.launch {
+        val settings = settingsRepo.passesSettings.value
+        // 下拉刷新也保留历史过境窗口, 否则刷新即丢 history (与筛选/启动计算口径一致)
+        satelliteRepo.calculatePasses(
+            time = System.currentTimeMillis() - settings.hoursBefore * 60L * 60L * 1000L,
+            hoursAhead = settings.hoursBefore + settings.hoursAhead,
+            minElevation = settings.minElevation,
+            aosStartMinute = settings.aosStartMinute,
+            aosEndMinute = settings.aosEndMinute,
+            invertAosTimeWindow = settings.invertAosTimeWindow,
+            modes = settings.selectedModes
+        )
+    }
+
+    companion object {
+        fun factory(container: IMainContainer) = viewModelFactory {
+            initializer {
+                PassesViewModel(
+                    satelliteRepo = container.satelliteRepo,
+                    settingsRepo = container.settingsRepo
+                )
+            }
+        }
+    }
+}

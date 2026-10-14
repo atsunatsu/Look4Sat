@@ -18,10 +18,16 @@
  */
 package com.rtbishop.look4sat.core.domain.model
 
-/** Latest release info fetched from the fork's GitHub releases API. */
+/** Latest release info fetched from the fork's GitHub releases page. */
 data class LatestRelease(
-    val versionTag: String, // e.g. "v4.4.6-ba7opf.6"
+    val versionTag: String, // e.g. "v4.4.8-ba7opf.13"
     val title: String,      // release name, may be empty
     val body: String,       // release notes / update description
-    val apkUrl: String?     // validated release asset URL, null if no compatible APK is published
-)
+    /** Download URL per published edition; a missing key means that edition is not published. */
+    val assetUrls: Map<ReleaseEdition, String> = emptyMap()
+) {
+    fun urlOf(edition: ReleaseEdition): String? = assetUrls[edition]
+
+    /** True when at least one edition of this release is installable. */
+    val hasAssets: Boolean get() = assetUrls.isNotEmpty()
+}

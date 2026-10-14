@@ -19,6 +19,7 @@ package com.rtbishop.look4sat.convention
 
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.CommonExtension
+import com.android.build.api.dsl.LibraryExtension
 import org.gradle.accessors.dm.LibrariesForLibs
 import org.gradle.api.Project
 import org.gradle.api.artifacts.dsl.DependencyHandler
@@ -51,6 +52,23 @@ internal fun DependencyHandler.androidTestImplementation(dependencyNotation: Any
 internal fun DependencyHandler.ksp(dependencyNotation: Any) =
     add("ksp", dependencyNotation)
 
+/** Dependencies that only the jsuenhanced edition links against (FT4 core, logbook…). */
+internal fun DependencyHandler.jsuenhancedImplementation(dependencyNotation: Any) =
+    add("${EDITION_ENHANCED}Implementation", dependencyNotation)
+
+/** Dependencies only the basic edition links against (frozen legacy implementations). */
+internal fun DependencyHandler.basicImplementation(dependencyNotation: Any) =
+    add("${EDITION_BASIC}Implementation", dependencyNotation)
+
+/**
+ * Product flavors for the single-repo dual release. Both flavors keep the same
+ * applicationId, signing config and versionCode (see AGENTS.md): the same identity
+ * is what makes an in-app switch between editions install as a plain update.
+ */
+internal const val EDITION_DIMENSION = "edition"
+internal const val EDITION_BASIC = "basic"
+internal const val EDITION_ENHANCED = "jsuenhanced"
+
 internal fun Project.setupAndroidApp() {
     applyPlugin(libs.plugins.android.application)
     extensions.configure<ApplicationExtension> {
@@ -62,6 +80,18 @@ internal fun Project.setupAndroidApp() {
             minSdk = libs.versions.minSdk.get().toInt()
             versionCode = libs.versions.appVersionCode.get().toInt()
             versionName = libs.versions.appVersionName.get()
+        }
+        // The edition is a compile-time constant so R8 constant-folds the branches
+        // that belong to the other flavor instead of shipping them in the APK.
+        buildFeatures.buildConfig = true
+        flavorDimensions += EDITION_DIMENSION
+        productFlavors {
+            create(EDITION_BASIC) {
+                buildConfigField("String", "EDITION", "\"$EDITION_BASIC\"")
+            }
+            create(EDITION_ENHANCED) {
+                buildConfigField("String", "EDITION", "\"$EDITION_ENHANCED\"")
+            }
         }
         buildTypes {
             debug {
@@ -89,10 +119,17 @@ internal fun Project.setupAndroidApp() {
 
 internal fun Project.setupAndroidLib() {
     applyPlugin(libs.plugins.android.library)
-    extensions.configure<CommonExtension> {
+    extensions.configure<LibraryExtension> {
         compileSdk = libs.versions.compileSdk.get().toInt()
         ndkVersion = libs.versions.ndkVersion.get()
         defaultConfig.minSdk = libs.versions.minSdk.get().toInt()
+        // Every Android library declares the same edition dimension so that the
+        // per-flavor source sets (src/basic, src/jsuenhanced) resolve everywhere.
+        flavorDimensions += EDITION_DIMENSION
+        productFlavors {
+            create(EDITION_BASIC)
+            create(EDITION_ENHANCED)
+        }
     }
     dependencies {
         androidTestImplementation(libs.bundles.androidTest)

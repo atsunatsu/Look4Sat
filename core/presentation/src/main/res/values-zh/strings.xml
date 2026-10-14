@@ -568,6 +568,12 @@
     <string name="update_check_error">检查更新失败，请检查网络连接。</string>
     <string name="update_check_download_error">下载失败，请重试。</string>
     <string name="update_check_no_apk">该版本未附带 APK 安装包。</string>
+    <string name="update_check_edition_hint">两个版本同批发布；切换为覆盖安装，应用数据保留。</string>
+    <string name="update_check_edition_basic">基础版</string>
+    <string name="update_check_edition_enhanced">增强版（JSUEnhanced）</string>
+    <string name="update_check_edition_current">已安装</string>
+    <string name="update_check_edition_switch">切换安装</string>
+    <string name="update_check_edition_missing">本次发布未提供</string>
 
     <!-- FT4 -->
     <string name="nav_ft4">FT4</string>

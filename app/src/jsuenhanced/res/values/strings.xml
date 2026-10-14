@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Edition-specific application label. The app module's resources override the
+  library (core:presentation) default of "Look4Sat-BA7OPF" for the jsuenhanced
+  flavor only, so both editions can sit side by side on the same device and are
+  instantly distinguishable in the launcher.
+-->
+<resources>
+    <string name="app_name" translatable="false">Look4Sat-JSUEnhanced</string>
+</resources>

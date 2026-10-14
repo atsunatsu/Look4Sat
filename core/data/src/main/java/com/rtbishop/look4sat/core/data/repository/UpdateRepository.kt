@@ -23,6 +23,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import com.rtbishop.look4sat.core.domain.model.LatestRelease
+import com.rtbishop.look4sat.core.domain.model.ReleaseEdition
 import com.rtbishop.look4sat.core.domain.repository.IUpdateRepository
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +33,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
-import java.util.Locale
 import java.util.zip.ZipFile
 import kotlin.coroutines.coroutineContext
 
@@ -48,13 +48,13 @@ class UpdateRepository(
             coroutineContext.ensureActive()
             val source = "$prefix$RELEASE_REPOSITORY/releases/latest"
             val html = readPage(source) ?: continue
-            val release = parseReleasePage(html, prefix, Build.SUPPORTED_ABIS.toList()) ?: continue
+            val release = parseReleasePage(html, prefix) ?: continue
             metadata = metadata ?: release
-            if (release.apkUrl != null) return@withContext release
+            if (release.assetUrls.isNotEmpty()) return@withContext release
             // GitHub lazy-loads the actual asset list in an include-fragment.
             val assets = readPage("$prefix$RELEASE_REPOSITORY/releases/expanded_assets/${release.versionTag}") ?: continue
-            val withAssets = parseReleasePage(html + "\n" + assets, prefix, Build.SUPPORTED_ABIS.toList())
-            if (withAssets?.apkUrl != null) return@withContext withAssets
+            val withAssets = parseReleasePage(html + "\n" + assets, prefix)
+            if (withAssets?.assetUrls?.isNotEmpty() == true) return@withContext withAssets
         }
         metadata
     }
@@ -78,7 +78,8 @@ class UpdateRepository(
         null
     }
 
-    override suspend fun downloadApk(url: String, dest: File): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun downloadApk(url: String, edition: ReleaseEdition, dest: File): Boolean =
+        withContext(Dispatchers.IO) {
         if (!isTrustedDownloadUrl(url)) return@withContext false
         val partial = File(dest.parentFile, "${dest.name}.part")
         try {
@@ -102,7 +103,7 @@ class UpdateRepository(
                             }
                         }
                     }
-                    validateApk(partial)
+                    validateApk(partial, edition)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
@@ -126,14 +127,18 @@ class UpdateRepository(
         }
     }
 
-    private fun validateApk(apk: File): Boolean {
+    private fun validateApk(apk: File, edition: ReleaseEdition): Boolean {
         if (!apk.isFile || apk.length() !in MIN_APK_BYTES..MAX_APK_BYTES) return false
         val archive = packageInfo(apk.absolutePath) ?: return false
         val installed = packageInfo(context.packageName, archive = false) ?: return false
         if (archive.packageName != context.packageName) return false
-        if (versionCode(archive) <= versionCode(installed)) return false
+        // Same versionCode is a valid install on purpose: switching editions reinstalls the
+        // same version of the other APK, and Android treats that as a plain update. Only a
+        // genuine downgrade (older version) is refused.
+        if (versionCode(archive) < versionCode(installed)) return false
         if (!signaturesMatch(installed, archive)) return false
-        return containsCompatibleNativeLibraries(apk)
+        if (edition == ReleaseEdition.JSUENHANCED && !containsFt4Core(apk)) return false
+        return true
     }
 
     @Suppress("DEPRECATION")
@@ -185,7 +190,7 @@ class UpdateRepository(
             installedCurrent.all(archiveHistory::contains)
     }
 
-    private fun containsCompatibleNativeLibraries(apk: File): Boolean = runCatching {
+    private fun containsFt4Core(apk: File): Boolean = runCatching {
         ZipFile(apk).use { zip ->
             val packagedAbis = zip.entries().asSequence()
                 .mapNotNull { entry ->
@@ -214,60 +219,13 @@ internal data class ReleaseAsset(
     val size: Long
 )
 
-internal fun selectReleaseAsset(
-    assets: List<ReleaseAsset>,
-    tag: String,
-    supportedAbis: List<String>
-): ReleaseAsset? = assets.mapNotNull { asset ->
-    val score = releaseAssetScore(
-        name = asset.name,
-        contentType = asset.contentType,
-        state = asset.state,
-        size = asset.size,
-        tag = tag,
-        supportedAbis = supportedAbis
-    ) ?: return@mapNotNull null
-    if (!isTrustedDownloadUrl(asset.url)) return@mapNotNull null
-    asset to score
-}.maxByOrNull { it.second }?.first
-
-private fun releaseAssetScore(
-    name: String,
-    contentType: String,
-    state: String,
-    size: Long,
-    tag: String,
-    supportedAbis: List<String>
-): Int? {
-    val normalized = name.lowercase(Locale.US)
-    if (!normalized.endsWith(".apk") || "look4sat" !in normalized || "ft4" !in normalized) return null
-    if (listOf("debug", "unsigned", "unaligned").any(normalized::contains)) return null
-    if (state.isNotBlank() && state != "uploaded") return null
-    if (contentType.isNotBlank() && contentType !in APK_CONTENT_TYPES) return null
-    // Release HTML has no reliable byte size; the downloaded APK is checked before publication.
-    if (size != -1L && size !in 100_000L..250_000_000L) return null
-
-    val namedAbis = KNOWN_ABIS.filter { abi ->
-        Regex("(?<![a-z0-9])${Regex.escape(abi)}(?![a-z0-9_])").containsMatchIn(normalized)
-    }
-    if (namedAbis.isNotEmpty() && namedAbis.none(supportedAbis::contains)) return null
-    var score = 100
-    if ("universal" in normalized) score += 20
-    supportedAbis.forEachIndexed { index, abi ->
-        if (abi in namedAbis) score += 50 - index
-    }
-    if (tag.lowercase(Locale.US).removePrefix("v") in normalized) score += 10
-    if ("release" in normalized) score += 5
-    return score
-}
-
 internal fun isTrustedDownloadUrl(url: String): Boolean = canonicalDownloadUrl(url) != null
 
 internal fun canonicalDownloadUrl(url: String): String? = runCatching {
     val prefix = UPDATE_MIRRORS.firstOrNull { url.startsWith(it) }.orEmpty()
     val canonical = url.removePrefix(prefix)
     val uri = URI(canonical)
-    val pathPrefix = "/Iu-yang1/Look4Sat-FT4/releases/download/"
+    val pathPrefix = "/atsunatsu/Look4Sat/releases/download/"
     val segments = uri.path.orEmpty().takeIf { it.startsWith(pathPrefix, true) }?.substring(pathPrefix.length)?.split('/')
     canonical.takeIf {
         uri.scheme == "https" && uri.host.equals("github.com", ignoreCase = true) &&
@@ -277,6 +235,3 @@ internal fun canonicalDownloadUrl(url: String): String? = runCatching {
             segments.last().endsWith(".apk", true)
     }
 }.getOrNull()
-
-private val APK_CONTENT_TYPES = setOf("application/vnd.android.package-archive", "application/octet-stream")
-private val KNOWN_ABIS = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")

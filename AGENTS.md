@@ -52,6 +52,45 @@ data download.
 - **Min SDK**: 24 | **Target SDK**: 36 | **JDK**: 17
 - **Gradle**: Uses version catalog (`gradle/libs.versions.toml`) + convention plugins in `build-logic/`
 
+## Dual Edition Builds (basic / jsuenhanced)
+
+One repository publishes two APKs for every tag. They share the `applicationId`
+(`cn.ba7opf.look4sat`), the signing key and the `versionCode`, so installing the other
+edition is a plain update over the same app identity — that is what makes the in-app
+edition switch on the update page work.
+
+| Edition | Flavor | Sources | Release asset |
+|---|---|---|---|
+| `basic` | `basic` | frozen 4.4.8 feature set | `Look4Sat-<version>.apk` (bare name kept for legacy in-app updates) |
+| `jsuenhanced` | `jsuenhanced` | FT4 decode, logbook, CAT/rotator control, L4S link | `Look4Sat-<version>-jsuenhanced.apk` |
+
+```shell
+./gradlew :app:assembleBasicRelease        # basic APK (also bundleBasicRelease for the AAB)
+./gradlew :app:assembleJsuenhancedRelease  # FT4 native core needs the pinned Windows toolchain
+```
+
+**Source-set split (do not break this).** Files whose behaviour differs per edition live in
+`src/basic/` (copy of the frozen `main` file) and `src/jsuenhanced/` (enhanced file) — never in
+`src/main/`, or both editions would compile the same class twice. A change that only belongs to
+one edition goes into that edition's source set; shared plumbing stays in `src/main/`. The
+runtime edition is exposed as `IMainContainer.edition` (`BuildConfig.EDITION` at the app layer).
+
+Rules that keep the split honest:
+
+- **basic must stay byte-identical to the pre-flavour file.** Where shared code changed and the
+  frozen copy no longer compiles, adapt the basic copy minimally and record the adaptation in the
+  implementation log — never "fix" basic by pulling enhanced behaviour into it.
+- **Enhanced-only modules are dependency-isolated**: `core:ft4-native`, `feature:ft4` and
+  `feature:logbook` are `jsuenhancedImplementation` only, so the basic APK never ships
+  `liblook4sat_ft4.so` (the release workflow asserts its absence).
+- **Never add per-edition version bumps.** Same `versionCode`/`versionName` for both editions;
+  only the asset name distinguishes them. A different versionCode would make switching editions a
+  downgrade (`INSTALL_FAILED_VERSION_DOWNGRADE`).
+- **Data layer stays shared** (Room schema and migrations live in `src/main/`), so switching
+  editions keeps the logbook and settings; never add destructive-migration fallbacks.
+- The removed `-Pl4sDevelopment` flag now fails the build on purpose: an ignored property would
+  silently emit a stable-package APK that overwrites the installed app.
+
 ## Key Libraries
 
 - **Compose** (BOM 2026.05.01) + Material3 Adaptive

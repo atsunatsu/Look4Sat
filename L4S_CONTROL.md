@@ -21,7 +21,7 @@
 
 固件：`cmake --preset L4S`，随后 `cmake --build --preset L4S`。原 Fusion/CW preset 不启用 L4S 控制。回退时使用原刷机工具、原固件及其兼容的配置/校准备份。
 
-Android：通过现有环境变量配置签名和 FT4 原生工具链后运行 `./gradlew.bat -Pl4sDevelopment=true :app:assembleRelease`。该参数使用独立联调包名、开发版本号及后缀 `-l4s-alpha7`；默认构建不改变稳定版标识。签名密码和证书不进入仓库。alpha7 可覆盖安装先前联调版。本轮请同时更新 APK 和 `L4S-v1-alpha7` 固件，旧 v1 固件仅提供其原有基本控制，不提供完整的事务式档案管理及编辑保护。
+Android：通过现有环境变量配置签名和 FT4 原生工具链后运行 `./gradlew.bat :app:assembleJsuenhancedRelease` 构建增强版（jsuenhanced flavor）。该 flavor 使用与稳定版相同的包名、签名与 versionCode，因此会**覆盖安装**稳定版（应用数据保留）；版本切换请在应用内设置→更新检查页用「基础版 / 增强版」按钮完成，不要再尝试用独立包名并存（`-Pl4sDevelopment` 开关已删除，传入它会直接构建失败）。签名密码和证书不进入仓库。
 
 alpha2 修正了原生 CDC 打开时未开启 DTR、导致固件不发送回复的问题。仅 L4S 原生 CDC 会话请求 DTR，RTS 保持关闭，其他 CAT 型号保持原行为。CW 拍发入口在选择 L4S 型号后即可见，位于展开的转发器控制区顶部；未连接时可预填文本，但只有已连接、跟踪就绪、CW 模式且确认未发射时才能发送。诊断导出增加 HELLO/OPEN、重试次数和接收字节数，不记录 CW 文本。
 

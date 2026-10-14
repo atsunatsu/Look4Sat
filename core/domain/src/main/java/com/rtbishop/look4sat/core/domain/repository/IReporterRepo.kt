@@ -19,4 +19,11 @@ package com.rtbishop.look4sat.core.domain.repository
 
 interface IReporter {
     fun reportFrequency(format: String, frequency: Long)
+
+    /**
+     * Rotation reporting was dropped from the enhanced radio rework. It is kept here
+     * with a no-op default so the frozen basic-edition radar loop (which still calls
+     * it) keeps compiling without forcing the enhanced reporters to implement it.
+     */
+    fun reportRotation(format: String, azimuth: Double, elevation: Double) = Unit
 }

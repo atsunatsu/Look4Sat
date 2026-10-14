@@ -170,6 +170,11 @@ data class RadioControlSettings(
         const val MODEL_ICOM_IC820 = "Icom IC-820"
         const val MODEL_QUANSHENG_UVK1 = "Quansheng UV-K1 (L4S)"
         const val MODEL_QUANSHENG_UVK5V3 = "Quansheng UV-K5 V3 (L4S)"
+
+        // Kept for the frozen basic-edition CAT settings UI; the jsuenhanced edition reads
+        // baud rates from its own transport descriptors.
+        val BAUD_RATES_YAESU = listOf(4800, 9600, 38400)
+        val BAUD_RATES_ICOM = listOf(4800, 9600, 19200, 38400, 57600, 115200)
         const val TRANSPORT_BLUETOOTH = "BLUETOOTH"
         const val TRANSPORT_USB = "USB"
         const val TRANSPORT_TCP = "TCP"

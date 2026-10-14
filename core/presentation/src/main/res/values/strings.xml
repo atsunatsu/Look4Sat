@@ -598,6 +598,12 @@ Upstream: https://github.com/rt-bishop/Look4Sat</string>
     <string name="update_check_error">Failed to check for updates. Check your connection.</string>
     <string name="update_check_download_error">Download failed. Try again.</string>
     <string name="update_check_no_apk">No APK attached to this release.</string>
+    <string name="update_check_edition_hint">Both editions ship in one release. Switching installs over the same app and keeps your data.</string>
+    <string name="update_check_edition_basic">Basic</string>
+    <string name="update_check_edition_enhanced">Enhanced (JSUEnhanced)</string>
+    <string name="update_check_edition_current">installed</string>
+    <string name="update_check_edition_switch">switch edition</string>
+    <string name="update_check_edition_missing">not published in this release</string>
 
     <!-- FT4 -->
     <string name="nav_ft4">FT4</string>

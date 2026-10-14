@@ -17,6 +17,7 @@
  */
 package com.rtbishop.look4sat.core.domain.repository
 import com.rtbishop.look4sat.core.domain.control.IControlDiagnostics
+import com.rtbishop.look4sat.core.domain.model.ReleaseEdition
 import com.rtbishop.look4sat.core.domain.model.SatRadio
 import com.rtbishop.look4sat.core.domain.audio.IAudioHub
 import com.rtbishop.look4sat.core.domain.logbook.IQsoRepository
@@ -26,6 +27,7 @@ import com.rtbishop.look4sat.core.domain.ft4.IFt4TransmitCoordinator
 import com.rtbishop.look4sat.core.domain.time.IDisciplinedClock
 import com.rtbishop.look4sat.core.domain.time.ITimeSynchronizationService
 import com.rtbishop.look4sat.core.domain.usecase.IAddToCalendar
+import com.rtbishop.look4sat.core.domain.usecase.IAudioCapture
 import com.rtbishop.look4sat.core.domain.usecase.ISaveImage
 import com.rtbishop.look4sat.core.domain.usecase.IShowToast
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +35,14 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface IMainContainer {
     val appScope: CoroutineScope
+
+    /**
+     * Which edition this install is. The default matches the frozen basic container;
+     * the jsuenhanced container (its own source set) overrides it. Used by the in-app
+     * edition switcher on the update page, which installs the other edition over the
+     * same applicationId and versionCode.
+     */
+    val edition: ReleaseEdition get() = ReleaseEdition.BASIC
     val settingsRepo: ISettingsRepo
     val selectionRepo: ISelectionRepo
     val satelliteRepo: ISatelliteRepo
@@ -42,17 +52,22 @@ interface IMainContainer {
     val qsoRepository: IQsoRepository
     val lotwUploadRepository: ILoTWUploadRepository
     val amSatRepo: IAmSatRepository
+    /** Shared audio hub: the CW panel listens here in both editions. */
     val audioHub: IAudioHub
-    val ft4Service: IFt4Service
-    val ft4AudioTransmitter: IFt4AudioTransmitter
-    val ft4TransmitCoordinator: IFt4TransmitCoordinator
-    val disciplinedClock: IDisciplinedClock
-    val timeSynchronizationService: ITimeSynchronizationService
+    // Enhanced-edition (jsuenhanced) services. Declared here so shared code can address
+    // them, but only the jsuenhanced container instantiates them. The basic container
+    // keeps the defaults below and never touches these — they are deliberately loud
+    // instead of returning a silently wrong value.
+    val ft4Service: IFt4Service get() = error(ENHANCED_ONLY)
+    val ft4AudioTransmitter: IFt4AudioTransmitter get() = error(ENHANCED_ONLY)
+    val ft4TransmitCoordinator: IFt4TransmitCoordinator get() = error(ENHANCED_ONLY)
+    val disciplinedClock: IDisciplinedClock get() = error(ENHANCED_ONLY)
+    val timeSynchronizationService: ITimeSynchronizationService get() = error(ENHANCED_ONLY)
     val updateRepo: IUpdateRepository
     val lotwRepo: ILoTWRepository
     val radioTrackingService: IRadioTrackingService
-    val rotatorTrackingService: IRotatorTrackingService
-    val controlDiagnostics: IControlDiagnostics
+    val rotatorTrackingService: IRotatorTrackingService get() = error(ENHANCED_ONLY)
+    val controlDiagnostics: IControlDiagnostics get() = error(ENHANCED_ONLY)
     val locationRepo: ILocationRepo
     val mutualPassData: StateFlow<MutualPassData>
     /** Grid Finder → LoTW station page prefill, consumed once by that page. */
@@ -65,7 +80,15 @@ interface IMainContainer {
     fun provideNetworkReporter(): IReporter
     fun provideSensorsRepo(): ISensorsRepo
     fun provideSaveImage(): ISaveImage
+    // Legacy basic-edition hooks kept for the frozen 4.4.8 code path (the jsuenhanced
+    // container serves radios through the extended tracking service instead).
+    fun provideTxRadioController(): IRadioController = error(BASIC_ONLY)
+    fun provideRxRadioController(): IRadioController = error(BASIC_ONLY)
+    fun provideAudioCapture(): IAudioCapture = error(BASIC_ONLY)
 }
+
+private const val ENHANCED_ONLY = "Available in the jsuenhanced edition only"
+private const val BASIC_ONLY = "Provided by the basic edition container only"
 
 data class MutualPassData(
     val samples: List<Pair<Long, Pair<Double, Double>>> = emptyList(),

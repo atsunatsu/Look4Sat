@@ -11,7 +11,11 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:ft4-native"))
+    // The FT4 native core (Flang/CMake toolchain) is an enhanced-edition feature:
+    // basic must not link it, otherwise liblook4sat_ft4.so would be packaged too.
+    // (Build scripts sit outside the convention plugin source set, so the flavor
+    // configuration is addressed by name — the documented Kotlin DSL form.)
+    "jsuenhancedImplementation"(project(":core:ft4-native"))
 }
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {

@@ -19,12 +19,18 @@
 package com.rtbishop.look4sat.core.domain.repository
 
 import com.rtbishop.look4sat.core.domain.model.LatestRelease
+import com.rtbishop.look4sat.core.domain.model.ReleaseEdition
 import java.io.File
 
 interface IUpdateRepository {
     /** Fetch the latest release of the fork repo from GitHub; null on failure. */
     suspend fun getLatestRelease(): LatestRelease?
 
-    /** Download the release APK from [url] into [dest]; true on success. */
-    suspend fun downloadApk(url: String, dest: File): Boolean
+    /**
+     * Download the [edition]'s APK from [url] into [dest]; true on success.
+     * The archive is validated against the installed app (package, signature, sizes and,
+     * for the enhanced edition, the FT4 native core) before it is reported as usable, and
+     * the same versionCode is accepted so the user can switch editions without a downgrade.
+     */
+    suspend fun downloadApk(url: String, edition: ReleaseEdition, dest: File): Boolean
 }

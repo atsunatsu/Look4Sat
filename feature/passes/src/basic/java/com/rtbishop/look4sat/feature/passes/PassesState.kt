@@ -1,0 +1,67 @@
+/*
+ * Look4Sat. Amateur radio satellite tracker and pass predictor.
+ * Copyright (C) 2019-2026 Arty Bishop and contributors.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+package com.rtbishop.look4sat.feature.passes
+
+import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
+
+data class PassesState(
+    val isPassesDialogShown: Boolean = false,
+    val isRadiosDialogShown: Boolean = false,
+    val isRefreshing: Boolean = true,
+    val isUtc: Boolean = false,
+    val nextPass: OrbitalPass,
+    val nextTime: String = "00:00:00",
+    val isNextTimeAos: Boolean = true,
+    val hours: Int = 24,
+    /** 历史过境回看窗口(小时), 0 = 只看未来. */
+    val hoursBefore: Int = 0,
+    val elevation: Double = 16.0,
+    val lowElevation: Double = 16.0,
+    val highElevation: Double = 65.0,
+    val aosStartMinute: Int = 0,
+    val aosEndMinute: Int = 23 * 60 + 59,
+    val invertAosTimeWindow: Boolean = false,
+    val showDeepSpace: Boolean = true,
+    val modes: List<String> = emptyList(),
+    val itemsList: List<OrbitalPass> = emptyList(),
+    val groupedPasses: Map<String, List<OrbitalPass>> = emptyMap(),
+    val shouldSeeWhatsNew: Boolean = false,
+    val sunTimes: Map<String, Pair<String, String>> = emptyMap(),
+    val focusedCatNum: Int? = null
+)
+
+sealed interface PassesAction {
+    data object DismissWhatsNew : PassesAction
+    data class FilterPasses(
+        val hoursAhead: Int,
+        val hoursBefore: Int,
+        val minElevation: Double,
+        val lowElevation: Double,
+        val highElevation: Double,
+        val aosStartMinute: Int,
+        val aosEndMinute: Int,
+        val invertAosTimeWindow: Boolean,
+        val showDeepSpace: Boolean
+    ) : PassesAction
+    data class FilterRadios(val modes: List<String>) : PassesAction
+    data object RefreshPasses : PassesAction
+    data object TogglePassesDialog : PassesAction
+    data object ToggleRadiosDialog : PassesAction
+    data class FocusCatNum(val catNum: Int) : PassesAction
+    data object ClearFocus : PassesAction
+}
