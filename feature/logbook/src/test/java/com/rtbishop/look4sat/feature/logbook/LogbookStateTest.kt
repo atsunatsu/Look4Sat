@@ -3,6 +3,7 @@ package com.rtbishop.look4sat.feature.logbook
 import com.rtbishop.look4sat.core.domain.logbook.QsoRecord
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.rtbishop.look4sat.core.domain.logbook.SATELLITE_MODE_FILTER
 
 class LogbookStateTest {
     @Test

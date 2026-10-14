@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import com.rtbishop.look4sat.core.domain.logbook.LogbookFilter
+import com.rtbishop.look4sat.core.domain.logbook.SATELLITE_MODE_FILTER
 import com.rtbishop.look4sat.core.domain.logbook.displayMode
 
 @Composable

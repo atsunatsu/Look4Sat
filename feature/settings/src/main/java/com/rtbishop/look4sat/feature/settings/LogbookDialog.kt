@@ -22,12 +22,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,12 +48,16 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rtbishop.look4sat.core.domain.logbook.LogbookFilter
 import com.rtbishop.look4sat.core.domain.logbook.QsoRecord
 import com.rtbishop.look4sat.core.domain.model.NominalFrequencies
+import com.rtbishop.look4sat.core.domain.logbook.SATELLITE_MODE_FILTER
 import com.rtbishop.look4sat.core.domain.logbook.displayMode
+import com.rtbishop.look4sat.core.domain.logbook.filterRecords
 import com.rtbishop.look4sat.core.domain.logbook.frequencyBand
 import com.rtbishop.look4sat.core.domain.logbook.unavailableUploadSummary
 import com.rtbishop.look4sat.core.presentation.LocalSpacing
@@ -133,6 +142,23 @@ fun LogbookDialog(
     // Record currently open in the edit dialog — a listed row, or the blank draft the Create
     // button just made. A draft carries id = 0, so saving it inserts a new row.
     var editTarget by remember { mutableStateOf<QsoRecord?>(null) }
+    // Query sheet state. The query is a *display* filter over the listed records only: the
+    // Upload button still signs every record exactly as before. Keeping it local to this
+    // dialog also keeps the per-edition settings ViewModels free of query fields.
+    var querySheetOpen by remember { mutableStateOf(false) }
+    var queryText by rememberSaveable { mutableStateOf("") }
+    var modeFilter by rememberSaveable { mutableStateOf("") }
+    var confirmationFilter by rememberSaveable { mutableStateOf(LogbookFilter.ALL) }
+    val queryActive = queryText.isNotBlank() || modeFilter.isNotEmpty() ||
+        confirmationFilter != LogbookFilter.ALL
+    val clearQuery = {
+        queryText = ""
+        modeFilter = ""
+        confirmationFilter = LogbookFilter.ALL
+    }
+    val shownRecords = remember(records, queryText, modeFilter, confirmationFilter) {
+        filterRecords(records, queryText, modeFilter, confirmationFilter)
+    }
     // Header leading button: Create while idle, Leave-selection while rows are checked.
     // Cancel is gone; its two jobs are split over those two labels.
     val onHeader = if (selectionMode) onExitSelection else ({ editTarget = newRecord() })
@@ -145,6 +171,9 @@ fun LogbookDialog(
         } else {
             stringResource(R.string.prefs_logbook_new)
         },
+        // Selecting records is a different job — the query button is hidden there.
+        extraText = if (selectionMode) null else stringResource(R.string.prefs_logbook_query),
+        onExtra = if (selectionMode) null else ({ querySheetOpen = true }),
         onAccept = if (selectionMode) onResubmitSelected else onUpload,
         acceptText = if (selectionMode) {
             stringResource(R.string.prefs_logbook_resubmit, selectedIds.size)
@@ -159,6 +188,13 @@ fun LogbookDialog(
         ) {
             if (records.isEmpty()) {
                 Text(stringResource(R.string.prefs_logbook_empty), fontSize = 14.sp)
+            } else if (shownRecords.isEmpty()) {
+                // A query can legitimately empty the list while records exist — say that,
+                // instead of showing the "log your first QSO" message.
+                Text(stringResource(R.string.prefs_logbook_query_empty), fontSize = 14.sp)
+                TextButton(onClick = { clearQuery() }) {
+                    Text(stringResource(R.string.prefs_logbook_query_clear), fontSize = 12.sp)
+                }
             } else {
                 // Selection mode shows the checked count; otherwise a hint that long-press
                 // opens it (the path to resubmitting already-uploaded records).
@@ -174,6 +210,18 @@ fun LogbookDialog(
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                if (queryActive && !selectionMode) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(R.string.prefs_logbook_query_hits, shownRecords.size),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        TextButton(onClick = { clearQuery() }) {
+                            Text(stringResource(R.string.prefs_logbook_query_clear), fontSize = 11.sp)
+                        }
+                    }
                 }
                 if (stationOptions.isNotEmpty()) {
                     // 台址 selector: filters the list to one Wavelog station profile
@@ -224,7 +272,7 @@ fun LogbookDialog(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    items(records, key = { it.id }) { record ->
+                    items(shownRecords, key = { it.id }) { record ->
                         LogbookRow(
                             record = record,
                             selectionMode = selectionMode,
@@ -242,6 +290,21 @@ fun LogbookDialog(
                 }
             }
         }
+    }
+
+    if (querySheetOpen) {
+        LogbookQuerySheet(
+            query = queryText,
+            modeFilter = modeFilter,
+            confirmation = confirmationFilter,
+            modes = records.map { it.displayMode }.filter(String::isNotBlank).distinct().sorted(),
+            hitCount = shownRecords.size,
+            onQueryChange = { queryText = it },
+            onModeFilter = { modeFilter = it },
+            onConfirmation = { confirmationFilter = it },
+            onClear = { clearQuery() },
+            onDismiss = { querySheetOpen = false }
+        )
     }
 
     if (positionWarning != null) {
@@ -487,3 +550,95 @@ private fun LogbookRow(
         }
     }
 }
+
+/**
+ * Query sheet for the logbook: the same sheet frame as the logbook itself, holding the
+ * free-text query plus the confirmation/mode chips. The predicate lives in
+ * `core.domain.logbook.filterRecords`, shared with the enhanced logbook page so both
+ * lists always answer the same question in the same way.
+ */
+@Composable
+private fun LogbookQuerySheet(
+    query: String,
+    modeFilter: String,
+    confirmation: LogbookFilter,
+    modes: List<String>,
+    hitCount: Int,
+    onQueryChange: (String) -> Unit,
+    onModeFilter: (String) -> Unit,
+    onConfirmation: (LogbookFilter) -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    SharedDialog(
+        title = stringResource(R.string.prefs_logbook_query_title),
+        onDismissRequest = onDismiss,
+        onCancel = onClear,
+        cancelText = stringResource(R.string.prefs_logbook_query_clear),
+        onAccept = onDismiss,
+        acceptText = stringResource(R.string.prefs_logbook_query_done)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = { Text(stringResource(R.string.prefs_logbook_query_hint), fontSize = 13.sp) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters)
+            )
+            Text(
+                text = stringResource(R.string.prefs_logbook_query_hits, hitCount),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                items(LogbookFilter.entries.toList()) { filter ->
+                    FilterChip(
+                        selected = confirmation == filter,
+                        onClick = { onConfirmation(filter) },
+                        label = { Text(queryFilterLabel(filter), fontSize = 12.sp) }
+                    )
+                }
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                item {
+                    FilterChip(
+                        selected = modeFilter.isEmpty(),
+                        onClick = { onModeFilter("") },
+                        label = { Text(stringResource(R.string.prefs_logbook_query_all_modes), fontSize = 12.sp) }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = modeFilter == SATELLITE_MODE_FILTER,
+                        onClick = {
+                            onModeFilter(if (modeFilter == SATELLITE_MODE_FILTER) "" else SATELLITE_MODE_FILTER)
+                        },
+                        label = { Text(stringResource(R.string.prefs_logbook_query_satellite_mode), fontSize = 12.sp) }
+                    )
+                }
+                items(modes) { mode ->
+                    FilterChip(
+                        selected = modeFilter == mode,
+                        onClick = { onModeFilter(if (modeFilter == mode) "" else mode) },
+                        label = { Text(mode, fontSize = 12.sp) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun queryFilterLabel(filter: LogbookFilter): String = stringResource(
+    when (filter) {
+        LogbookFilter.ALL -> R.string.prefs_logbook_query_all
+        LogbookFilter.CONFIRMED -> R.string.prefs_logbook_query_confirmed
+        LogbookFilter.UNCONFIRMED -> R.string.prefs_logbook_query_unconfirmed
+        LogbookFilter.DRAFTS -> R.string.prefs_logbook_query_incomplete
+    }
+)

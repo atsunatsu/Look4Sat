@@ -393,6 +393,9 @@ fun SharedDialog(
     acceptEnabled: Boolean = true,
     /** Label of the leading button; [R.string.btn_cancel] when null. */
     cancelText: String? = null,
+    /** Optional second leading button, drawn next to the leading one (logbook's Query). */
+    extraText: String? = null,
+    onExtra: (() -> Unit)? = null,
     titleFontSize: Int = 16,
     titleTextAlign: TextAlign = if (onCancel != null && onAccept != null) TextAlign.Center else TextAlign.Start,
     titleHorizontalPadding: Dp = 0.dp,
@@ -407,6 +410,10 @@ fun SharedDialog(
         ) {
             if (onCancel != null) {
                 CardButton(onClick = onCancel, text = cancelText ?: stringResource(R.string.btn_cancel))
+            }
+            if (onExtra != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                CardButton(onClick = onExtra, text = extraText.orEmpty())
             }
             Text(
                 text = title,

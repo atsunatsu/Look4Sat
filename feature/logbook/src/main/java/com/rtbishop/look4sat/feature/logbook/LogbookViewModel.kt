@@ -15,7 +15,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rtbishop.look4sat.core.domain.logbook.AdifImportResult
 import com.rtbishop.look4sat.core.domain.logbook.IQsoRepository
+import com.rtbishop.look4sat.core.domain.logbook.LogbookFilter
 import com.rtbishop.look4sat.core.domain.logbook.QsoRecord
+import com.rtbishop.look4sat.core.domain.logbook.SATELLITE_MODE_FILTER
+import com.rtbishop.look4sat.core.domain.logbook.filterRecords
 import com.rtbishop.look4sat.core.domain.logbook.QsoStatus
 import com.rtbishop.look4sat.core.domain.logbook.displayMode
 import com.rtbishop.look4sat.core.domain.logbook.frequencyBand
@@ -130,9 +133,7 @@ data class LogbookEditor(
     }
 }
 
-enum class LogbookFilter { ALL, CONFIRMED, UNCONFIRMED, DRAFTS }
 
-internal const val SATELLITE_MODE_FILTER = "__SATELLITE__"
 
 enum class LogbookError {
     CALLSIGN_REQUIRED,
@@ -196,21 +197,9 @@ data class LogbookState(
     val showStation: Boolean = false,
     val stationCallsign: String = ""
 ) {
-    val filteredRecords: List<QsoRecord> get() = records.filter { record ->
-        (query.isBlank() || listOf(record.theirCallsign, record.myCallsign, record.satelliteName, record.theirGrid, record.myGrid, record.comment)
-            .any { it.contains(query.trim(), true) }) &&
-            when (modeFilter) {
-                "" -> true
-                SATELLITE_MODE_FILTER -> record.isSatellite
-                else -> record.displayMode == modeFilter
-            } &&
-            when (confirmationFilter) {
-                LogbookFilter.ALL -> true
-                LogbookFilter.CONFIRMED -> record.lotwConfirmed
-                LogbookFilter.UNCONFIRMED -> record.status == QsoStatus.COMPLETE && !record.lotwConfirmed
-                LogbookFilter.DRAFTS -> record.status != QsoStatus.COMPLETE
-            }
-    }
+    /** Same predicate as the settings logbook dialog's query sheet — one definition, two surfaces. */
+    val filteredRecords: List<QsoRecord>
+        get() = filterRecords(records, query, modeFilter, confirmationFilter)
 }
 
 sealed interface LogbookAction {
