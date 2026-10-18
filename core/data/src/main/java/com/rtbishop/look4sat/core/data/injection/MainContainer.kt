@@ -39,6 +39,7 @@ import com.rtbishop.look4sat.core.data.framework.Ft817Controller
 import com.rtbishop.look4sat.core.data.framework.Ic705Controller
 import com.rtbishop.look4sat.core.data.framework.NetworkReporter
 import com.rtbishop.look4sat.core.data.framework.RadioTrackingService
+import com.rtbishop.look4sat.core.data.framework.transport.makeSerialChannel
 import com.rtbishop.look4sat.core.data.lotw.LoTWUploadRepository
 import com.rtbishop.look4sat.core.data.repository.AmSatRepository
 import com.rtbishop.look4sat.core.data.repository.DatabaseRepo
@@ -120,7 +121,7 @@ class MainContainer(private val context: Context) : IMainContainer {
     override val lotwUploadRepository: ILoTWUploadRepository by lazy { LoTWUploadRepository(context) }
     override val radioTrackingService: IRadioTrackingService by lazy {
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        RadioTrackingService(appScope, manager, satelliteRepo, settingsRepo)
+        RadioTrackingService(appScope, manager, context, satelliteRepo, settingsRepo)
     }
     override val locationRepo: ILocationRepo by lazy {
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -177,10 +178,11 @@ class MainContainer(private val context: Context) : IMainContainer {
         val manager  = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val settings = settingsRepo.radioControlSettings.value
         val address  = settings.txRadioAddress
+        val channel = makeSerialChannel(context, settings.txTransport, address, settings.baudRate)
         return if (settings.radioModel == RadioControlSettings.MODEL_ICOM_IC705) {
-            Ic705Controller(manager, address)
+            Ic705Controller(manager, address, channel)
         } else {
-            Ft817Controller(manager, address)
+            Ft817Controller(manager, address, channel)
         }
     }
 
@@ -188,10 +190,11 @@ class MainContainer(private val context: Context) : IMainContainer {
         val manager  = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val settings = settingsRepo.radioControlSettings.value
         val address  = settings.rxRadioAddress
+        val channel = makeSerialChannel(context, settings.rxTransport, address, settings.baudRate)
         return if (settings.radioModel == RadioControlSettings.MODEL_ICOM_IC705) {
-            Ic705Controller(manager, address)
+            Ic705Controller(manager, address, channel)
         } else {
-            Ft817Controller(manager, address)
+            Ft817Controller(manager, address, channel)
         }
     }
 
