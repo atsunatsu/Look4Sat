@@ -1201,6 +1201,8 @@ fun RadioControlDialog(
     val txName     = rememberSaveable { mutableStateOf(initialSettings.txRadioName) }
     val rxName     = rememberSaveable { mutableStateOf(initialSettings.rxRadioName) }
     val baudRate   = rememberSaveable { mutableIntStateOf(initialSettings.baudRate) }
+    val txTransport = rememberSaveable { mutableStateOf(initialSettings.txTransport) }
+    val rxTransport = rememberSaveable { mutableStateOf(initialSettings.rxTransport) }
     val selectingFor = rememberSaveable { mutableStateOf("") } // "tx", "rx", or ""
 
     val isIcom = radioModel.value == RadioControlSettings.MODEL_ICOM_IC705
@@ -1236,7 +1238,9 @@ fun RadioControlDialog(
                 txRadioName    = txName.value,
                 rxRadioName    = if (isSingleRadio) "" else rxName.value,
                 baudRate       = baudRate.intValue,
-                splitMode      = splitMode.value
+                splitMode      = splitMode.value,
+                txTransport    = txTransport.value,
+                rxTransport    = rxTransport.value
             )
         )
         onDismiss()
@@ -1303,6 +1307,24 @@ fun RadioControlDialog(
             }
 
             // TX Radio (always shown; in split mode this is the single IC-705)
+            Text("TX connection", fontWeight = FontWeight.Medium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                RadioControlSettings.TRANSPORT_OPTIONS.forEach { option ->
+                    FilterChip(
+                        selected = txTransport.value == option,
+                        onClick = {
+                            if (txTransport.value != option) {
+                                txTransport.value = option
+                                txAddress.value = ""
+                                txName.value = ""
+                            }
+                        },
+                        label = { Text(option, fontSize = 11.sp) },
+                        enabled = enabled.value
+                    )
+                }
+            }
+
             val txLabel = if (isSingleRadio) "Radio (IC-705)" else "TX Radio (Uplink)"
             Text(txLabel, fontWeight = FontWeight.Medium)
             if (txAddress.value.isNotBlank()) {
@@ -1317,6 +1339,23 @@ fun RadioControlDialog(
 
             // RX Radio (hidden in split mode — the same radio handles both)
             if (!isSingleRadio) {
+            Text("RX connection", fontWeight = FontWeight.Medium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                RadioControlSettings.TRANSPORT_OPTIONS.forEach { option ->
+                    FilterChip(
+                        selected = rxTransport.value == option,
+                        onClick = {
+                            if (rxTransport.value != option) {
+                                rxTransport.value = option
+                                rxAddress.value = ""
+                                rxName.value = ""
+                            }
+                        },
+                        label = { Text(option, fontSize = 11.sp) },
+                        enabled = enabled.value
+                    )
+                }
+            }
                 Text("RX Radio (Downlink)", fontWeight = FontWeight.Medium)
                 if (rxAddress.value.isNotBlank()) {
                     Text("${rxName.value} — ${rxAddress.value}", fontSize = 13.sp)
@@ -1329,45 +1368,63 @@ fun RadioControlDialog(
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
-            // Paired device picker (inline, shown while selecting)
+            // Device picker for USB OTG and paired Bluetooth.
             if (selectingFor.value.isNotBlank()) {
+                val selectingTx = selectingFor.value == "tx"
+                val transport = if (selectingTx) txTransport.value else rxTransport.value
+                val isUsb = transport == RadioControlSettings.TRANSPORT_USB
+                val choices = if (isUsb) {
+                    val usb = context.getSystemService(Context.USB_SERVICE) as android.hardware.usb.UsbManager
+                    usb.deviceList.values.sortedBy { it.deviceName }.map {
+                        Pair("USB VID %04X / PID %04X".format(it.vendorId, it.productId), "${it.vendorId}:${it.productId}")
+                    }
+                } else pairedDevices
                 Text(
-                    text       = "Paired Bluetooth Devices:",
-                    fontWeight = FontWeight.Medium,
-                    color      = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                    if (isUsb) "Connected USB devices:" else "Paired Bluetooth devices:",
+                    fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                if (pairedDevices.isEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                if (choices.isEmpty()) {
                     Text(
-                        "No paired devices found. Pair your BT adapter in Android Bluetooth settings first.",
+                        if (isUsb) "No USB device found. Connect an OTG adapter and reopen this dialog."
+                        else "No paired device found. Pair the module in Android Bluetooth settings.",
                         fontSize = 13.sp
                     )
-                } else {
-                    pairedDevices.forEach { (name, address) ->
-                        androidx.compose.material3.Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (selectingFor.value == "tx") {
-                                        txAddress.value = address
-                                        txName.value    = name
-                                    } else {
-                                        rxAddress.value = address
-                                        rxName.value    = name
-                                    }
-                                    selectingFor.value = ""
-                                }
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Row(
-                                modifier              = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(name, modifier = Modifier.weight(1f))
-                                Text(address, fontSize = 12.sp)
+                }
+                choices.forEach { (name, address) ->
+                    androidx.compose.material3.Surface(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (selectingTx) {
+                                txAddress.value = address
+                                txName.value = name
+                            } else {
+                                rxAddress.value = address
+                                rxName.value = name
                             }
+                            selectingFor.value = ""
+                        }.padding(vertical = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(name, modifier = Modifier.weight(1f))
+                            Text(address, fontSize = 12.sp)
                         }
                     }
+                }
+                if (transport == RadioControlSettings.TRANSPORT_BLE) {
+                    OutlinedTextField(
+                        value = if (selectingTx) txAddress.value else rxAddress.value,
+                        onValueChange = {
+                            if (selectingTx) { txAddress.value = it; txName.value = "BLE UART" }
+                            else { rxAddress.value = it; rxName.value = "BLE UART" }
+                        },
+                        label = { Text("BLE MAC address (unpaired UART modules)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Supports Nordic UART and HM-10 profiles.", fontSize = 11.sp)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
             }
