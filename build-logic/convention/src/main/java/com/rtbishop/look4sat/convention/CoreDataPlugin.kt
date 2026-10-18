@@ -35,6 +35,7 @@ internal class CoreDataPlugin : Plugin<Project> {
             ksp(libs.androidx.room.compiler)
             implementation(libs.kotlin.coroutines)
             implementation(libs.other.okhttp)
+            implementation(libs.other.usbserial)
             // android.jar's org.json is a stub ("not mocked") in unit tests;
             // provide a real implementation so JSON parsing is testable.
             testImplementation(libs.test.json)
