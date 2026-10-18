@@ -18,6 +18,8 @@
 package com.rtbishop.look4sat.core.data.framework
 
 import android.bluetooth.BluetoothManager
+import android.content.Context
+import com.rtbishop.look4sat.core.data.framework.transport.makeSerialChannel
 import android.util.Log
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 import com.rtbishop.look4sat.core.domain.model.SatRadio
@@ -42,6 +44,7 @@ import kotlinx.coroutines.launch
 class RadioTrackingService(
     private val appScope: CoroutineScope,
     private val bluetoothManager: BluetoothManager,
+    private val context: Context,
     private val satelliteRepo: ISatelliteRepo,
     private val settingsRepo: ISettingsRepo
 ) : IRadioTrackingService {
@@ -76,7 +79,7 @@ class RadioTrackingService(
                 _state.update { it.copy(errorMessage = "No radio address configured in Settings") }
                 return
             }
-            val tx = makeController(isIcom, txAddr)
+            val tx = makeController(isIcom, txAddr, rcSettings.txTransport, rcSettings.baudRate)
             txController = tx
             rxController = null
             _state.update { it.copy(errorMessage = null) }
@@ -94,8 +97,8 @@ class RadioTrackingService(
                 _state.update { it.copy(errorMessage = "No radio addresses configured in Settings") }
                 return
             }
-            val tx = makeController(isIcom, txAddr)
-            val rx = makeController(isIcom, rxAddr)
+            val tx = makeController(isIcom, txAddr, rcSettings.txTransport, rcSettings.baudRate)
+            val rx = makeController(isIcom, rxAddr, rcSettings.rxTransport, rcSettings.baudRate)
             txController = tx
             rxController = rx
             _state.update { it.copy(errorMessage = null) }
@@ -117,9 +120,11 @@ class RadioTrackingService(
         }
     }
 
-    private fun makeController(isIcom: Boolean, address: String): IRadioController =
-        if (isIcom) Ic705Controller(bluetoothManager, address)
-        else        Ft817Controller(bluetoothManager, address)
+    private fun makeController(isIcom: Boolean, address: String, transport: String, baudRate: Int): IRadioController {
+        val channel = makeSerialChannel(context, transport, address, baudRate)
+        return if (isIcom) Ic705Controller(bluetoothManager, address, channel)
+        else Ft817Controller(bluetoothManager, address, channel)
+    }
 
     override suspend fun disconnectRadios() {
         stopTracking()
