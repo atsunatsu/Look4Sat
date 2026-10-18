@@ -131,9 +131,16 @@ data class RadioControlSettings(
     val rxRadioName: String,
     val baudRate: Int,
     /** IC-705 only: use single-radio split-VFO mode instead of two radios. */
-    val splitMode: Boolean = false
+    val splitMode: Boolean = false,
+    val txTransport: String = "Bluetooth SPP",
+    val rxTransport: String = "Bluetooth SPP"
 ) {
     companion object {
+        const val TRANSPORT_SPP = "Bluetooth SPP"
+        const val TRANSPORT_BLE = "Bluetooth BLE UART"
+        const val TRANSPORT_USB = "USB serial (OTG)"
+        val TRANSPORT_OPTIONS = listOf(TRANSPORT_SPP, TRANSPORT_BLE, TRANSPORT_USB)
+
         const val MODEL_YAESU_FT817   = "Yaesu FT-817/818"
         const val MODEL_YAESU_FT857   = "Yaesu FT-857/897"
         const val MODEL_ICOM_IC705    = "Icom IC-705"
