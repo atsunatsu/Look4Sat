@@ -31,6 +31,7 @@ kotlin-serialization = "1.11.0"
 
 other-okhttp = "5.4.0"
 other-osmdroid = "6.1.20"
+other-usbserial = "3.9.0"
 
 test-junit4 = "4.13.2"
 robolectric = "4.16"
@@ -78,6 +79,7 @@ kotlin-serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-j
 other-okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "other-okhttp" }
 #noinspection UnusedVersionCatalogEntry
 other-osmdroid = { module = "org.osmdroid:osmdroid-android", version.ref = "other-osmdroid" }
+other-usbserial = { module = "com.github.mik3y:usb-serial-for-android", version.ref = "other-usbserial" }
 
 test-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlin-coroutines" }
 test-junit4 = { module = "junit:junit", version.ref = "test-junit4" }
