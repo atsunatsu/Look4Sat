@@ -19,6 +19,7 @@ package com.rtbishop.look4sat.core.data.framework
 
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
+import com.rtbishop.look4sat.core.data.framework.transport.SerialChannel
 import android.util.Log
 import com.rtbishop.look4sat.core.domain.repository.IRadioController
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +42,8 @@ import java.util.UUID
  */
 class Ic705Controller(
     private val bluetoothManager: BluetoothManager,
-    private val deviceAddress: String
+    private val deviceAddress: String,
+    private val externalChannel: SerialChannel? = null
 ) : IRadioController {
 
     private val tag = "IC705"
@@ -68,12 +70,18 @@ class Ic705Controller(
         if (isConnected) return@withContext true
         if (deviceAddress.isBlank()) return@withContext false
         try {
-            val device  = bluetoothManager.adapter.getRemoteDevice(deviceAddress)
-            val btSocket = device.createInsecureRfcommSocketToServiceRecord(sppId)
-            btSocket.connect()
-            socket       = btSocket
-            outputStream = btSocket.outputStream
-            inputStream  = btSocket.inputStream
+            if (externalChannel != null) {
+                if (!externalChannel.connect()) return@withContext false
+                outputStream = externalChannel.outputStream
+                inputStream = externalChannel.inputStream
+            } else {
+                val device = bluetoothManager.adapter.getRemoteDevice(deviceAddress)
+                val btSocket = device.createInsecureRfcommSocketToServiceRecord(sppId)
+                btSocket.connect()
+                socket = btSocket
+                outputStream = btSocket.outputStream
+                inputStream = btSocket.inputStream
+            }
             isConnected  = true
             // Enter VFO mode — frequency/mode commands return FA if the radio
             // is in memory-channel mode. Safe to send regardless of current state.
@@ -95,6 +103,7 @@ class Ic705Controller(
                 inputStream?.close()
                 outputStream?.close()
                 socket?.close()
+                externalChannel?.close()
             } catch (e: Exception) {
                 Log.e(tag, "Disconnect error: ${e.message}")
             } finally {
