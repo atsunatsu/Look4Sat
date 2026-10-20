@@ -5,19 +5,15 @@ name: Build Look4Sat APK
 #   mode=test     -> publish a test prerelease, hidden from /releases/latest.
 #   mode=release  -> publish the official GitHub Release (v<version>).
 #
-# The installed Hermes APK is versionCode 608. Failed startup/smoke test
-# workflow runs #4-9 consumed the global run counter; #10 starts at 609.
-# Each subsequent new run increases by one (599+github.run_number).
+# Installed Hermes build has versionCode 608; diagnostic workflow runs #4-9
+# did not build usable APKs. The first preview build (#10) is versionCode 609.
+# Later workflow runs use 599+github.run_number (e.g. #11 -> 610).
 # Test builds and official releases share the same versionCode sequence. Test APKs add ".test.<run_number>"
 # to versionName; official release tags and versionName still use the version catalog.
 # Changes to the version catalog happen only in the runner's checkout, NOT in Git.
 # Local Gradle builds keep using the catalog unchanged. Runs are manual only.
 
 on:
-  # A one-off preview build on a separate branch; main remains manual-only.
-  push:
-    branches:
-      - artifact-preview-30f72b6
   workflow_dispatch:
     inputs:
       mode:
@@ -60,8 +56,7 @@ jobs:
           test -n "$VERSION"
           [[ "$SOURCE_CODE" =~ ^[0-9]+$ ]]
           [[ "$BUILD_RUN_NUMBER" =~ ^[0-9]+$ ]]
-          # Existing workflow run numbers 1-3 preceded the numbered test builds.
-          # Run #4 starts at versionCode 609 after the Hermes-built versionCode 608.
+          # Diagnostic runs #4-9 did not produce usable APKs. Run #10 starts at 609.
           # GitHub re-runs retain their original number.
           CODE=$((599 + BUILD_RUN_NUMBER))
           if (( CODE <= SOURCE_CODE || CODE > 2100000000 )); then
@@ -162,12 +157,15 @@ jobs:
             || { echo "::error::APK versionCode does not match the CI-stamped version."; exit 1; }
           echo "apk bytes: $(stat -c%s "$APK")"
 
-      - name: Install local artifact uploader (no external action refs)
-        if: ${{ inputs.mode == 'artifact' || github.event_name == 'push' }}
+      # The repo's GitHub Actions policy rejects marketplace action refs at startup.
+      # This local JavaScript action uses GitHub's own artifact toolkit and receives
+      # the runtime artifact token from the runner, without publishing a Release.
+      - name: Install local artifact client
+        if: ${{ inputs.mode == 'artifact' }}
         run: npm install --prefix source/.github/actions/local-artifact --no-save --no-audit --no-fund @actions/artifact@2.3.2
 
-      - name: Upload signed test APK without creating a Release
-        if: ${{ inputs.mode == 'artifact' || github.event_name == 'push' }}
+      - name: Upload signed test APK without creating any Release
+        if: ${{ inputs.mode == 'artifact' }}
         uses: ./source/.github/actions/local-artifact
         env:
           ARTIFACT_NAME: Look4Sat-test-${{ steps.version.outputs.code }}-${{ steps.version.outputs.short_sha }}
