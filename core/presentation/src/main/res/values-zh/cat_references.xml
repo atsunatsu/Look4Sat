@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rc_cat_reference_hint">RX/TX 基准独立。修改任一基准会退出计算器联动，另一侧保持不变；输入频率须在电台支持范围内。</string>
+    <string name="rc_cat_invalid_reference">请输入电台支持范围内的精确正频率（MHz）。</string>
+    <string name="rc_cat_runtime_reference">本次 CAT 运行基准，不写入电台存储。</string>
+</resources>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rc_l4s_correction_step">固定修正编辑步进（Hz）</string>
+    <string name="rc_l4s_edit_locked">发射、手台菜单或保存期间禁止编辑频率。</string>
+    <string name="rc_l4s_profiles">卫星档案</string>
+    <string name="rc_l4s_profiles_upgrade">请连接 alpha7 L4S 固件手台以管理档案。</string>
+    <string name="rc_l4s_profile_capacity">已保存档案：%1$d / %2$d</string>
+    <string name="rc_l4s_profiles_readonly">检测到未知存储内容：档案只读，不会自动擦除。</string>
+    <string name="rc_l4s_refresh">刷新</string>
+    <string name="rc_l4s_export">导出</string>
+    <string name="rc_l4s_import">导入</string>
+    <string name="rc_l4s_confirm_handset">预览已校验（%1$d%%）。请在手台按 MENU 确认，EXIT 取消。</string>
+    <string name="rc_l4s_store_progress">正在保存档案：%1$d%%</string>
+    <string name="rc_l4s_merge_counts">新增 %1$d · 覆盖 %2$d · 删除 %3$d</string>
+    <string name="rc_l4s_profiles_empty">暂无已保存档案。</string>
+    <string name="rc_l4s_profile_damaged">损坏或不兼容记录：保留占用，明确删除前不会覆盖。</string>
+    <string name="rc_l4s_merge_preview">合并预览：冲突项不勾选时保留手台原档案</string>
+    <string name="rc_l4s_merge_add">新增档案</string>
+    <string name="rc_l4s_merge_keep_or_replace">保留原档案，勾选才覆盖</string>
+    <string name="rc_l4s_stop_tracking_first">请先停止跟踪，再删除当前档案或恢复备份。</string>
+    <string name="rc_l4s_send_for_confirmation">发送到手台确认</string>
+    <string name="rc_l4s_export_saved_only">仅导出已保存卫星档案；不含未保存改动、校准、日志及手机 CW 预设。</string>
+    <string name="rc_l4s_profile_alias">显示别名</string>
+    <string name="rc_l4s_alias_local">别名仅保存在本机，不改变档案身份。</string>
+    <string name="rc_l4s_rx_reference">接收基准／下行（MHz）</string>
+    <string name="rc_l4s_tx_reference">发射基准／上行（MHz）</string>
+    <string name="rc_l4s_delete_confirm_handset">请求删除，在手台确认</string>
+    <string name="rc_l4s_profile_details">%1$s · 功率 %2$s · 静噪 %3$d · CW %4$d WPM／%5$d Hz／音量 %6$d</string>
+    <string name="rc_l4s_frequency_settings">基准频率设置</string>
+    <string name="rc_l4s_independent">RX/TX 基准独立</string>
+    <string name="rc_l4s_calculator_linked">计算器联动基准</string>
+    <string name="rc_l4s_unsaved">本次改动未保存：需在手台 APPLY + SAVE 才永久保留</string>
+    <string name="rc_l4s_saved">已保存卫星档案</string>
+    <string name="rc_l4s_wait_reference">等待手机基准同步</string>
+    <string name="rc_l4s_reference_hint">修改任一基准不改变另一侧，并退出计算器联动。固定修正在手台 MENU 编辑。</string>
+    <string name="rc_l4s_invalid_reference">请输入 18–1300 MHz 范围内的有效基准频率。</string>
+    <string name="rc_l4s_doppler_values">多普勒 TX %1$d Hz · RX %2$d Hz</string>
+    <string name="rc_l4s_store_failed">档案保存失败，旧快照保留；请等待硬件就绪。</string>
+</resources>

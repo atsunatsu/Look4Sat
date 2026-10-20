@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rc_l4s_hint">L4S firmware required. USB-C OTG carries control only; voice uses the handheld microphone. One half-duplex radio with independent RX/TX frequencies. Turn off USB paddle/handkey mode before connecting. Both frequencies stay fixed throughout TX and resume tracking after TX ends.</string>
+    <string name="rc_l4s_firmware">L4S firmware: %1$s</string>
+    <string name="rc_l4s_hold">Hold PTT (radio mic)</string>
+    <string name="rc_l4s_stop">Stop TX</string>
+    <string name="rc_l4s_cw">CW text</string>
+    <string name="rc_l4s_frozen">TX/RX Doppler held until transmission ends</string>
+    <string name="rc_l4s_linear">Linear transponders use native CW. SSB transmission is not supported.</string>
+    <string name="rc_l4s_target">Target TX %1$s · RX %2$s</string>
+    <string name="rc_l4s_applied">Applied TX %1$s · RX %2$s</string>
+    <string name="rc_l4s_source">TX source: %1$s</string>
+    <string name="rc_l4s_local">Handheld</string>
+    <string name="rc_l4s_off">Off</string>
+    <string name="rc_l4s_message">CW message (A–Z, 0–9, / ? . , = -)</string>
+    <string name="rc_l4s_wpm">Speed: %1$d WPM</string>
+    <string name="rc_l4s_send">Send</string>
+    <string name="rc_l4s_progress">CW %1$d/%2$d · %3$s</string>
+    <string name="rc_l4s_need_connection">Connect to the L4S radio first. You can prepare CW text here; transmission is disabled.</string>
+    <string name="rc_l4s_need_tracking">Select a transponder and start tracking; wait until the radio is ready.</string>
+    <string name="rc_l4s_need_cw_mode">CW text requires a CW or linear transponder. FM uses hold-to-talk PTT.</string>
+    <string name="rc_l4s_no_cw">The connected firmware does not report CW text support.</string>
+    <string name="rc_l4s_busy">Stop the current transmission and confirm PTT OFF before sending CW.</string>
+    <string name="rc_l4s_radio">Radio (single half-duplex)</string>
+    <string name="rc_calculator_cat_link">Frequency edits update CAT tracking. Both frequencies stay held during transmission.</string>
+    <string name="rc_calculator_need_tracking">Connect the radio and start tracking to apply calculator frequency edits.</string>
+    <string name="rc_l4s_menu_open">Close the radio MENU before transmitting.</string>
+    <string name="rc_l4s_tones">CTCSS TX %1$s · RX %2$s · Activation %3$s</string>
+    <string name="rc_l4s_step">Doppler control step (Hz)</string>
+    <string name="rc_l4s_step_hint">Default 250 Hz; 10–10000 Hz in multiples of 10. Both frequencies remain held during TX.</string>
+    <string name="rc_l4s_bases">Base TX %1$s · RX %2$s</string>
+    <string name="rc_l4s_corrections">Correction TX %1$d Hz · RX %2$d Hz · Step %3$d Hz</string>
+    <string name="rc_l4s_presets_hint">Tap F1–F8 to fill the message; hold to edit. Press Send to transmit.</string>
+    <string name="rc_l4s_edit_preset">Edit F%1$d preset</string>
+    <string name="rc_l4s_preset_save_hint">Saved on this phone. Empty text clears this preset; editing never transmits.</string>
+</resources>

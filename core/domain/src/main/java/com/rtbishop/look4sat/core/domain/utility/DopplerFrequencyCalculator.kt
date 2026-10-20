@@ -34,6 +34,10 @@ import java.util.Locale
  */
 object DopplerFrequencyCalculator {
 
+    fun parseOffsetHz(valueKHz: String): Long = valueKHz.toDoubleOrNull()
+        ?.takeIf { it.isFinite() && kotlin.math.abs(it) <= 10_000.0 }
+        ?.let { (it * 1_000.0).toLong() } ?: 0L
+
     /**
      * Given a downlink frequency (what the user hears), compute the
      * uplink frequency the user should transmit.
@@ -59,8 +63,8 @@ object DopplerFrequencyCalculator {
      * to the downlink (in Hz).
      * Full path: ④→③→②→①
      *
-     * The user-entered downlink frequency already includes the offset, so subtract
-     * it before the inverse downlink Doppler.
+     * The user-entered ground downlink already includes the satellite-domain offset.
+     * Undo downlink Doppler first, then subtract the offset before passband mapping.
      */
     fun computeUplinkFromDownlinkWithOffset(
         downlinkHz: Long,
@@ -72,7 +76,7 @@ object DopplerFrequencyCalculator {
         // ④→③ 逆下行多普勒：卫星转发的频率（含 offset）
         val satTxWithOffset = orbitalPos.getUplinkFreq(downlinkHz)
         // ③ 去掉 offset（offset 在卫星本地频率域）
-        val satTx = satTxWithOffset - offsetHz
+        val satTx = subtractExactOrNull(satTxWithOffset, offsetHz) ?: return null
         // ③→② 逆 passband 映射
         val satRx = TransponderMapper.mapDownlinkToUplink(satTx, transponder) ?: return null
         // ②→① 逆上行多普勒：地面应发射的频率
@@ -117,7 +121,30 @@ object DopplerFrequencyCalculator {
         val satTx = TransponderMapper.mapUplinkToDownlink(satRx, transponder) ?: return null
         // ③ 加上 offset（offset 在卫星本地频率域）
         // ③→④ 下行多普勒：地面听到的
-        return orbitalPos.getDownlinkFreq(satTx + offsetHz)
+        val shiftedDownlink = addExactOrNull(satTx, offsetHz) ?: return null
+        return orbitalPos.getDownlinkFreq(shiftedDownlink)
+    }
+
+    /** Ground-station TX limits whose Doppler-shifted signal reaches the satellite passband. */
+    fun groundUplinkRange(transponder: SatRadio, orbitalPos: OrbitalPos): LongRange? {
+        if (!isLinearTransponder(transponder)) return null
+        val low = orbitalPos.getUplinkFreq(transponder.uplinkLow ?: return null)
+        val high = orbitalPos.getUplinkFreq(transponder.uplinkHigh ?: return null)
+        return minOf(low, high)..maxOf(low, high)
+    }
+
+    /** Ground-station RX limits after downlink Doppler and satellite-domain offset are applied. */
+    fun groundDownlinkRangeWithOffset(
+        transponder: SatRadio,
+        orbitalPos: OrbitalPos,
+        offsetHz: Long
+    ): LongRange? {
+        if (!isLinearTransponder(transponder)) return null
+        val lowNominal = addExactOrNull(transponder.downlinkLow ?: return null, offsetHz) ?: return null
+        val highNominal = addExactOrNull(transponder.downlinkHigh ?: return null, offsetHz) ?: return null
+        val low = orbitalPos.getDownlinkFreq(lowNominal)
+        val high = orbitalPos.getDownlinkFreq(highNominal)
+        return minOf(low, high)..maxOf(low, high)
     }
 
     /** True if this transponder supports linear passband mapping. */
@@ -170,4 +197,18 @@ object DopplerFrequencyCalculator {
             group.firstOrNull { it.downlinkMode?.equals("CW", ignoreCase = true) != true } ?: group.first()
         }
     }
+
+    private fun addExactOrNull(left: Long, right: Long): Long? =
+        try {
+            Math.addExact(left, right)
+        } catch (_: ArithmeticException) {
+            null
+        }
+
+    private fun subtractExactOrNull(left: Long, right: Long): Long? =
+        try {
+            Math.subtractExact(left, right)
+        } catch (_: ArithmeticException) {
+            null
+        }
 }

@@ -145,6 +145,18 @@ private fun SettingsScreen(
         return
     }
     val dialogs = rememberDialogVisibility()
+    var showRadioProfiles by rememberSaveable {mutableStateOf(false)}
+    val diagnosticContext=LocalContext.current
+    LaunchedEffect(uiState.controlDiagnosticsExportText) {
+        uiState.controlDiagnosticsExportText?.let {text ->
+            val intent=android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type="text/plain"
+                putExtra(android.content.Intent.EXTRA_TEXT,text)
+            }
+            diagnosticContext.startActivity(android.content.Intent.createChooser(intent,diagnosticContext.getString(R.string.control_diagnostics_export)))
+            onAction(SettingsAction.ConsumeControlDiagnosticsExport)
+        }
+    }
     val pendingCustomSourcesGrant = remember { mutableStateOf<(() -> Unit)?>(null) }
     val pendingCustomSourcesDeny = remember { mutableStateOf<(() -> Unit)?>(null) }
     val permissions = rememberSettingsPermissions(
@@ -252,9 +264,16 @@ private fun SettingsScreen(
         RadioControlDialog(
             initialSettings = uiState.radioControlSettings,
             onDismiss = { dialogs.radioControl = false },
-            onSave = { onAction(SettingsAction.UpdateRadioControl(it)) }
+            onSave = { onAction(SettingsAction.UpdateRadioControl(it)) },
+            frequencyLocked=uiState.radioTrackingState.frequencyEditingLocked,
+            onOpenProfiles={dialogs.radioControl=false;showRadioProfiles=true;onAction(SettingsAction.RefreshRadioProfiles)},
+            diagnosticCount=uiState.controlDiagnosticCount,
+            onExportDiagnostics={onAction(SettingsAction.ExportControlDiagnostics)},
+            onClearDiagnostics={onAction(SettingsAction.ClearControlDiagnostics)}
         )
     }
+    if(showRadioProfiles) RadioProfilesDialog(uiState.radioProfiles,uiState.radioTrackingState,
+        uiState.radioProfilesExport,onAction) {showRadioProfiles=false}
     if (dialogs.compassCalibration) {
         LaunchedEffect(Unit) { onAction(SettingsAction.StartCompassCalibration) }
         CompassCalibrationDialog(

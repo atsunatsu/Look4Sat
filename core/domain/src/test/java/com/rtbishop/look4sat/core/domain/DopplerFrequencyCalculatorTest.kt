@@ -267,6 +267,50 @@ class DopplerFrequencyCalculatorTest {
     }
 
     @Test
+    fun groundRangesApplyBothDopplerDirectionsAndSatelliteOffset() {
+        val xpdr = linearTransponder()
+        val orbitalPos = pos(7.0)
+
+        val txRange = DopplerFrequencyCalculator.groundUplinkRange(xpdr, orbitalPos)
+        val rxRange = DopplerFrequencyCalculator.groundDownlinkRangeWithOffset(
+            xpdr,
+            orbitalPos,
+            offsetHz = 2_500L
+        )
+
+        assertNotNull(txRange)
+        assertNotNull(rxRange)
+        assertTrue(txRange!!.first > xpdr.uplinkLow!!)
+        assertTrue(rxRange!!.first < xpdr.downlinkLow!! + 2_500L)
+        assertEquals(orbitalPos.getUplinkFreq(xpdr.uplinkLow!!), txRange.first)
+        assertEquals(orbitalPos.getDownlinkFreq(xpdr.downlinkHigh!! + 2_500L), rxRange.last)
+    }
+
+    @Test
+    fun nonZeroDopplerAndOffsetRemainReciprocalAcrossFullPath() {
+        val xpdr = linearTransponder(inverted = true)
+        val orbitalPos = pos(-6.5)
+        val groundTx = DopplerFrequencyCalculator.groundUplinkRange(xpdr, orbitalPos)!!.let {
+            it.first + (it.last - it.first) * 3 / 5
+        }
+        val groundRx = DopplerFrequencyCalculator.computeDownlinkFromUplinkWithOffset(
+            groundTx,
+            xpdr,
+            orbitalPos,
+            offsetHz = -3_750L
+        )
+        val roundTripTx = DopplerFrequencyCalculator.computeUplinkFromDownlinkWithOffset(
+            requireNotNull(groundRx),
+            xpdr,
+            orbitalPos,
+            offsetHz = -3_750L
+        )
+
+        assertNotNull(roundTripTx)
+        assertTrue(kotlin.math.abs(roundTripTx!! - groundTx) < 20L)
+    }
+
+    @Test
     fun computeUplinkFromDownlink_invertedTransponder() {
         val xpdr = linearTransponder(inverted = true, downHigh = 435_500_000L)
         val orbitalPos = pos(0.0)

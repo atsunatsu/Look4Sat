@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rc_l4s_correction_step">Fixed-correction edit step (Hz)</string>
+    <string name="rc_l4s_edit_locked">Frequency editing is locked during TX, radio MENU or saving.</string>
+    <string name="rc_l4s_profiles">Satellite profiles</string>
+    <string name="rc_l4s_profiles_upgrade">Connect an alpha7 L4S radio to use profile management.</string>
+    <string name="rc_l4s_profile_capacity">Saved profiles: %1$d / %2$d</string>
+    <string name="rc_l4s_profiles_readonly">Unknown storage detected; profiles are read-only and will not be erased.</string>
+    <string name="rc_l4s_refresh">Refresh</string>
+    <string name="rc_l4s_export">Export</string>
+    <string name="rc_l4s_import">Import</string>
+    <string name="rc_l4s_confirm_handset">Preview verified (%1$d%%). Press MENU on the radio to confirm; EXIT cancels.</string>
+    <string name="rc_l4s_store_progress">Saving profiles: %1$d%%</string>
+    <string name="rc_l4s_merge_counts">Add %1$d · Replace %2$d · Delete %3$d</string>
+    <string name="rc_l4s_profiles_empty">No saved profiles.</string>
+    <string name="rc_l4s_profile_damaged">Damaged or unsupported record; preserved until explicitly deleted.</string>
+    <string name="rc_l4s_merge_preview">Merge preview — unchecked conflicts keep the existing profile</string>
+    <string name="rc_l4s_merge_add">New profile</string>
+    <string name="rc_l4s_merge_keep_or_replace">Keep existing; check to replace</string>
+    <string name="rc_l4s_stop_tracking_first">Stop tracking before changing the active profile or restoring a backup.</string>
+    <string name="rc_l4s_send_for_confirmation">Send to radio for confirmation</string>
+    <string name="rc_l4s_export_saved_only">Exports saved satellite profiles only; excludes live edits, calibration, logs and phone CW presets.</string>
+    <string name="rc_l4s_profile_alias">Display alias</string>
+    <string name="rc_l4s_alias_local">Alias is stored on this phone and does not change profile identity.</string>
+    <string name="rc_l4s_rx_reference">RX reference / downlink (MHz)</string>
+    <string name="rc_l4s_tx_reference">TX reference / uplink (MHz)</string>
+    <string name="rc_l4s_delete_confirm_handset">Request deletion; confirm on radio</string>
+    <string name="rc_l4s_profile_details">%1$s · Power %2$s · SQL %3$d · CW %4$d WPM / %5$d Hz / Level %6$d</string>
+    <string name="rc_l4s_frequency_settings">Reference frequencies</string>
+    <string name="rc_l4s_independent">Independent RX/TX references</string>
+    <string name="rc_l4s_calculator_linked">Calculator-linked references</string>
+    <string name="rc_l4s_unsaved">Unsaved runtime changes — APPLY + SAVE on radio to retain</string>
+    <string name="rc_l4s_saved">Saved satellite profile</string>
+    <string name="rc_l4s_wait_reference">Waiting for phone reference synchronization</string>
+    <string name="rc_l4s_reference_hint">Editing either reference keeps the other unchanged and leaves calculator linking. Fixed corrections are edited in the radio MENU.</string>
+    <string name="rc_l4s_invalid_reference">Enter an exact reference from 18 to 1300 MHz.</string>
+    <string name="rc_l4s_doppler_values">Doppler TX %1$d Hz · RX %2$d Hz</string>
+    <string name="rc_l4s_store_failed">Profile save failed. The old snapshot is retained; wait for the hardware to become ready.</string>
+</resources>

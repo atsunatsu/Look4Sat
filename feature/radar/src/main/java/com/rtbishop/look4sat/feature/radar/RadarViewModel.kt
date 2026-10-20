@@ -17,6 +17,8 @@
  */
 package com.rtbishop.look4sat.feature.radar
 
+import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
+import com.rtbishop.look4sat.core.domain.repository.TrackingPhase
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -86,7 +88,9 @@ class RadarViewModel(
             orientationValues = correctedOrientation(sensorsRepo.sensorData.value),
             shouldShowSweep = settingsRepo.otherSettings.value.stateOfSweep,
             shouldUseCompass = settingsRepo.otherSettings.value.stateOfSensors,
-            sstv = SstvSubState(selectedMode = settingsRepo.otherSettings.value.sstvMode)
+            sstv = SstvSubState(selectedMode = settingsRepo.otherSettings.value.sstvMode),
+            radioControl = RadioControlSubState(cwPresets=settingsRepo.getRemoteCwPresets()),
+            radioTransport = settingsRepo.radioControlSettings.value.catTransport
         )
     )
     val uiState: StateFlow<RadarState> = _uiState
@@ -128,9 +132,14 @@ class RadarViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            settingsRepo.radioControlSettings.collectLatest { settings ->
+                _uiState.update { it.copy(radioTransport = settings.catTransport,
+                    radioControl = it.radioControl.copy(isL4sModel = settings.radioModel in setOf(
+                        RadioControlSettings.MODEL_QUANSHENG_UVK1, RadioControlSettings.MODEL_QUANSHENG_UVK5V3))) }
+            }
+        }
     }
-
-    // --- Pass loading split into focused functions ---
 
     private fun collectPassAndStartTickLoop() {
         viewModelScope.launch {
@@ -217,9 +226,20 @@ class RadarViewModel(
                             ),
                             txBaseFrequencyHz = svc.txBaseFrequencyHz,
                             ctcssTone = svc.ctcssTone,
-                            isTracking = svc.isActive,
+                            isTracking = svc.isActive || svc.trackingPhase == TrackingPhase.INITIALIZING,
+                            isReady = svc.isActive && svc.trackingPhase == TrackingPhase.READY,
                             selectedTransponderUuid = svc.selectedTransponder?.uuid,
-                            errorMessage = svc.errorMessage
+                            errorMessage = svc.errorMessage,
+                            remoteRadio = svc.remoteRadio,
+                            transmitOwner = svc.transmitOwner,
+                            pttState = svc.pttState,
+                            targetTxHz = svc.targetTxFrequencyHz,
+                            targetRxHz = svc.targetRxFrequencyHz,
+                            referenceRxHz=svc.nominalRxFrequencyHz,
+                            calculatorLinked=svc.calculatorLinked,
+                            txDopplerHz=svc.txDopplerCorrectionHz,rxDopplerHz=svc.rxDopplerCorrectionHz,
+                            referenceDirty=svc.referenceDirty,
+                            serviceEditingLocked=svc.frequencyEditingLocked
                         )
                     )
                 }
@@ -228,10 +248,19 @@ class RadarViewModel(
     }
 
     override fun onCleared() {
+        trackingService.cancelRemoteTransmit()
         sensorsRepo.disableSensor()
     }
 
     fun onAction(action: RadarAction) {
+        if(_uiState.value.radioControl.frequencyEditingLocked && when(action) {
+            is RadarAction.SetBaseFrequencies -> true
+            is RadarAction.ChangeCalculatorOffset -> calculatorCatnum==trackingService.state.value.currentPass?.catNum &&
+                (_uiState.value.radioControl.txPanel.isConnected || _uiState.value.radioControl.rxPanel.isConnected)
+            is RadarAction.SetCtcssTone,is RadarAction.TuneCalculator,
+            is RadarAction.SelectTransmitter -> true
+            else->false
+        })return
         when (action) {
             is RadarAction.AddToCalendar -> addToCalendar(action.name, action.aosTime, action.losTime)
             is RadarAction.SelectTransmitter -> {
@@ -247,12 +276,11 @@ class RadarViewModel(
                     transponders.find { it.uuid == action.uuid }?.let { trackingService.setTransponder(it) }
                 }
             }
-            is RadarAction.SetTxFrequency -> trackingService.setTxBaseFrequency(action.frequencyHz)
-            is RadarAction.AdjustTxFrequency -> trackingService.adjustTxBaseFrequency(action.deltaHz)
+            is RadarAction.SetBaseFrequencies -> trackingService.setBaseFrequencies(action.bases)
             is RadarAction.SetCtcssTone -> trackingService.setCtcssTone(action.toneHz)
             RadarAction.ToggleTracking -> {
                 val svc = trackingService.state.value
-                if (svc.isActive) {
+                if (svc.isActive || svc.trackingPhase == TrackingPhase.INITIALIZING) {
                     trackingService.stopTracking()
                 } else {
                     val pass = _uiState.value.currentPass ?: return
@@ -262,6 +290,20 @@ class RadarViewModel(
             }
             RadarAction.ConnectRadios -> viewModelScope.launch { trackingService.connectRadios() }
             RadarAction.DisconnectRadios -> viewModelScope.launch { trackingService.disconnectRadios() }
+            is RadarAction.VoicePtt -> trackingService.setVoicePtt(action.pressed)
+            is RadarAction.SendCw -> trackingService.sendCw(action.text, action.wpm)
+            is RadarAction.SetNativeCwOptions -> trackingService.setNativeCwOptions(action.options)
+            RadarAction.SyncHandsetCwPresets -> trackingService.syncHandsetCwPresets()
+            RadarAction.CancelHandsetCwSync -> trackingService.cancelHandsetCwSync()
+            RadarAction.RefreshNativeDiagnostics -> trackingService.refreshNativeDiagnostics()
+            is RadarAction.SaveCwPreset -> {
+                settingsRepo.updateRemoteCwPreset(action.index,action.text)
+                _uiState.update { it.copy(radioControl=it.radioControl.copy(cwPresets=settingsRepo.getRemoteCwPresets())) }
+            }
+            RadarAction.StopRemoteTx -> trackingService.cancelRemoteTransmit()
+            is RadarAction.RadioMonitor -> trackingService.setRadioMonitor(action.enabled)
+            is RadarAction.Recording -> trackingService.recordingAction(action.action)
+            is RadarAction.SaveRecording -> trackingService.saveRecording(action.destinationUri)
 
             // SSTV actions
             is RadarAction.SstvPermissionResult -> {
@@ -328,6 +370,12 @@ class RadarViewModel(
                 _uiState.update {
                     if (it.calculatorTxHz == action.txHz && it.calculatorRxHz == action.rxHz) it
                     else it.copy(calculatorTxHz = action.txHz, calculatorRxHz = action.rxHz)
+                }
+            }
+            is RadarAction.TuneCalculator -> {
+                transponders.find { it.uuid == action.tuning.transponderUuid }?.let {
+                    _uiState.update { state -> state.copy(transceivers = state.transceivers.copy(selectedUuid = it.uuid)) }
+                    trackingService.tuneFromCalculator(it, action.tuning)
                 }
             }
         }

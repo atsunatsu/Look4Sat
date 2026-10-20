@@ -130,19 +130,84 @@ data class RadioControlSettings(
     val txRadioName: String,
     val rxRadioName: String,
     val baudRate: Int,
-    /** IC-705 only: use single-radio split-VFO mode instead of two radios. */
-    val splitMode: Boolean = false
+    /** Use one Icom radio with VFO-A/B split or supported satellite MAIN/SUB control. */
+    val splitMode: Boolean = false,
+    val catTransport: String = TRANSPORT_BLUETOOTH,
+    /** Dedicated satellite MAIN/SUB when supported; ordinary VFO-A/B split otherwise. */
+    val duplexMode: String = DUPLEX_MODE_SPLIT,
+    /** Optional override for the radio's default CI-V address (0x00..0xFF). */
+    val civAddress: Int? = null,
+    /** TCP payload protocol: direct binary CAT or Hamlib rigctld text commands. */
+    val tcpProtocol: String = TCP_PROTOCOL_RAW_CAT,
+    /** Time that a manually moved dial must remain stable before it becomes the new reference. */
+    val dialSettleMillis: Long = 1_500L,
+    /** Manual-tuning detection threshold for linear transponders. */
+    val linearDialDeadbandHz: Long = 20L,
+    /** Manual-tuning detection threshold for FM transponders. */
+    val fmDialDeadbandHz: Long = 200L,
+    /** Optional spacing between commands sharing one physical CAT connection. */
+    val sharedBusCommandDelayMillis: Long = 0L,
+    /** L4S tracking/control quantum, distinct from the radio's 10 Hz hardware resolution. */
+    val l4sDopplerStepHz: Long = 250L,
+    val l4sCorrectionEditStepHz: Long = 10L,
+    val n76BluetoothAudio: Boolean = false,
+    val n76Options: N76ControlOptions = N76ControlOptions()
 ) {
     companion object {
-        const val MODEL_YAESU_FT817   = "Yaesu FT-817/818"
-        const val MODEL_YAESU_FT857   = "Yaesu FT-857/897"
-        const val MODEL_ICOM_IC705    = "Icom IC-705"
+        const val MODEL_YAESU_FT817 = "Yaesu FT-817/818"
+        const val MODEL_YAESU_FT857 = "Yaesu FT-857/897"
+        const val MODEL_YAESU_FTX1 = "Yaesu FTX-1"
+        const val MODEL_ICOM_IC705 = "Icom IC-705"
+        const val MODEL_ICOM_IC9700 = "Icom IC-9700"
+        const val MODEL_ICOM_IC910 = "Icom IC-910/D/H"
+        const val MODEL_ICOM_IC820 = "Icom IC-820"
+        const val MODEL_QUANSHENG_UVK1 = "Quansheng UV-K1 (L4S)"
+        const val MODEL_QUANSHENG_UVK5V3 = "Quansheng UV-K5 V3 (L4S)"
+        const val MODEL_VERO_N76 = "Vero VR-N76"
+        const val TRANSPORT_BLUETOOTH = "BLUETOOTH"
+        const val TRANSPORT_USB = "USB"
+        const val TRANSPORT_TCP = "TCP"
+        const val TCP_PROTOCOL_RAW_CAT = "RAW_CAT"
+        const val TCP_PROTOCOL_HAMLIB = "HAMLIB_RIGCTLD"
+        const val DUPLEX_MODE_SPLIT = "SPLIT"
+        const val DUPLEX_MODE_SATELLITE = "SATELLITE"
 
-        val SUPPORTED_RADIOS = listOf(MODEL_YAESU_FT817, MODEL_YAESU_FT857, MODEL_ICOM_IC705)
+        val SUPPORTED_RADIOS = RadioModelCatalog.supportedModels
+        val SUPPORTED_TRANSPORTS = listOf(TRANSPORT_BLUETOOTH, TRANSPORT_USB, TRANSPORT_TCP)
+        val SUPPORTED_TCP_PROTOCOLS = listOf(TCP_PROTOCOL_RAW_CAT, TCP_PROTOCOL_HAMLIB)
 
-        /** Baud rates available for Yaesu radios. */
-        val BAUD_RATES_YAESU = listOf(4800, 9600, 38400)
-        /** Baud rates available for Icom IC-705 (higher speeds supported via CI-V USB/BT). */
-        val BAUD_RATES_ICOM  = listOf(4800, 9600, 19200, 38400, 57600, 115200)
     }
+}
+
+fun supportedRadioBaudRates(model: String): List<Int> = radioModelDescriptor(model).baudRates
+
+data class RadioTcpEndpoint(val host: String, val port: Int)
+
+/** Parses host:port, requiring brackets around IPv6 so USB selectors cannot be mistaken for hosts. */
+fun parseRadioTcpEndpoint(value: String): RadioTcpEndpoint? {
+    val input = value.trim()
+    if (input.isEmpty()) return null
+    val host: String
+    val portText: String
+    if (input.startsWith('[')) {
+        val closingBracket = input.indexOf(']')
+        if (
+            closingBracket <= 1 ||
+            closingBracket + 1 >= input.length ||
+            input[closingBracket + 1] != ':' ||
+            input.indexOf('[', startIndex = 1) >= 0 ||
+            input.indexOf(']', startIndex = closingBracket + 1) >= 0
+        ) return null
+        host = input.substring(1, closingBracket)
+        portText = input.substring(closingBracket + 2)
+    } else {
+        if (input.count { it == ':' } != 1) return null
+        val separator = input.indexOf(':')
+        if (separator <= 0 || separator == input.lastIndex) return null
+        host = input.substring(0, separator).trim()
+        portText = input.substring(separator + 1)
+    }
+    val port = portText.toIntOrNull()?.takeIf { it in 1..65_535 } ?: return null
+    if (host.isBlank() || host.any(Char::isWhitespace)) return null
+    return RadioTcpEndpoint(host, port)
 }

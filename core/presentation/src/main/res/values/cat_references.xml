@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rc_cat_reference_hint">RX and TX references are independent. Editing either reference exits calculator linking and keeps the other unchanged. The radio must support the entered frequencies.</string>
+    <string name="rc_cat_invalid_reference">Enter an exact positive frequency supported by your radio (MHz).</string>
+    <string name="rc_cat_runtime_reference">Runtime CAT references; not saved to radio memory.</string>
+</resources>

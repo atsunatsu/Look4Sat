@@ -77,7 +77,9 @@ class SettingsViewModel(
     private val satelliteRepo: ISatelliteRepo,
     private val sensorsRepo: ISensorsRepo,
     private val apkFile: File,
-    private val showToast: IShowToast
+    private val showToast: IShowToast,
+    private val radioTrackingService: com.rtbishop.look4sat.core.domain.repository.IRadioTrackingService? = null,
+    private val controlDiagnostics: com.rtbishop.look4sat.core.domain.control.IControlDiagnostics = com.rtbishop.look4sat.core.domain.control.NoOpControlDiagnostics
 ) : ViewModel() {
 
     private val defaultPosSettings = PositionSettings(false, settingsRepo.stationPosition.value, 0)
@@ -109,6 +111,11 @@ class SettingsViewModel(
     val uiState: StateFlow<SettingsState> = _uiState
 
     init {
+        radioTrackingService?.let { service ->
+            viewModelScope.launch { service.profileManagerState.collect {value -> _uiState.update {it.copy(radioProfiles=value)}} }
+            viewModelScope.launch { service.state.collect {value -> _uiState.update {it.copy(radioTrackingState=value)}} }
+        }
+        viewModelScope.launch {controlDiagnostics.events.collect {value->_uiState.update {it.copy(controlDiagnosticCount=value.size)}}}
         viewModelScope.launch {
             settingsRepo.stationPosition.collect { geoPos ->
                 _uiState.update {
@@ -200,6 +207,21 @@ class SettingsViewModel(
 
     fun onAction(action: SettingsAction) {
         when (action) {
+            SettingsAction.RefreshRadioProfiles -> viewModelScope.launch {radioTrackingService?.refreshRadioProfiles()}
+            is SettingsAction.DeleteRadioProfile -> viewModelScope.launch {radioTrackingService?.requestDeleteRadioProfile(action.slot)}
+            is SettingsAction.ImportRadioProfiles -> viewModelScope.launch {radioTrackingService?.prepareRadioProfileImport(action.json)}
+            is SettingsAction.RestoreRadioProfiles -> viewModelScope.launch {radioTrackingService?.stageRadioProfileImport(action.overwrite)}
+            SettingsAction.CancelRadioProfileOperation -> viewModelScope.launch {radioTrackingService?.cancelRadioProfileOperation()}
+            SettingsAction.ExportRadioProfiles -> viewModelScope.launch {
+                val json=radioTrackingService?.exportRadioProfiles();_uiState.update {it.copy(radioProfilesExport=json)}
+            }
+            SettingsAction.ConsumeRadioProfilesExport -> _uiState.update {it.copy(radioProfilesExport=null)}
+            is SettingsAction.SetRadioProfileAlias -> radioTrackingService?.setRadioProfileAlias(action.key,action.alias)
+            SettingsAction.ExportControlDiagnostics -> {
+                _uiState.update { it.copy(controlDiagnosticsExportText = controlDiagnostics.exportText()) }
+            }
+            SettingsAction.ClearControlDiagnostics -> controlDiagnostics.clear()
+            SettingsAction.ConsumeControlDiagnosticsExport -> _uiState.update {it.copy(controlDiagnosticsExportText=null)}
             // Position
             SettingsAction.SetGpsPosition -> setGpsPosition()
             is SettingsAction.SetGeoPosition -> setGeoPosition(action.latitude, action.longitude)
@@ -240,7 +262,10 @@ class SettingsViewModel(
             }
             // Remote control & data sources
             is SettingsAction.UpdateRC -> settingsRepo.updateRCSettings(action.settings)
-            is SettingsAction.UpdateRadioControl -> settingsRepo.updateRadioControlSettings(action.settings)
+            is SettingsAction.UpdateRadioControl -> viewModelScope.launch {
+                if(radioTrackingService==null)settingsRepo.updateRadioControlSettings(action.settings)
+                else if(!radioTrackingService.applyRadioControlSettings(action.settings))showToast("Radio is busy")
+            }
             is SettingsAction.UpdateDataSources -> settingsRepo.updateDataSourcesSettings(action.settings)
             // Wavelog configuration (single block; LoTW and Wavelog are mutually exclusive)
             is SettingsAction.UpdateWavelogUpload -> applyWavelogUploadSettings(action.settings)
@@ -1043,7 +1068,9 @@ class SettingsViewModel(
                     satelliteRepo = container.satelliteRepo,
                     sensorsRepo = container.provideSensorsRepo(),
                     apkFile = File(context.cacheDir, "look4sat-update.apk"),
-                    showToast = container.provideShowToast()
+                    showToast = container.provideShowToast(),
+                    radioTrackingService = container.radioTrackingService,
+                    controlDiagnostics = container.controlDiagnostics
                 )
             }
         }

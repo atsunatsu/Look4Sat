@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rc_cat_reference_hint">RX/TX 基準獨立。修改任一基準會退出計算器聯動，另一側保持不變；輸入頻率須在電台支援範圍內。</string>
+    <string name="rc_cat_invalid_reference">請輸入電台支援範圍內的精確正頻率（MHz）。</string>
+    <string name="rc_cat_runtime_reference">本次 CAT 執行基準，不寫入電台儲存。</string>
+</resources>

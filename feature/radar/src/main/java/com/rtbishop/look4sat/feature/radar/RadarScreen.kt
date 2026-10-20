@@ -203,6 +203,25 @@ fun RadarDestination(
     val viewModel: RadarViewModel = viewModel(factory = RadarViewModel.factory(container))
     val logViewModel: LogViewModel = viewModel(factory = LogViewModel.factory(container))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycle=androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val observer=androidx.lifecycle.LifecycleEventObserver {_,event ->
+            if(event==androidx.lifecycle.Lifecycle.Event.ON_STOP) viewModel.onAction(RadarAction.StopRemoteTx)
+            if(event==androidx.lifecycle.Lifecycle.Event.ON_START || event==androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                container.appScope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                    container.radioTrackingService.setAudioForeground(event==androidx.lifecycle.Lifecycle.Event.ON_START)
+                }
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            viewModel.onAction(RadarAction.StopRemoteTx)
+            container.appScope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                container.radioTrackingService.setAudioForeground(false)
+            }
+        }
+    }
     val mutualData by container.mutualPassData.collectAsStateWithLifecycle()
     val navigateUpAndClearMutual = {
         if (container.mutualPassData.value.endTime > 0L) {
@@ -238,13 +257,22 @@ fun RadarDestination(
         viewModel.onAction(RadarAction.SstvPermissionResult(granted))
         viewModel.onAction(RadarAction.CwPermissionResult(granted))
     }
-    // Grid-check "fix it" jump from the log page: hand the affected records' grids to the
-    // station-location page as its prefill (mirrors the Grid Finder's hand-off).
+    val radioPermissionLauncher=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {granted ->
+        if(granted)viewModel.onAction(RadarAction.ConnectRadios)
+    }
+    val dispatchAction: (RadarAction)->Unit = {action ->
+        val permission=requiredRadioPermission(uiState.radioTransport)
+        if(action==RadarAction.ConnectRadios && permission!=null &&
+            ContextCompat.checkSelfPermission(context,permission)!=PackageManager.PERMISSION_GRANTED) {
+            radioPermissionLauncher.launch(permission)
+        } else viewModel.onAction(action)
+    }
+    // Grid-check "fix it" jump: prefill the station page with the affected grids.
     val openLoTWStationForGridFix: (List<String>) -> Unit = { grids ->
         if (grids.isNotEmpty()) container.setPendingLoTWStationGrid(grids.joinToString(","))
         onOpenLoTWStation()
     }
-    RadarScreen(uiState, viewModel::onAction, navigateUpAndClearMutual, mutualData, logViewModel, requestMicPermission = {
+    RadarScreen(uiState, dispatchAction, navigateUpAndClearMutual, mutualData, logViewModel, requestMicPermission = {
         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }, onFixGrid = openLoTWStationForGridFix, onOpenPassMap = onOpenPassMap, onStartMatch = onStartMatch)
 }
@@ -760,6 +788,7 @@ private fun PagerCard(
                         onAction = onAction
                     )
                     RadarPage.Calculator -> CalculatorPage(
+                        radioControl = uiState.radioControl,
                         transceivers = uiState.transceivers.transmitters,
                         selectedUuid = uiState.transceivers.selectedUuid,
                         orbitalPos = uiState.orbitalPos,

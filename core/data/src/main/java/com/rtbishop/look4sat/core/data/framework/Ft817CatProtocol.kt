@@ -29,8 +29,9 @@ object Ft817CatProtocol {
     const val CMD_PTT_OFF: Byte = 0x88.toByte()
     const val CMD_CTCSS_MODE: Byte = 0x0A
     const val CMD_CTCSS_TONE: Byte = 0x0B
+    const val CMD_READ_TX_STATUS: Byte = 0xF7.toByte()
 
-    const val CTCSS_ENC_ON: Byte = 0x2A
+    const val CTCSS_ENC_ON: Byte = 0x4A
     const val CTCSS_OFF: Byte = 0x8A.toByte()
 
     val MODE_TO_BYTE: Map<String, Byte> = mapOf(
@@ -40,6 +41,7 @@ object Ft817CatProtocol {
         "CW-R" to 0x03,
         "AM" to 0x04,
         "FM" to 0x08,
+        "FM-N" to 0x88.toByte(),
         "DIG" to 0x0A,
         "PKT" to 0x0C
     )
@@ -51,6 +53,7 @@ object Ft817CatProtocol {
      * Example: 145500000 Hz → [0x14, 0x55, 0x00, 0x00]
      */
     fun encodeFrequencyBcd(frequencyHz: Long): ByteArray {
+        require(frequencyHz in 0L..999_999_990L) { "Yaesu CAT frequency is outside the 8-digit BCD range" }
         val freq10Hz = frequencyHz / 10
         val bcd = ByteArray(4)
         val digits = String.format(Locale.US, "%08d", freq10Hz)
@@ -66,11 +69,13 @@ object Ft817CatProtocol {
      * Decode 4-byte BCD frequency to Hz.
      */
     fun decodeFrequencyBcd(bcd: ByteArray): Long {
+        require(bcd.size == 4) { "Yaesu CAT frequency requires exactly four BCD bytes" }
         var freq10Hz = 0L
         for (i in 0 until 4) {
             val b = bcd[i].toInt() and 0xFF
             val high = b shr 4
             val low = b and 0x0F
+            require(high <= 9 && low <= 9) { "Invalid Yaesu CAT BCD frequency" }
             freq10Hz = freq10Hz * 100 + high * 10 + low
         }
         return freq10Hz * 10
@@ -81,6 +86,7 @@ object Ft817CatProtocol {
      * 67.0 Hz → 670 (in 0.1 Hz) → BCD [0x06, 0x70]
      */
     fun encodeCtcssToneBcd(toneHz: Double): ByteArray {
+        require(toneHz.isFinite() && toneHz in 0.0..999.9) { "Invalid CTCSS tone" }
         val tone01Hz = (toneHz * 10).roundToLong()
         val digits = String.format(Locale.US, "%04d", tone01Hz)
         val bcd = ByteArray(2)
@@ -98,7 +104,8 @@ object Ft817CatProtocol {
     }
 
     fun buildSetModeCommand(mode: String): ByteArray? {
-        val modeByte = MODE_TO_BYTE[mode.uppercase(Locale.US)] ?: return null
+        val normalized=when(val value=mode.uppercase(Locale.US)) { "NFM","FMN"->"FM-N"; "AFSK"->"FM"; else->value }
+        val modeByte = MODE_TO_BYTE[normalized] ?: return null
         return byteArrayOf(modeByte, 0x00, 0x00, 0x00, CMD_SET_MODE)
     }
 
@@ -114,6 +121,15 @@ object Ft817CatProtocol {
         return byteArrayOf(0x00, 0x00, 0x00, 0x00, CMD_PTT_OFF)
     }
 
+    fun buildReadTxStatusCommand(): ByteArray {
+        return byteArrayOf(0x00, 0x00, 0x00, 0x00, CMD_READ_TX_STATUS)
+    }
+
+    fun parsePttState(status: Byte, variant: YaesuCatVariant): Boolean = when (variant) {
+        YaesuCatVariant.FT817 -> status != 0xFF.toByte()
+        YaesuCatVariant.FT857 -> status.toInt() and 0x80 == 0
+    }
+
     fun buildCtcssModeCommand(enabled: Boolean): ByteArray {
         val sub = if (enabled) CTCSS_ENC_ON else CTCSS_OFF
         return byteArrayOf(sub, 0x00, 0x00, 0x00, CMD_CTCSS_MODE)
@@ -121,7 +137,10 @@ object Ft817CatProtocol {
 
     fun buildSetCtcssToneCommand(toneHz: Double): ByteArray {
         val bcd = encodeCtcssToneBcd(toneHz)
-        return byteArrayOf(bcd[0], bcd[1], 0x00, 0x00, CMD_CTCSS_TONE)
+        // The legacy CAT command has separate encoder and decoder tone fields.
+        // FT-817/818 and FT-857/897 do not support different values, so Hamlib
+        // writes the requested tone to both fields even when only encode is used.
+        return byteArrayOf(bcd[0], bcd[1], bcd[0], bcd[1], CMD_CTCSS_TONE)
     }
 
     /**
@@ -130,9 +149,10 @@ object Ft817CatProtocol {
      */
     fun parseReadResponse(response: ByteArray): Pair<Long, String>? {
         if (response.size < 5) return null
-        val freqBcd = response.copyOfRange(0, 4)
-        val frequencyHz = decodeFrequencyBcd(freqBcd)
-        val modeByte = response[4]
+        val frequencyHz = runCatching {
+            decodeFrequencyBcd(response.copyOfRange(0, 4))
+        }.getOrNull() ?: return null
+        val modeByte = (response[4].toInt() and 0x7F).toByte()
         val mode = BYTE_TO_MODE[modeByte] ?: return null
         return Pair(frequencyHz, mode)
     }

@@ -39,6 +39,8 @@ interface IMainContainer {
     val qsoRepository: IQsoRepository
     val lotwUploadRepository: ILoTWUploadRepository
     val radioTrackingService: IRadioTrackingService
+    val controlDiagnostics: com.rtbishop.look4sat.core.domain.control.IControlDiagnostics
+    val audioHub: com.rtbishop.look4sat.core.domain.audio.IAudioHub
     val locationRepo: ILocationRepo
     val mutualPassData: StateFlow<MutualPassData>
     /** Grid Finder → LoTW station page prefill, consumed once by that page. */
@@ -50,8 +52,6 @@ interface IMainContainer {
     fun provideBluetoothReporter(): IReporter
     fun provideNetworkReporter(): IReporter
     fun provideSensorsRepo(): ISensorsRepo
-    fun provideTxRadioController(): IRadioController
-    fun provideRxRadioController(): IRadioController
     fun provideAudioCapture(): IAudioCapture
     fun provideSaveImage(): ISaveImage
 }

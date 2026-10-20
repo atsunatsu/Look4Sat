@@ -29,6 +29,7 @@ import com.rtbishop.look4sat.core.domain.model.MapSource
 import com.rtbishop.look4sat.core.domain.model.OtherSettings
 import com.rtbishop.look4sat.core.domain.model.PassesSettings
 import com.rtbishop.look4sat.core.domain.model.RCSettings
+import com.rtbishop.look4sat.core.domain.model.supportedRadioBaudRates
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 
 import com.rtbishop.look4sat.core.domain.model.WavelogUploadSettings
@@ -956,34 +957,117 @@ class SettingsRepo(
     private val keyRxRadioName = "rxRadioName"
     private val keyRadioBaudRate = "radioBaudRate"
     private val keyRadioSplitMode = "radioSplitMode"
+    private val keyRadioCatTransport = "radioCatTransport"
+    private val keyRadioDuplexMode = "radioDuplexMode"
+    private val keyRadioCivAddress = "radioCivAddress"
+    private val keyRadioTcpProtocol = "radioTcpProtocol"
+    private val keyRadioDialSettle = "radioDialSettleMillis"
+    private val keyRadioLinearDeadband = "radioLinearDialDeadbandHz"
+    private val keyRadioFmDeadband = "radioFmDialDeadbandHz"
+    private val keyRadioSharedBusDelay = "radioSharedBusCommandDelayMillis"
+    private val keyRadioL4sStep = "radioL4sDopplerStepHz"
+    private val keyRadioCorrectionStep = "radioL4sCorrectionEditStepHz"
+    private val keyN76BluetoothAudio = "radioN76BluetoothAudio"
+    private val keyN76Options = "radioN76Options"
+
+    override fun getRemoteCwPresets(): List<String> = readRemoteCwPresets(preferences)
+
+    override fun updateRemoteCwPreset(index: Int, text: String) {
+        writeRemoteCwPreset(preferences,index,text)
+    }
+    override fun getRadioProfileMetadata():Map<String,com.rtbishop.look4sat.core.domain.repository.RadioProfileMetadata> = runCatching {
+        val json=JSONObject(preferences.getString("l4sProfileMetadata","{}") ?: "{}")
+        json.keys().asSequence().associateWith {key->val item=json.getJSONObject(key)
+            com.rtbishop.look4sat.core.domain.repository.RadioProfileMetadata(item.getString("name"),item.getString("uuid"),item.optString("description"))}
+    }.getOrDefault(emptyMap())
+    override fun setRadioProfileMetadata(values:Map<String,com.rtbishop.look4sat.core.domain.repository.RadioProfileMetadata>) {
+        val json=JSONObject();values.forEach {(key,item)->json.put(key,JSONObject().put("name",item.satelliteName).put("uuid",item.transponderUuid).put("description",item.description))}
+        preferences.edit {putString("l4sProfileMetadata",json.toString())}
+    }
+    override fun getRadioProfileAliases():Map<String,String> = runCatching {
+        val json=JSONObject(preferences.getString("l4sProfileAliases","{}") ?: "{}")
+        json.keys().asSequence().associateWith {json.getString(it)}
+    }.getOrDefault(emptyMap())
+    override fun setRadioProfileAliases(values:Map<String,String>) {
+        val json=JSONObject();values.forEach {(key,value)->json.put(key,value)}
+        preferences.edit {putString("l4sProfileAliases",json.toString())}
+    }
 
     private val _radioControlSettings = MutableStateFlow(getRadioControlSettings())
     override val radioControlSettings: StateFlow<RadioControlSettings> = _radioControlSettings
 
     override fun updateRadioControlSettings(settings: RadioControlSettings) {
+        val supportedBaudRates = supportedRadioBaudRates(settings.radioModel)
+        val normalized = settings.copy(
+            baudRate = settings.baudRate.takeIf { it in supportedBaudRates } ?: supportedBaudRates.first(),
+            dialSettleMillis = settings.dialSettleMillis.coerceIn(0L, 10_000L),
+            linearDialDeadbandHz = settings.linearDialDeadbandHz.coerceIn(1L, 10_000L),
+            fmDialDeadbandHz = settings.fmDialDeadbandHz.coerceIn(10L, 100_000L),
+            sharedBusCommandDelayMillis = settings.sharedBusCommandDelayMillis.coerceIn(0L, 2_000L),
+            l4sDopplerStepHz = com.rtbishop.look4sat.core.domain.repository.normalizeL4sStep(settings.l4sDopplerStepHz),
+            l4sCorrectionEditStepHz = settings.l4sCorrectionEditStepHz.coerceIn(10,1000)/10*10,
+            n76Options = settings.n76Options.normalized()
+        )
         preferences.edit {
-            putBoolean(keyRadioControlEnabled, settings.enabled)
-            putString(keyRadioModel, settings.radioModel)
-            putString(keyTxRadioAddress, settings.txRadioAddress)
-            putString(keyRxRadioAddress, settings.rxRadioAddress)
-            putString(keyTxRadioName, settings.txRadioName)
-            putString(keyRxRadioName, settings.rxRadioName)
-            putInt(keyRadioBaudRate, settings.baudRate)
-            putBoolean(keyRadioSplitMode, settings.splitMode)
+            putBoolean(keyRadioControlEnabled, normalized.enabled)
+            putString(keyRadioModel, normalized.radioModel)
+            putString(keyTxRadioAddress, normalized.txRadioAddress)
+            putString(keyRxRadioAddress, normalized.rxRadioAddress)
+            putString(keyTxRadioName, normalized.txRadioName)
+            putString(keyRxRadioName, normalized.rxRadioName)
+            putInt(keyRadioBaudRate, normalized.baudRate)
+            putBoolean(keyRadioSplitMode, normalized.splitMode)
+            putString(keyRadioCatTransport, normalized.catTransport)
+            putString(keyRadioDuplexMode, normalized.duplexMode)
+            putInt(keyRadioCivAddress, normalized.civAddress ?: -1)
+            putString(keyRadioTcpProtocol, normalized.tcpProtocol)
+            putLong(keyRadioDialSettle, normalized.dialSettleMillis)
+            putLong(keyRadioLinearDeadband, normalized.linearDialDeadbandHz)
+            putLong(keyRadioFmDeadband, normalized.fmDialDeadbandHz)
+            putLong(keyRadioSharedBusDelay, normalized.sharedBusCommandDelayMillis)
+            putLong(keyRadioL4sStep, normalized.l4sDopplerStepHz)
+            putLong(keyRadioCorrectionStep, normalized.l4sCorrectionEditStepHz)
+            putBoolean(keyN76BluetoothAudio, normalized.n76BluetoothAudio)
+            putString(keyN76Options, normalized.n76Options.toPreferenceJson())
         }
-        _radioControlSettings.value = settings
+        _radioControlSettings.value = normalized
     }
 
-    private fun getRadioControlSettings(): RadioControlSettings = RadioControlSettings(
-        enabled = preferences.getBoolean(keyRadioControlEnabled, false),
-        radioModel = preferences.getString(keyRadioModel, null) ?: RadioControlSettings.MODEL_YAESU_FT817,
-        txRadioAddress = preferences.getString(keyTxRadioAddress, null) ?: "",
-        rxRadioAddress = preferences.getString(keyRxRadioAddress, null) ?: "",
-        txRadioName = preferences.getString(keyTxRadioName, null) ?: "TX Radio",
-        rxRadioName = preferences.getString(keyRxRadioName, null) ?: "RX Radio",
-        baudRate = preferences.getInt(keyRadioBaudRate, 4800),
-        splitMode = preferences.getBoolean(keyRadioSplitMode, false)
-    )
+    private fun getRadioControlSettings(): RadioControlSettings {
+        val model = preferences.getString(keyRadioModel, null) ?: RadioControlSettings.MODEL_YAESU_FT817
+        val supportedBaudRates = supportedRadioBaudRates(model)
+        return RadioControlSettings(
+            enabled = preferences.getBoolean(keyRadioControlEnabled, false),
+            radioModel = model,
+            txRadioAddress = preferences.getString(keyTxRadioAddress, null) ?: "",
+            rxRadioAddress = preferences.getString(keyRxRadioAddress, null) ?: "",
+            txRadioName = preferences.getString(keyTxRadioName, null) ?: "TX Radio",
+            rxRadioName = preferences.getString(keyRxRadioName, null) ?: "RX Radio",
+            baudRate = preferences.getInt(keyRadioBaudRate, 4800)
+                .takeIf { it in supportedBaudRates } ?: supportedBaudRates.first(),
+            splitMode = preferences.getBoolean(keyRadioSplitMode, false),
+            catTransport = preferences.getString(keyRadioCatTransport, null)
+                ?: RadioControlSettings.TRANSPORT_BLUETOOTH,
+            duplexMode = preferences.getString(keyRadioDuplexMode, null)
+                ?.takeIf {
+                    it == RadioControlSettings.DUPLEX_MODE_SATELLITE ||
+                        it == RadioControlSettings.DUPLEX_MODE_SPLIT
+                }
+                ?: RadioControlSettings.DUPLEX_MODE_SPLIT,
+            civAddress = preferences.getInt(keyRadioCivAddress, -1).takeIf { it in 0..0xFF },
+            tcpProtocol = preferences.getString(keyRadioTcpProtocol, null)
+                ?.takeIf { it in RadioControlSettings.SUPPORTED_TCP_PROTOCOLS }
+                ?: RadioControlSettings.TCP_PROTOCOL_RAW_CAT,
+            dialSettleMillis = preferences.getLong(keyRadioDialSettle, 1_500L).coerceIn(0L, 10_000L),
+            linearDialDeadbandHz = preferences.getLong(keyRadioLinearDeadband, 20L).coerceIn(1L, 10_000L),
+            fmDialDeadbandHz = preferences.getLong(keyRadioFmDeadband, 200L).coerceIn(10L, 100_000L),
+            sharedBusCommandDelayMillis = preferences.getLong(keyRadioSharedBusDelay, 0L).coerceIn(0L, 2_000L),
+            l4sDopplerStepHz = com.rtbishop.look4sat.core.domain.repository.normalizeL4sStep(preferences.getLong(keyRadioL4sStep,250L)),
+            l4sCorrectionEditStepHz = preferences.getLong(keyRadioCorrectionStep,10).coerceIn(10,1000)/10*10,
+            n76BluetoothAudio = preferences.getBoolean(keyN76BluetoothAudio, false),
+            n76Options = n76OptionsFromJson(preferences.getString(keyN76Options, null))
+        )
+    }
     //endregion
 
     //region # Per-satellite calculator offset settings

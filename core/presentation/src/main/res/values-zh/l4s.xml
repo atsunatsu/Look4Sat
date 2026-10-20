@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rc_l4s_hint">需要 L4S 固件。USB-C OTG 只传控制命令，语音使用手台麦克风。单台半双工，独立 RX/TX 频率。连接前关闭 USB 拨片／手键模式。整个发射期间保持两路频率不变，结束后恢复跟踪。</string>
+    <string name="rc_l4s_firmware">L4S 固件：%1$s</string>
+    <string name="rc_l4s_hold">按住 PTT（手台麦克风）</string>
+    <string name="rc_l4s_stop">停止发射</string>
+    <string name="rc_l4s_cw">CW 拍发</string>
+    <string name="rc_l4s_frozen">发射中：TX/RX 多普勒保持，结束后恢复</string>
+    <string name="rc_l4s_linear">线性转发器使用原生 CW，不支持 SSB 发射。</string>
+    <string name="rc_l4s_target">目标 TX %1$s · RX %2$s</string>
+    <string name="rc_l4s_applied">已应用 TX %1$s · RX %2$s</string>
+    <string name="rc_l4s_source">发射来源：%1$s</string>
+    <string name="rc_l4s_local">手台</string>
+    <string name="rc_l4s_off">未发射</string>
+    <string name="rc_l4s_message">CW 文本（A–Z、0–9、/ ? . , = -）</string>
+    <string name="rc_l4s_wpm">速度：%1$d WPM</string>
+    <string name="rc_l4s_send">发送</string>
+    <string name="rc_l4s_progress">CW %1$d/%2$d · %3$s</string>
+    <string name="rc_l4s_need_connection">请先连接 L4S 电台。可以预填 CW 文本，未连接时禁止发送。</string>
+    <string name="rc_l4s_need_tracking">选择转发器并开始跟踪，等待电台就绪后才能发送。</string>
+    <string name="rc_l4s_need_cw_mode">CW 拍发需选择 CW／线性转发器；FM 使用按住 PTT 通话。</string>
+    <string name="rc_l4s_no_cw">连接的固件未声明支持 CW 文本拍发。</string>
+    <string name="rc_l4s_busy">请先停止当前发射并确认 PTT 关闭，再发送 CW。</string>
+    <string name="rc_l4s_radio">电台（单机半双工）</string>
+    <string name="rc_calculator_cat_link">修改频率会同步 CAT 跟踪；发射期间保持两路频率，停发后应用。</string>
+    <string name="rc_calculator_need_tracking">请先连接电台并开始跟踪，计算器频率修改才会应用到电台。</string>
+    <string name="rc_l4s_menu_open">请先关闭手台 MENU，再开始发射。</string>
+    <string name="rc_l4s_tones">亚音 TX %1$s · RX %2$s · 激活 %3$s</string>
+    <string name="rc_l4s_step">多普勒控制步进（Hz）</string>
+    <string name="rc_l4s_step_hint">默认 250 Hz；可设 10–10000 Hz，须为 10 的整数倍。发射期间两路频率保持不变。</string>
+    <string name="rc_l4s_bases">基准 TX %1$s · RX %2$s</string>
+    <string name="rc_l4s_corrections">修正 TX %1$d Hz · RX %2$d Hz · 步进 %3$d Hz</string>
+    <string name="rc_l4s_presets_hint">点击 F1–F8 填入内容，长按编辑；按“发送”才开始拍发。</string>
+    <string name="rc_l4s_edit_preset">编辑 F%1$d 预设</string>
+    <string name="rc_l4s_preset_save_hint">保存在本机。清空内容可清除预设；编辑不会发射。</string>
+</resources>

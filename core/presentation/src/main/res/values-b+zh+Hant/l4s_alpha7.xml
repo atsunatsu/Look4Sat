@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rc_l4s_correction_step">固定修正編輯步進（Hz）</string>
+    <string name="rc_l4s_edit_locked">發射、手台選單或儲存期間禁止編輯頻率。</string>
+    <string name="rc_l4s_profiles">衛星檔案</string>
+    <string name="rc_l4s_profiles_upgrade">請連接 alpha7 L4S 韌體手台以管理檔案。</string>
+    <string name="rc_l4s_profile_capacity">已儲存檔案：%1$d / %2$d</string>
+    <string name="rc_l4s_profiles_readonly">偵測到未知儲存內容：檔案唯讀，不會自動清除。</string>
+    <string name="rc_l4s_refresh">重新整理</string>
+    <string name="rc_l4s_export">匯出</string>
+    <string name="rc_l4s_import">匯入</string>
+    <string name="rc_l4s_confirm_handset">預覽已驗證（%1$d%%）。請在手台按 MENU 確認，EXIT 取消。</string>
+    <string name="rc_l4s_store_progress">正在儲存檔案：%1$d%%</string>
+    <string name="rc_l4s_merge_counts">新增 %1$d · 覆寫 %2$d · 刪除 %3$d</string>
+    <string name="rc_l4s_profiles_empty">尚無已儲存檔案。</string>
+    <string name="rc_l4s_profile_damaged">損壞或不相容記錄：保留占用，明確刪除前不會覆寫。</string>
+    <string name="rc_l4s_merge_preview">合併預覽：衝突項未勾選時保留手台原檔案</string>
+    <string name="rc_l4s_merge_add">新增檔案</string>
+    <string name="rc_l4s_merge_keep_or_replace">保留原檔案，勾選才覆寫</string>
+    <string name="rc_l4s_stop_tracking_first">請先停止追蹤，再刪除目前檔案或還原備份。</string>
+    <string name="rc_l4s_send_for_confirmation">傳送至手台確認</string>
+    <string name="rc_l4s_export_saved_only">僅匯出已儲存衛星檔案；不含未儲存變更、校準、日誌及手機 CW 預設。</string>
+    <string name="rc_l4s_profile_alias">顯示別名</string>
+    <string name="rc_l4s_alias_local">別名僅儲存在本機，不改變檔案身分。</string>
+    <string name="rc_l4s_rx_reference">接收基準／下行（MHz）</string>
+    <string name="rc_l4s_tx_reference">發射基準／上行（MHz）</string>
+    <string name="rc_l4s_delete_confirm_handset">請求刪除，在手台確認</string>
+    <string name="rc_l4s_profile_details">%1$s · 功率 %2$s · 靜噪 %3$d · CW %4$d WPM／%5$d Hz／音量 %6$d</string>
+    <string name="rc_l4s_frequency_settings">基準頻率設定</string>
+    <string name="rc_l4s_independent">RX/TX 基準獨立</string>
+    <string name="rc_l4s_calculator_linked">計算器連動基準</string>
+    <string name="rc_l4s_unsaved">本次變更未儲存：需在手台 APPLY + SAVE 才永久保留</string>
+    <string name="rc_l4s_saved">已儲存衛星檔案</string>
+    <string name="rc_l4s_wait_reference">等待手機基準同步</string>
+    <string name="rc_l4s_reference_hint">修改任一基準不改變另一側，並退出計算器連動。固定修正在手台 MENU 編輯。</string>
+    <string name="rc_l4s_invalid_reference">請輸入 18–1300 MHz 範圍內的有效基準頻率。</string>
+    <string name="rc_l4s_doppler_values">都卜勒 TX %1$d Hz · RX %2$d Hz</string>
+    <string name="rc_l4s_store_failed">檔案儲存失敗，舊快照保留；請等待硬體就緒。</string>
+</resources>

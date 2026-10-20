@@ -1,0 +1,20 @@
+<resources>
+    <string name="rc_ftx1_usb_hint">USB CAT-1 (Enhanced port) · MAIN firmware ≥ 1.08</string>
+    <string name="rc_panel_reference">Reference frequencies</string>
+    <string name="rc_panel_independent">Independent</string>
+    <string name="rc_panel_linked">Linked</string>
+    <string name="rc_panel_saved">Saved</string>
+    <string name="rc_panel_unsaved">Unsaved</string>
+    <string name="rc_panel_waiting">Waiting for frequencies</string>
+    <string name="rc_panel_rx">RX</string>
+    <string name="rc_panel_tx">TX</string>
+    <string name="rc_panel_reference_pair">RX %1$s · TX %2$s MHz</string>
+    <string name="rc_panel_fine_tune">Fine tune (Hz)</string>
+    <string name="rc_panel_tx_tone">TX tone</string>
+    <string name="rc_panel_tone_hz">%1$s Hz</string>
+    <string name="rc_panel_tone_off">Off</string>
+    <string name="rc_panel_connect">Connect</string>
+    <string name="rc_panel_disconnect">Disconnect</string>
+    <string name="rc_panel_track">Track</string>
+    <string name="rc_panel_stop">Stop</string>
+</resources>
