@@ -14,6 +14,10 @@ name: Build Look4Sat APK
 # Local Gradle builds keep using the catalog unchanged. Runs are manual only.
 
 on:
+  # One-off preview trigger isolated to this branch; main stays manual-only.
+  push:
+    branches:
+      - artifact-preview-30f72b6
   workflow_dispatch:
     inputs:
       mode:
@@ -162,7 +166,7 @@ jobs:
           echo "apk bytes: $(stat -c%s "$APK")"
 
       - name: Upload test APK without publishing any Release
-        if: ${{ inputs.mode == 'artifact' }}
+        if: ${{ inputs.mode == 'artifact' || github.event_name == 'push' }}
         uses: actions/upload-artifact@v4
         with:
           name: Look4Sat-test-${{ steps.version.outputs.code }}-${{ steps.version.outputs.short_sha }}
