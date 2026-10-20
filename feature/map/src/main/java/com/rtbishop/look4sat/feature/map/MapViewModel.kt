@@ -222,7 +222,7 @@ class MapViewModel(
                     }
                 }
             }
-            openRadarPassMap(passWindow)
+            passWindow?.let(::openRadarPassMap)
         }
     }
 
