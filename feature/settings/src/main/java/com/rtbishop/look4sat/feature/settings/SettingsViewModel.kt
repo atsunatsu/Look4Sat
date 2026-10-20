@@ -33,7 +33,7 @@ import com.rtbishop.look4sat.core.domain.repository.IUpdateRepository
 import com.rtbishop.look4sat.core.domain.repository.LoTWResult
 import com.rtbishop.look4sat.core.domain.repository.LoTWSyncMode
 import com.rtbishop.look4sat.core.domain.repository.applyLoTWGridResult
-import com.rtbishop.look4sat.core.domain.repository.lotwCursorApi
+import com.rtbishop.look4sat.core.domain.repository.lotwIncrementalSince
 import com.rtbishop.look4sat.core.domain.repository.lotwCursorEpochMs
 import com.rtbishop.look4sat.core.domain.repository.resolveLoTWSyncMode
 import com.rtbishop.look4sat.core.domain.repository.positionWarning
@@ -524,7 +524,7 @@ class SettingsViewModel(
         val callsign = settings.callsign.trim().uppercase()
         val effectiveMode = resolveLoTWSyncMode(settingsRepo.getLastLotwSyncCallsign(), callsign, mode)
         val since = if (effectiveMode == LoTWSyncMode.Incremental) {
-            lotwCursorApi(settingsRepo.getLastLotwSyncDate())
+            lotwIncrementalSince(settingsRepo)
         } else ""
         _uiState.update {
             it.copy(lotwSyncing = true, lotwSyncMode = effectiveMode, lotwProgress = null, lotwError = null)

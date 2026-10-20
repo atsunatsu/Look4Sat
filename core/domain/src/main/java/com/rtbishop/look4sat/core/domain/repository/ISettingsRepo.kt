@@ -163,6 +163,9 @@ interface ISettingsRepo {
     /** Last successful LoTW sync date ("yyyyMMdd", empty when never synced). */
     fun getLastLotwSyncDate(): String
     fun setLastLotwSyncDate(date: String)
+    /** Server-side QSL watermark, distinct from the last successful sync time. */
+    fun getLastLotwQslCursor(): String = ""
+    fun setLastLotwQslCursor(cursor: String) {}
     /** Callsign of the last successful LoTW sync (empty when never synced). */
     fun getLastLotwSyncCallsign(): String
     fun setLastLotwSyncCallsign(callsign: String)

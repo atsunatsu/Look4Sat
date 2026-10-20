@@ -155,6 +155,37 @@ class LoTWGridSyncTest {
         assertEquals(emptyMap<String, List<GridQso>>(), mergeGridQsos(emptyMap(), emptyMap()))
     }
 
+    @Test
+    fun mergeCorrectedStationLocationReplacesPriorCopies() {
+        val old = qso("BA7ABC", 1000L).copy(
+            myGrid = "OL62", myGrids = setOf("OL62"),
+            stationKey = "old", theirGrids = listOf("PM95", "PM96")
+        )
+        val fixed = old.copy(
+            myGrid = "OL63", myGrids = setOf("OL63", "OL64"),
+            stationKey = "new", theirGrids = listOf("PM96")
+        )
+        val other = qso("BA7DEF", 2000L).copy(myGrid = "OL62")
+        val merged = mergeGridQsos(
+            mapOf("PM95" to listOf(old, other), "PM96" to listOf(old)),
+            mapOf("PM96" to listOf(fixed))
+        )
+        assertEquals(listOf(other), merged["PM95"])
+        assertEquals(listOf(fixed), merged["PM96"])
+    }
+
+    @Test
+    fun mergeKeepsOtherSatelliteAtSameCallAndTime() {
+        val old = qso("BA7ABC", 1000L)
+        val other = old.copy(satName = "SO-50")
+        val fixed = old.copy(myGrid = "OL63", myGrids = setOf("OL63"))
+        val merged = mergeGridQsos(
+            mapOf("PM95" to listOf(old, other)),
+            mapOf("PM95" to listOf(fixed))
+        )
+        assertEquals(listOf(other, fixed), merged["PM95"])
+    }
+
     // endregion
 
     // region applyLoTWGridResult
@@ -181,6 +212,46 @@ class LoTWGridSyncTest {
         assertEquals(setOf("OL62", "PM95"), repo.getRoamedGrids())
         assertEquals("2026-09-16 00:00:00", repo.getLastLotwSyncDate())
         assertEquals("BA7OPF", repo.getLastLotwSyncCallsign())
+    }
+
+    @Test
+    fun applyIncrementalCorrectsWorkedAndRoamedGrids() = runBlocking {
+        val old = qso("BA7ABC", 1000L).copy(
+            myGrid = "OL62", myGrids = setOf("OL62"), theirGrids = listOf("PM95")
+        )
+        val fixed = old.copy(
+            myGrid = "OL63", myGrids = setOf("OL63", "OL64"),
+            theirGrids = listOf("PM96")
+        )
+        val repo = FakeSettingsRepo().apply {
+            setWorkedGrids(setOf("PM95"))
+            setWorkedGridQsos(mapOf("PM95" to listOf(old)))
+            setRoamedGrids(setOf("OL62"))
+            setLastLotwSyncDate("2026-10-19 11:00:00")
+            setLastLotwQslCursor("2026-10-19 10:00:00")
+        }
+        val report = LoTWResult.Success(
+            setOf("PM96"), mapOf("PM96" to listOf(fixed)),
+            setOf("OL63", "OL64"), "2026-10-20 10:00:00"
+        )
+        applyLoTWGridResult(repo, report, LoTWSyncMode.Incremental, "BA7OPF", now)
+        assertEquals(setOf("PM96"), repo.getWorkedGrids())
+        assertEquals(setOf("PM96"), repo.getWorkedGridQsos().keys)
+        assertEquals(setOf("OL63", "OL64"), repo.getRoamedGrids())
+        assertEquals("2026-10-20 10:00:00", lotwIncrementalSince(repo))
+        assertEquals(lotwSyncCursor(now), repo.getLastLotwSyncDate())
+    }
+
+    @Test
+    fun emptyIncrementalPreservesQslCursor() = runBlocking {
+        val repo = FakeSettingsRepo().apply {
+            setLastLotwSyncDate("2026-10-19 11:00:00")
+            setLastLotwQslCursor("2026-10-19 10:00:00")
+        }
+        applyLoTWGridResult(repo, LoTWResult.Success(emptySet(), emptyMap()),
+            LoTWSyncMode.Incremental, "BA7OPF", now)
+        assertEquals("2026-10-19 10:00:00", repo.getLastLotwQslCursor())
+        assertEquals(lotwSyncCursor(now), repo.getLastLotwSyncDate())
     }
 
     @Test
@@ -257,6 +328,7 @@ class LoTWGridSyncTest {
         private var roamedGrids: Set<String> = emptySet()
         private var lastSyncDate: String = ""
         private var lastSyncCallsign: String = ""
+        private var lastQslCursor: String = ""
 
         override fun getWorkedGrids(): Set<String> = workedGrids
         override fun setWorkedGrids(grids: Set<String>) { workedGrids = grids }
@@ -271,6 +343,8 @@ class LoTWGridSyncTest {
         override fun getMarkedGridStations(): Map<String, List<MarkedStation>> = markedGridStations
         override fun setMarkedGridStations(stations: Map<String, List<MarkedStation>>) { markedGridStations = stations }
         override fun getLastLotwSyncDate(): String = lastSyncDate
+        override fun getLastLotwQslCursor(): String = lastQslCursor
+        override fun setLastLotwQslCursor(cursor: String) { lastQslCursor = cursor }
         override fun setLastLotwSyncDate(date: String) { lastSyncDate = date }
         override fun getLastLotwSyncCallsign(): String = lastSyncCallsign
         override fun setLastLotwSyncCallsign(callsign: String) { lastSyncCallsign = callsign }

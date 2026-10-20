@@ -37,6 +37,13 @@ class LoTWRepositoryTest {
         }
 
     @Test
+    fun parseQslUpdateWatermarkFromHeader() {
+        val body = "<ADIF_VERS:5>3.1.4\n<APP_LoTW_LASTQSL:19>2026-10-20 09:10:11\n<eoh>\n"
+        assertEquals("2026-10-20 09:10:11", repo.parseLastQslCursor(body))
+        assertNull(repo.parseLastQslCursor(report()))
+    }
+
+    @Test
     fun parseRejectsBodyWithoutEoh() {
         assertNull(repo.parseConfirmedGrids("<HTML>Username/password incorrect</HTML>"))
     }

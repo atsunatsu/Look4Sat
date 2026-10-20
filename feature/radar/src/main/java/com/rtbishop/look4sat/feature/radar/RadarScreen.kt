@@ -526,7 +526,11 @@ private fun RadarActionsMenu(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = onDismissRequest,
-            modifier = Modifier.width(220.dp)
+            modifier = Modifier.width(220.dp),
+            // Match the app's shared dialogs and cards instead of Material3's
+            // darker default popup surface and different corner radius.
+            shape = sheetDialogShape(),
+            containerColor = sheetDialogContainerColor()
         ) {
             Text(
                 text = stringResource(R.string.radar_tools_title),

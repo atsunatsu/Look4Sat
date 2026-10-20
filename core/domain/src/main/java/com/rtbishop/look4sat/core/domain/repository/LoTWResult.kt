@@ -26,7 +26,9 @@ sealed class LoTWResult {
         val qsos: Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>,
         /** Distinct 4-char gridsquares the account itself operated from
          *  (ADIF <MY_GRIDSQUARE>, satellite QSOs only) — "roamed/activated" grids. */
-        val roamedGrids: Set<String> = emptySet()
+        val roamedGrids: Set<String> = emptySet(),
+        /** Most recent server-side QSL update from APP_LoTW_LASTQSL (if any). */
+        val lastQslCursor: String? = null
     ) : LoTWResult()
 
     /** HTTP 200 but LoTW replied with its login-error page (bad callsign/password). */

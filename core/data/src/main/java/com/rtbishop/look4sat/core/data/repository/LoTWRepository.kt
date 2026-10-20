@@ -53,7 +53,7 @@ class LoTWRepository : ILoTWRepository {
             fetchReportBody(callsign, password, since = "", onProgress = {}).fold(
                 onSuccess = { body ->
                     parseBoth(body)?.let { (grids, _, roamed) ->
-                        LoTWResult.Success(grids, emptyMap(), roamed)
+                        LoTWResult.Success(grids, emptyMap(), roamed, parseLastQslCursor(body))
                     } ?: LoTWResult.RateLimited
                 },
                 onFailure = { toResult(it) }
@@ -69,7 +69,7 @@ class LoTWRepository : ILoTWRepository {
         fetchReportBody(callsign, password, since, onProgress).fold(
             onSuccess = { body ->
                 parseBoth(body)?.let { (grids, qsos, roamed) ->
-                    LoTWResult.Success(grids, qsos, roamed)
+                    LoTWResult.Success(grids, qsos, roamed, parseLastQslCursor(body))
                 } ?: LoTWResult.RateLimited
             },
             onFailure = { toResult(it) }
@@ -81,6 +81,17 @@ class LoTWRepository : ILoTWRepository {
         is RateLimitException -> LoTWResult.RateLimited
         is TimeoutException -> LoTWResult.Timeout
         else -> LoTWResult.NetworkError(e.message ?: e.javaClass.simpleName)
+    }
+
+    /** Latest QSL match/update time in the LoTW report header. */
+    internal fun parseLastQslCursor(body: String): String? {
+        val eoh = body.indexOf("<EOH>", ignoreCase = true)
+        if (eoh < 0) return null
+        val raw = body.substring(0, eoh).lineSequence()
+            .map(String::trim)
+            .firstOrNull { it.startsWith("<APP_LoTW_LASTQSL:", ignoreCase = true) }
+            ?.substringAfter('>')?.trim()
+        return raw?.takeIf { it.matches(Regex("""\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}""")) }
     }
 
     /** Single report fetch feeding the grid set, the per-QSO detail and the roamed set. */

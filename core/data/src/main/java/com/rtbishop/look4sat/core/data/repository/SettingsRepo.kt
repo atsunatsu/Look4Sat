@@ -380,12 +380,19 @@ class SettingsRepo(
     // report requests and to merge increments into the stored grid data.
     private val keyLastLotwSyncDate = "lotwLastSyncDate"
     private val keyLastLotwSyncCallsign = "lotwLastSyncCallsign"
+    private val keyLastLotwQslCursor = "lotwLastQslCursor"
 
     override fun getLastLotwSyncDate(): String =
         preferences.getString(keyLastLotwSyncDate, null).orEmpty()
 
     override fun setLastLotwSyncDate(date: String) =
         preferences.edit { putString(keyLastLotwSyncDate, date) }
+
+    override fun getLastLotwQslCursor(): String =
+        preferences.getString(keyLastLotwQslCursor, null).orEmpty()
+
+    override fun setLastLotwQslCursor(cursor: String) =
+        preferences.edit { putString(keyLastLotwQslCursor, cursor) }
 
     override fun getLastLotwSyncCallsign(): String =
         preferences.getString(keyLastLotwSyncCallsign, null).orEmpty()
