@@ -7,9 +7,21 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "upload action startup test" > smoke.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: smoke-test
-          path: smoke.txt
-          retention-days: 1
+      - name: Upload via toolkit library, without action references
+        run: |
+          set -euo pipefail
+          echo "artifact upload test" > smoke.txt
+          npm install --prefix "$RUNNER_TEMP/artifact-tool" --no-save --no-audit --no-fund @actions/artifact@2.3.2
+          export ARTIFACT_LIBRARY="$RUNNER_TEMP/artifact-tool/node_modules/@actions/artifact"
+          node <<'JS'
+          const {DefaultArtifactClient} = require(process.env.ARTIFACT_LIBRARY);
+          const path = require('path');
+          const file = path.resolve('smoke.txt');
+          new DefaultArtifactClient().uploadArtifact(
+            'smoke-' + process.env.GITHUB_RUN_NUMBER,
+            [file],
+            process.env.GITHUB_WORKSPACE,
+            {retentionDays:1}
+          ).then(result => console.log('Uploaded artifact', result.id))
+           .catch(error => {console.error(error); process.exitCode = 1});
+          JS
