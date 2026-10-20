@@ -7,4 +7,9 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "preview workflow startup test"
+      - run: echo "upload action startup test" > smoke.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test
+          path: smoke.txt
+          retention-days: 1
