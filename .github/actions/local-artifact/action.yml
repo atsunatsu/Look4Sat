@@ -1,0 +1,5 @@
+name: Local Actions Artifact Upload
+description: Upload a workflow artifact using the Actions artifact toolkit
+runs:
+  using: node20
+  main: index.js
