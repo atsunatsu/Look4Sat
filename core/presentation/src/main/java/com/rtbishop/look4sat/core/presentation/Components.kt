@@ -28,6 +28,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -137,19 +138,30 @@ fun RowScope.TimerRow(timeString: String, isTimeAos: Boolean) {
         colorScheme.onSurface to colorScheme.primary
     }
     ElevatedCard(modifier = Modifier.weight(1f)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Text(text = "AOS", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = aosColor)
-            Text(
-                text = timeString,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = colorScheme.primary
-            )
-            Text(text = "LOS", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = losColor)
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            // In landscape the timer often shares a row with the pass card and
+            // action buttons. Keep the clock readable before the AOS/LOS labels.
+            val showLabels = maxWidth >= 270.dp
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (showLabels) {
+                    Text(text = "AOS", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = aosColor)
+                }
+                Text(
+                    text = timeString,
+                    fontSize = if (showLabels) 32.sp else if (maxWidth >= 200.dp) 28.sp else 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (showLabels) {
+                    Text(text = "LOS", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = losColor)
+                }
+            }
         }
     }
 }
@@ -637,9 +649,11 @@ fun ScreenColumn(
     floatingBar: @Composable () -> Unit = {},
     content: @Composable (Boolean) -> Unit = {}
 ) {
-    val isVertical = isVerticalLayout()
     Surface(color = MaterialTheme.colorScheme.background) {
-        Box(modifier = Modifier.layoutPadding(), contentAlignment = Alignment.BottomCenter) {
+        BoxWithConstraints(modifier = Modifier.layoutPadding(), contentAlignment = Alignment.BottomCenter) {
+            // The space inside a navigation rail is narrower than the window size
+            // class. Use the actual screen content width when arranging page headers.
+            val isVertical = maxWidth < 600.dp
             Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.extraSmall)) {
                 topBar(isVertical)
                 Surface(
