@@ -460,4 +460,21 @@ class MutualViewModelTest {
         // 空结果会设置 "No mutual passes found" 提示, 这是正常行为而非筛选错误.
         assertTrue(state.mutualPasses.isEmpty())
     }
+    @Test
+    fun `swiping right focuses one satellite and swiping left clears the focus`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+        val vm = createVm(satellites = listOf(TestOrbits.ISS))
+
+        vm.onSelectPass(3)
+        vm.onFocusCatNum(TestOrbits.ISS.data.catnum)
+
+        assertEquals(TestOrbits.ISS.data.catnum, vm.uiState.value.focusedCatNum)
+        assertEquals("changing satellite focus collapses expanded pass", -1, vm.uiState.value.selectedPassIndex)
+
+        vm.onSelectPass(0)
+        vm.onClearFocus()
+
+        assertNull(vm.uiState.value.focusedCatNum)
+        assertEquals("clearing satellite focus collapses expanded pass", -1, vm.uiState.value.selectedPassIndex)
+    }
+
 }
