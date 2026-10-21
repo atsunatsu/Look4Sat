@@ -586,21 +586,42 @@ private fun MapScreen(
     Column(modifier = Modifier.layoutPadding(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val isVertical = isVerticalLayout()
         if (passWindow != null) {
-            TopBar {
-                IconCard(
-                    action = { previousPass?.let(onSwitchPass) },
-                    resId = R.drawable.ic_arrow,
-                    modifier = rotateMod,
-                    enabled = previousPass != null
-                )
-                TimerRow(timeString = timeString, isTimeAos = isTimeAos)
-                IconCard(
-                    action = { nextPass?.let(onSwitchPass) },
-                    resId = R.drawable.ic_arrow,
-                    enabled = nextPass != null
-                )
+            if (isVertical) {
+                TopBar {
+                    IconCard(
+                        action = { previousPass?.let(onSwitchPass) },
+                        resId = R.drawable.ic_arrow,
+                        modifier = rotateMod,
+                        enabled = previousPass != null
+                    )
+                    TimerRow(timeString = timeString, isTimeAos = isTimeAos)
+                    IconCard(
+                        action = { nextPass?.let(onSwitchPass) },
+                        resId = R.drawable.ic_arrow,
+                        enabled = nextPass != null
+                    )
+                }
+                TopBar { NextPassRow(pass = uiState.orbitalPass, isUtc = uiState.isUtc) }
+            } else {
+                // Keep the satellite pass map usable on a short landscape
+                // screen: put all header controls on one row to leave room
+                // for the actual map and its timeline.
+                TopBar {
+                    IconCard(
+                        action = { previousPass?.let(onSwitchPass) },
+                        resId = R.drawable.ic_arrow,
+                        modifier = rotateMod,
+                        enabled = previousPass != null
+                    )
+                    TimerRow(timeString = timeString, isTimeAos = isTimeAos)
+                    NextPassRow(pass = uiState.orbitalPass, isUtc = uiState.isUtc)
+                    IconCard(
+                        action = { nextPass?.let(onSwitchPass) },
+                        resId = R.drawable.ic_arrow,
+                        enabled = nextPass != null
+                    )
+                }
             }
-            TopBar { NextPassRow(pass = uiState.orbitalPass, isUtc = uiState.isUtc) }
         } else if (isGridMode) {
             // Grid mode: replace the satellite-selection top bar with the
             // award filter chips (All / DXCC / VUCC / WAPC / WAJA / WAIPA / WAZ / WAS).
