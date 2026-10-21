@@ -395,8 +395,6 @@ private fun MutualContent(
                 isExpanded = state.selectedPassIndex == index,
                 timeFormat = timeFormat,
                 isUtc = state.isUtc,
-                minElevA = state.stationAMinElev,
-                minElevB = state.stationBMinElev,
                 onClick = { onSelectPass(if (state.selectedPassIndex == index) -1 else index) },
                 onNavigateToRadar = { onNavigateToRadar(pass.catNum, pass.startTime, mutualData) }
             )
@@ -662,8 +660,6 @@ private fun MutualPassCard(
     isExpanded: Boolean,
     timeFormat: SimpleDateFormat,
     isUtc: Boolean,
-    minElevA: Double,
-    minElevB: Double,
     onClick: () -> Unit,
     onNavigateToRadar: () -> Unit
 ) {
@@ -671,15 +667,11 @@ private fun MutualPassCard(
     // are controlled by this single progress value for bidirectional drag sync.
     var dragProgress by remember(pass) { mutableFloatStateOf(0.5f) }
 
-    // Filter to only show the portion where both stations are above their minElev
-    val visibleSamples = remember(pass, minElevA, minElevB) {
-        pass.elevationSamples.filter { (_, elev) ->
-            elev.first >= minElevA && elev.second >= minElevB
-        }
-    }
-    val visibleTracks = remember(pass, minElevA, minElevB) {
-        pass.trackSamples.filter { it.elevationA >= minElevA && it.elevationB >= minElevB }
-    }
+    // Minimum-elevation sliders decide whether a pass qualifies for the result list,
+    // not how much of its curve or radar track is drawn. Keep the full above-horizon
+    // mutual-pass samples so both elevation curves remain visible down to 0°.
+    val visibleSamples = remember(pass) { pass.elevationSamples }
+    val visibleTracks = remember(pass) { pass.trackSamples }
     val visibleStart = visibleSamples.firstOrNull()?.first ?: pass.startTime
     val visibleEnd = visibleSamples.lastOrNull()?.first ?: pass.endTime
     val adjustedMaxElev = maxOf(
