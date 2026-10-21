@@ -412,13 +412,10 @@ class MutualViewModel(
             }
 
             val errorMsg = if (results.isEmpty()) {
-                // Debug: check if the main pass list is the culprit
-                val passCount = satelliteRepo.passes.value.size
-                val satCount = satellites.size
                 when {
-                    passCount == 0 -> "Pass list is empty. Select satellites from the list first."
-                    satCount == 0 -> "No satellites selected."
-                    else -> "No mutual passes found (${passCount} passes, ${satCount} satellites)."
+                    filteredSatellites.isEmpty() -> "No satellites match the selected transponder filters."
+                    filteredSatellites.size == 1 -> "No mutual passes found (1 satellite)."
+                    else -> "No mutual passes found (${filteredSatellites.size} satellites)."
                 }
             } else null
 
@@ -451,99 +448,21 @@ class MutualViewModel(
         minElevADeg: Double, minElevBDeg: Double,
         time: Long, hours: Int, hoursBefore: Int
     ): List<MutualPass> {
-        // 终点始终是 now + hoursAhead; 起点已由调用方下移 hoursBefore 小时,
-        // 因此这里的 endTime 要在起点之上补回 hoursBefore, 保证窗口 = [now-hb, now+h].
+        // The main Passes list is filtered by its own minimum elevation, AOS
+        // window and radio settings, and is calculated for the device location.
+        // Reusing it can silently omit mutual passes that satisfy the two
+        // station-specific elevation controls on this page. Search independently
+        // so Match results depend only on this page's inputs and satellite filter.
         val endTime = time + (hoursBefore + hours) * 60L * 60L * 1000L
         val sampleInterval = 5_000L
-
-        // Use the main page's pass list for AOS/LOS times, then sample the curves
-        // using the actual positions. The passes list is already computed by getLeoPass
-        // and its AOS/LOS times match the Passes page exactly.
-        // The satellites argument may be a subset (transponder-type filter), so
-        // only passes belonging to the filtered satellites are reused.
-        val allowedCatnums = satellites.map { it.data.catnum }.toSet()
-        val existingPasses = satelliteRepo.passes.value.filter { it.catNum in allowedCatnums }
-        val results = findMutualPassesFromList(existingPasses, satellites, posA, posB,
-            minElevADeg, minElevBDeg, time, endTime, sampleInterval)
-        if (results.isNotEmpty()) return results
-
-        // Fallback: try the independent search.
-        return findMutualPassesFallback(satellites, posA, posB,
-            minElevADeg, minElevBDeg, time, endTime, sampleInterval)
+        return findMutualPassesIndependently(
+            satellites, posA, posB, minElevADeg, minElevBDeg,
+            time, endTime, sampleInterval
+        )
     }
 
-    /** Reuse the main page's pass list. Uses AOS/LOS times directly (no refineEdge) */
-    private fun findMutualPassesFromList(
-        existingPasses: List<OrbitalPass>,
-        satellites: List<OrbitalObject>,
-        posA: GeoPos, posB: GeoPos,
-        minElevADeg: Double, minElevBDeg: Double,
-        time: Long, endTime: Long, sampleInterval: Long
-    ): List<MutualPass> {
-        val results = mutableListOf<MutualPass>()
-        for (pass in existingPasses) {
-            if (pass.losTime <= time || pass.aosTime >= endTime) continue
-            if (pass.isDeepSpace) continue
-            if (pass.orbitalObject.data.meanmo < 1e-8) continue
-
-            val sat = pass.orbitalObject
-            // Refine the AOS/LOS to the actual posA/posB (0° horizon).
-            // This ensures the elevation curve starts from ~0°.
-            val refinedAos = refineEdge(sat, posA, posB, pass.aosTime, 1_000L, goingUp = true)
-            val refinedLos = refineEdge(sat, posA, posB, pass.losTime, 1_000L, goingUp = false)
-            if (refinedLos <= refinedAos) continue
-
-            val samples = mutableListOf<Pair<Long, Pair<Double, Double>>>()
-            val tracks = mutableListOf<TrackSample>()
-            var maxElevA = 0.0
-            var maxElevB = 0.0
-
-            var tSample = refinedAos
-            while (tSample <= refinedLos) {
-                // Use getElevation (same function used by getLeoPass) for elevation,
-                // and getFullPosition only for azimuth.
-                val elevA = sat.getElevation(posA, tSample) * 180.0 / PI
-                val elevB = sat.getElevation(posB, tSample) * 180.0 / PI
-                val fullA = sat.getFullPosition(posA, tSample)
-                val fullB = sat.getFullPosition(posB, tSample)
-                if (elevA > maxElevA) maxElevA = elevA
-                if (elevB > maxElevB) maxElevB = elevB
-                samples.add(tSample to (elevA to elevB))
-                tracks.add(
-                    TrackSample(
-                        time = tSample,
-                        azimuthA = fullA.azimuth * 180.0 / PI,
-                        elevationA = elevA,
-                        azimuthB = fullB.azimuth * 180.0 / PI,
-                        elevationB = elevB
-                    )
-                )
-                tSample += sampleInterval
-            }
-
-            // Search uses the 0° horizon as the pass boundary, but the user sliders are
-            // a final visibility filter. Both stations must exceed their own threshold;
-            // otherwise the result would expand to an empty filtered chart.
-            if (maxElevA > minElevADeg && maxElevB > minElevBDeg) {
-                results.add(
-                    MutualPass(
-                        catNum = pass.catNum,
-                        name = pass.orbitalObject.data.name,
-                        startTime = refinedAos,
-                        endTime = refinedLos,
-                        maxElevationA = (maxElevA * 10).roundToInt() / 10.0,
-                        maxElevationB = (maxElevB * 10).roundToInt() / 10.0,
-                        elevationSamples = samples,
-                        trackSamples = tracks
-                    )
-                )
-            }
-        }
-        return results
-    }
-
-    /** Fallback: search passes independently (same logic as original findMutualPasses). */
-    private fun findMutualPassesFallback(
+    /** Independent pass search, unaffected by the main Passes page's filters. */
+    private fun findMutualPassesIndependently(
         satellites: List<OrbitalObject>,
         posA: GeoPos, posB: GeoPos,
         minElevADeg: Double, minElevBDeg: Double,
@@ -560,7 +479,10 @@ class MutualViewModel(
 
                 val refinedAos = refineEdge(sat, posA, posB, aos, 1_000L, true)
                 val refinedLos = refineEdge(sat, posA, posB, los, 1_000L, false)
-                if (refinedLos <= refinedAos) continue
+                if (refinedLos <= refinedAos) {
+                    searchStart = los + 120_000L
+                    continue
+                }
 
                 val mutualPass = sampleMutualPass(sat, posA, posB, refinedAos, refinedLos,
                     minElevADeg, minElevBDeg, sampleInterval)
@@ -669,15 +591,8 @@ class MutualViewModel(
         var t = startTime
         val step = 60_000L
 
-        // Skip an in-progress mutual window at the search start (same as getLeoPass):
-        // walk forward until either station drops below the horizon, then keep searching.
-        if (elevationDeg(sat, posA, t) > 0.0 && elevationDeg(sat, posB, t) > 0.0) {
-            while (t < endTime) {
-                if (elevationDeg(sat, posA, t) <= 0.0 || elevationDeg(sat, posB, t) <= 0.0) break
-                t += step
-            }
-        }
-
+        // If the search begins during a mutual pass, return that active window too.
+        // Its AOS may predate the query start, so look back far enough to recover it.
         while (t < endTime) {
             val elevA = elevationDeg(sat, posA, t)
             val elevB = elevationDeg(sat, posB, t)
@@ -685,7 +600,7 @@ class MutualViewModel(
             if (elevA > 0.0 && elevB > 0.0) {
                 var aos = t
                 var rew = t
-                while (rew > startTime - 600_000L) {
+                while (rew > startTime - 30 * 60_000L) {
                     val eA = elevationDeg(sat, posA, rew)
                     val eB = elevationDeg(sat, posB, rew)
                     if (eA <= 0.0 || eB <= 0.0) {

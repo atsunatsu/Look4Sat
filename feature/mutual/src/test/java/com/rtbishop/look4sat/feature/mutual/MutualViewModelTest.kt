@@ -49,13 +49,14 @@ class MutualViewModelTest {
     private fun TestScope.createVm(
         satellites: List<OrbitalObject> = emptyList(),
         passes: List<OrbitalPass> = emptyList(),
-        position: GeoPos = TestOrbits.GUANGZHOU
+        position: GeoPos = TestOrbits.GUANGZHOU,
+        nowMillis: () -> Long = { TestOrbits.FIXTURE_BASE }
     ): MutualViewModel = MutualViewModel(
         satelliteRepo = FakeSatelliteRepo(satellites, passes),
         settingsRepo = FakeSettingsRepo(position),
         computeDispatcher = StandardTestDispatcher(mainDispatcherRule.dispatcher.scheduler),
         // Pin the clock to the fixture base so results never depend on wall time.
-        nowMillis = { TestOrbits.FIXTURE_BASE }
+        nowMillis = nowMillis
     )
 
     private fun TestScope.queryAndSettle(vm: MutualViewModel) {
@@ -183,7 +184,7 @@ class MutualViewModelTest {
     }
 
     @Test
-    fun `query with everything empty reports empty pass list`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+    fun `query with thresholds above the maximum reports no mutual passes`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
         val vm = createVm(satellites = listOf(TestOrbits.ISS), passes = emptyList())
         vm.onStationBGrid("OL62")
         vm.onStationAMinElev(89.0)
@@ -194,13 +195,13 @@ class MutualViewModelTest {
 
         val state = vm.uiState.value
         assertFalse(state.isCalculating)
-        assertEquals("Pass list is empty. Select satellites from the list first.", state.errorMessage)
+        assertEquals("No mutual passes found (1 satellite).", state.errorMessage)
     }
 
     // --------------------------------------------------- query: happy path
 
     @Test
-    fun `query finds mutual passes reusing the main pass list`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+    fun `query finds mutual passes with independent pass search`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
         val windows = TestOrbits.findPassWindows(hoursAhead = 12)
         assertTrue("test fixture must produce ISS passes over Guangzhou", windows.isNotEmpty())
 
@@ -253,12 +254,69 @@ class MutualViewModelTest {
         }
     }
 
-    // -------------------------------------------------- query: fallback
+    @Test
+    fun `matching results ignore the main pass page elevation filter`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+        val allPasses = TestOrbits.findPassWindows(hoursAhead = 24)
+        assertTrue("fixture must produce several pass windows", allPasses.size >= 2)
+
+        // Simulate the main Passes page excluding low-peak-elevation windows.
+        val threshold = allPasses.map { it.maxElevation }.sorted()[allPasses.size / 2]
+        val filteredMainPasses = allPasses.filter { it.maxElevation > threshold }
+        assertTrue("elevation filter must retain some passes", filteredMainPasses.isNotEmpty())
+        assertTrue("elevation filter must remove some passes", filteredMainPasses.size < allPasses.size)
+
+        val allPassesVm = createVm(satellites = listOf(TestOrbits.ISS), passes = allPasses)
+        allPassesVm.onStationBGrid("OL62")
+        allPassesVm.onHoursAhead(24)
+        queryAndSettle(allPassesVm)
+
+        val filteredPassesVm = createVm(satellites = listOf(TestOrbits.ISS), passes = filteredMainPasses)
+        filteredPassesVm.onStationBGrid("OL62")
+        filteredPassesVm.onHoursAhead(24)
+        queryAndSettle(filteredPassesVm)
+
+        val allResults = allPassesVm.uiState.value.mutualPasses.map { it.startTime to it.endTime }
+        val filteredResults = filteredPassesVm.uiState.value.mutualPasses.map { it.startTime to it.endTime }
+
+        assertTrue("fixture must produce multiple mutual passes", allResults.size >= 2)
+        assertEquals(allResults, filteredResults)
+    }
 
     @Test
-    fun `query falls back to independent search when pass list is empty`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+    fun `query includes a mutual pass already in progress`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+        val stationB = GeoPos(23.0, 113.0) // center of grid OL62
+        val passWindows = TestOrbits.findPassWindows(hoursAhead = 24)
+        val activeTime = passWindows.asSequence()
+            .flatMap { pass ->
+                generateSequence(pass.aosTime + 60_000L) { it + 30_000L }
+                    .takeWhile { it < pass.losTime }
+            }
+            .first { time ->
+                TestOrbits.ISS.getElevation(TestOrbits.GUANGZHOU, time) > 0.0 &&
+                    TestOrbits.ISS.getElevation(stationB, time) > 0.0
+            }
+
+        val vm = createVm(
+            satellites = listOf(TestOrbits.ISS),
+            passes = emptyList(),
+            nowMillis = { activeTime }
+        )
+        vm.onStationBGrid("OL62")
+        vm.onHoursAhead(12)
+        queryAndSettle(vm)
+
+        assertTrue(
+            "an active mutual pass should remain in the results",
+            vm.uiState.value.mutualPasses.any { it.startTime < activeTime && it.endTime > activeTime }
+        )
+    }
+
+    // ---------------------------------------------- independent search
+
+    @Test
+    fun `query finds mutual passes when main pass list is empty`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
         // Two satellites (ISS + staggered variant) raise the odds of a window
-        // within the fallback horizon while keeping the search realistic.
+        // within the searched horizon while keeping the search realistic.
         val vm = createVm(
             satellites = listOf(TestOrbits.ISS, TestOrbits.ISS_VARIANT),
             passes = emptyList()
@@ -273,7 +331,7 @@ class MutualViewModelTest {
         assertTrue(state.hasSearched)
         // GZ + SZ are ~100km apart: a 12h ISS window must yield at least one mutual pass
         assertNull(state.errorMessage)
-        assertTrue("fallback should find mutual passes", state.mutualPasses.isNotEmpty())
+        assertTrue("independent search should find mutual passes", state.mutualPasses.isNotEmpty())
     }
 
     @Test
