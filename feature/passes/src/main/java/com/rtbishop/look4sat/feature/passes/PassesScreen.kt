@@ -177,8 +177,9 @@ private fun PassesScreen(
                 }
             )
         }
-    ) { _ ->
+    ) { isVertical ->
         PassesList(
+            isVerticalLayout = isVertical,
             isRefreshing = uiState.isRefreshing,
             isUtc = uiState.isUtc,
             passes = uiState.itemsList,
@@ -194,6 +195,7 @@ private fun PassesScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PassesList(
+    isVerticalLayout: Boolean,
     isRefreshing: Boolean,
     isUtc: Boolean,
     passes: List<OrbitalPass>,
@@ -203,7 +205,6 @@ private fun PassesList(
     navigateToRadar: (Int, Long) -> Unit,
     onAction: (PassesAction) -> Unit
 ) {
-    val isVerticalLayout = isVerticalLayout()
     val refreshState = rememberPullToRefreshState()
     ElevatedCard(modifier = Modifier.fillMaxSize()) {
         PullToRefreshBox(
