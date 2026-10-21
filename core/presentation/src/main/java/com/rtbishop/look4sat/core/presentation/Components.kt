@@ -185,6 +185,10 @@ fun RowScope.NextPassRow(pass: OrbitalPass, modifier: Modifier = Modifier, isUtc
             .height(48.dp)
             .weight(1f)
     ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // Share the header with the timer/actions in landscape without
+        // squeezing three equally weighted fields into unreadable fragments.
+        val compact = maxWidth < 320.dp
         Column(
             verticalArrangement = Arrangement.spacedBy((-2).dp),
             modifier = Modifier
@@ -226,20 +230,25 @@ fun RowScope.NextPassRow(pass: OrbitalPass, modifier: Modifier = Modifier, isUtc
                     fontSize = 15.sp,
                     modifier = Modifier.weight(1f)
                 )
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "${pass.altitude} km", fontSize = 15.sp)
+                if (!compact) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "${pass.altitude} km", fontSize = 15.sp)
+                    }
                 }
                 Text(
                     text = stringResource(R.string.pass_aosLos, pass.aosAzimuth.toInt(), pass.losAzimuth.toInt()),
-                    fontSize = 15.sp,
+                    fontSize = if (compact) 12.sp else 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.End,
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
         }
     }
 }
