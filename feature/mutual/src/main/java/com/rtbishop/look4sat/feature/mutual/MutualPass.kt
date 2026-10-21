@@ -57,3 +57,14 @@ internal fun nextUpcomingMutualPass(passes: List<MutualPass>, nowMs: Long): Mutu
     passes.asSequence()
         .filter { it.endTime > nowMs }
         .minByOrNull { it.startTime }
+
+/**
+ * Applies the optional swipe-to-focus filter while preserving each pass's index
+ * in the unfiltered result list (used to keep expanded-card selection stable).
+ */
+internal fun visibleMutualPasses(
+    passes: List<MutualPass>,
+    focusedCatNum: Int?
+): List<Pair<Int, MutualPass>> =
+    passes.mapIndexed { index, pass -> index to pass }
+        .filter { (_, pass) -> focusedCatNum == null || pass.catNum == focusedCatNum }
