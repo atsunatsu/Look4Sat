@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -430,14 +433,18 @@ private fun ReportDialog(
                 onDismiss = onDismissSubmitConfirmation
             )
         }
-        if (dayReports.isEmpty()) {
+        if (!upload.isExpanded && dayReports.isEmpty()) {
             Text(
                 text = stringResource(id = R.string.amsat_no_reports),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
-        } else {
-            LazyColumn(modifier = Modifier.heightIn(max = 480.dp)) {
+        } else if (!upload.isExpanded) {
+            LazyColumn(
+                modifier = Modifier.heightIn(
+                    max = minOf(480.dp, (LocalConfiguration.current.screenHeightDp * 0.56f).dp)
+                )
+            ) {
                 items(dayReports) { report ->
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -500,6 +507,8 @@ private fun AmSatUploadPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(max = minOf(480.dp, (LocalConfiguration.current.screenHeightDp * 0.62f).dp))
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
