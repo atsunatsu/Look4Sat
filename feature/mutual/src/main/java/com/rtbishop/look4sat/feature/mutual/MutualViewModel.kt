@@ -71,6 +71,8 @@ data class MutualUiState(
     /** 转发器类型筛选: 只匹配搭载线性(USB/LSB/CW/SSB)转发器的卫星. 默认开启. */
     val filterLinear: Boolean = true,
     val mutualPasses: List<MutualPass> = emptyList(),
+    /** Optional satellite focus applied by swiping right on a result card. */
+    val focusedCatNum: Int? = null,
     val isCalculating: Boolean = false,
     val hasSearched: Boolean = false,
     val selectedPassIndex: Int = -1,
@@ -222,6 +224,16 @@ class MutualViewModel(
     fun onFilterFM(value: Boolean) = _uiState.update { it.copy(filterFM = value) }
     fun onFilterLinear(value: Boolean) = _uiState.update { it.copy(filterLinear = value) }
     fun onSelectPass(index: Int) = _uiState.update { it.copy(selectedPassIndex = index) }
+
+    /** Show only mutual passes for the swiped satellite. */
+    fun onFocusCatNum(catNum: Int) = _uiState.update {
+        it.copy(focusedCatNum = catNum, selectedPassIndex = -1)
+    }
+
+    /** Clear the satellite focus and show mutual passes for all satellites again. */
+    fun onClearFocus() = _uiState.update {
+        it.copy(focusedCatNum = null, selectedPassIndex = -1)
+    }
 
     /**
      * Run the existing two-station pass calculation from the radar overflow menu,
