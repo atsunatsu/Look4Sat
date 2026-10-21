@@ -415,7 +415,10 @@ private fun RadarScreen(
                     PagerCard(uiState, onAction, logViewModel, requestMicPermission, Modifier.weight(1f), onFixGrid = onFixGrid)
                 }
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     RadarCard(uiState, trackB, trackBPosition, Modifier.weight(1f))
                     PagerCard(uiState, onAction, logViewModel, requestMicPermission, Modifier.weight(1f), onFixGrid = onFixGrid)
                 }
