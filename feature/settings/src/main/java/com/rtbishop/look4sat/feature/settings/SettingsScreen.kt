@@ -497,8 +497,7 @@ private fun SettingsScreen(
                 }
             }
         }
-    ) { _ ->
-        val isVerticalLayout = isVerticalLayout()
+    ) { isVerticalLayout ->
         val wavelogMode = uiState.wavelogUploadSettings.isReady
         LazyVerticalGrid(
             columns = GridCells.Fixed(if (isVerticalLayout) 1 else 2),
@@ -794,11 +793,9 @@ private fun OtherCard(
     loTWEnabled: Boolean = true,
     onAction: (SettingsAction) -> Unit
 ) {
-    ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(420.dp) // 370dp + one switch row (light theme)
-    ) {
+    // Let the settings switches determine their own height. A fixed 420 dp
+    // panel wastes an entire landscape viewport and can clip larger text.
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
             Text(
                 text = stringResource(id = R.string.prefs_other_title),
