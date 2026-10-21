@@ -1,0 +1,45 @@
+name: Dispatch Look4Sat 4.4.8-ba7opf.16.1
+
+on:
+  push:
+    branches:
+      - 'release/dispatch-v4.4.8-ba7opf.16.1'
+    paths:
+      - '.github/workflows/dispatch-v4.4.8-ba7opf.16.1.yml'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch existing signed release workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: 61d5ab0996031a3c257c72c0af79e1e100b11071
+          RELEASE_NOTES: |
+            # Look4Sat v4.4.8-ba7opf.16.1
+
+            ## 中文
+            - 修复 CAT 未启用、电台未连接或尚未完成能力协商时仍显示远程电台控制按钮的问题。
+            - 根据设备实际支持的能力分别显示语音 PTT 和停止发射按钮，兼容仅支持 CW 或设置管理的设备。
+            - CAT 关闭时，CW 发送不可用，避免残留连接状态导致误操作。
+            - 在 v4.4.8-ba7opf.16 基础上更新，包含此前匹配页和地图等功能。
+
+            ## English
+            - Hide remote radio controls when CAT is disabled, the radio is disconnected, or capabilities are not yet negotiated.
+            - Show voice PTT and Stop TX only when supported; preserve CW-only and settings-only devices.
+            - Disable CW sending when CAT is off, even with stale connected state.
+            - Includes previous v4.4.8-ba7opf.16 changes.
+        run: |
+          set -euo pipefail
+          current="$(gh api repos/atsunatsu/Look4Sat/branches/main --jq '.commit.sha')"
+          if [ "$current" != "$EXPECTED_MAIN_SHA" ]; then
+            echo "::error::Main moved; refusing to dispatch release against a different commit."
+            exit 1
+          fi
+          gh workflow run publish-release.yml --repo atsunatsu/Look4Sat --ref main \
+            --field mode=release --field notes="$RELEASE_NOTES"
+          echo "Official release workflow dispatched from main $current"
