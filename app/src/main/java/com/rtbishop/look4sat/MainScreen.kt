@@ -83,7 +83,6 @@ import com.rtbishop.look4sat.core.presentation.RadarDestination
 import com.rtbishop.look4sat.core.presentation.RadarPassMapDestination
 import com.rtbishop.look4sat.core.presentation.RadarMatchDestination
 import com.rtbishop.look4sat.core.presentation.Screen
-import com.rtbishop.look4sat.core.presentation.hasEnoughHeight
 import com.rtbishop.look4sat.core.presentation.hasEnoughWidth
 import com.rtbishop.look4sat.feature.gridfinder.GridFinderDestination
 import com.rtbishop.look4sat.feature.map.MapDestination
