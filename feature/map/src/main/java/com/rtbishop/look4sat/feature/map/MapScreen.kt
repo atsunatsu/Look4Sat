@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -86,6 +87,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -875,7 +877,7 @@ private fun WorkedGridQsoDialog(
         // Centered card, ~85% width, internal scroll for long lists.
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-            modifier = Modifier.fillMaxWidth(0.88f)
+            modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(0.88f)
         ) {
             Column {
                 // Header: grid + counts on the left, "Match" action on the right
@@ -924,7 +926,7 @@ private fun WorkedGridQsoDialog(
                 androidx.compose.material3.HorizontalDivider()
                 Column(
                     Modifier
-                        .heightIn(max = 380.dp)
+                        .heightIn(max = minOf(380.dp, (LocalConfiguration.current.screenHeightDp * 0.62f).dp))
                         .verticalScroll(rememberScrollState())
                 ) {
                     // Marked stations show first as red reminder rows: pale-yellow
@@ -1037,7 +1039,7 @@ private fun RegionQsoDialog(
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-            modifier = Modifier.fillMaxWidth(0.88f)
+            modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(0.88f)
         ) {
             Column {
                 Row(
@@ -1073,7 +1075,7 @@ private fun RegionQsoDialog(
                 androidx.compose.material3.HorizontalDivider()
                 Column(
                     Modifier
-                        .heightIn(max = 380.dp)
+                        .heightIn(max = minOf(380.dp, (LocalConfiguration.current.screenHeightDp * 0.62f).dp))
                         .verticalScroll(rememberScrollState())
                 ) {
                     if (qsos.isEmpty()) {
