@@ -186,69 +186,69 @@ fun RowScope.NextPassRow(pass: OrbitalPass, modifier: Modifier = Modifier, isUtc
             .weight(1f)
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        // Share the header with the timer/actions in landscape without
-        // squeezing three equally weighted fields into unreadable fragments.
-        val compact = maxWidth < 320.dp
-        Column(
-            verticalArrangement = Arrangement.spacedBy((-2).dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 6.dp, top = 1.dp, end = 6.dp, bottom = 0.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = pass.name,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 6.dp)
-                        .infiniteMarquee(),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                val elevColor = elevationColor(pass.maxElevation)
-                Icon(
-                    painter = painterResource(R.drawable.ic_elevation),
-                    contentDescription = null,
-                    tint = elevColor,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "${pass.maxElevation}°",
-                    color = elevColor
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
+            // In landscape the pass card shares a row with the timer and actions.
+            // Hide only the altitude on narrow cards to preserve time and azimuths.
+            val compact = maxWidth < 320.dp
+            Column(
+                verticalArrangement = Arrangement.spacedBy((-2).dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 6.dp, top = 1.dp, end = 6.dp, bottom = 0.dp)
             ) {
-                Text(
-                    text = sdfTime.format(Date(pass.aosTime)),
-                    fontSize = 15.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                if (!compact) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "${pass.altitude} km", fontSize = 15.sp)
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = pass.name,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 6.dp)
+                            .infiniteMarquee(),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    val elevColor = elevationColor(pass.maxElevation)
+                    Icon(
+                        painter = painterResource(R.drawable.ic_elevation),
+                        contentDescription = null,
+                        tint = elevColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${pass.maxElevation}°",
+                        color = elevColor
+                    )
                 }
-                Text(
-                    text = stringResource(R.string.pass_aosLos, pass.aosAzimuth.toInt(), pass.losAzimuth.toInt()),
-                    fontSize = if (compact) 12.sp else 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.weight(1f)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = sdfTime.format(Date(pass.aosTime)),
+                        fontSize = 15.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!compact) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "${pass.altitude} km", fontSize = 15.sp)
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.pass_aosLos, pass.aosAzimuth.toInt(), pass.losAzimuth.toInt()),
+                        fontSize = if (compact) 12.sp else 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
-        }
         }
     }
 }
