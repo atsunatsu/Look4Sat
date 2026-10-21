@@ -57,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -296,10 +297,12 @@ private fun Look4SatNavigationScaffold(
         navigationSuiteColors = NavigationSuiteDefaults.colors(
             navigationRailContainerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
+        // Six rail destinations cannot fit on a short landscape phone: the
+        // bottom entries become untappable. Reserve the rail for tall windows.
         layoutType = when {
-            !hasEnoughHeight() && hasEnoughWidth() -> NavigationSuiteType.NavigationRail
-            !hasEnoughWidth() -> NavigationSuiteType.ShortNavigationBarCompact
-            else -> NavigationSuiteType.ShortNavigationBarMedium
+            hasEnoughWidth() && LocalConfiguration.current.screenHeightDp >= 560 ->
+                NavigationSuiteType.NavigationRail
+            else -> NavigationSuiteType.ShortNavigationBarCompact
         }
     ) { content() }
 }
