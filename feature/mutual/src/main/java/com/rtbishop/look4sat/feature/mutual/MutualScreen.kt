@@ -246,8 +246,7 @@ private fun MutualContent(
     // the focus to show results for every satellite. Keep original indices so
     // expanding a pass still targets the correct item after filtering.
     val visiblePasses = remember(state.mutualPasses, state.focusedCatNum) {
-        state.mutualPasses.mapIndexed { index, pass -> index to pass }
-            .filter { (_, pass) -> state.focusedCatNum == null || pass.catNum == state.focusedCatNum }
+        visibleMutualPasses(state.mutualPasses, state.focusedCatNum)
     }
 
     LazyColumn(
