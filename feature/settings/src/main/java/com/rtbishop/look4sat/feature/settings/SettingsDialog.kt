@@ -384,12 +384,15 @@ fun LoTWDialog(
 ) {
     val call = rememberSaveable { mutableStateOf(initialSettings.callsign) }
     val pass = rememberSaveable { mutableStateOf(initialSettings.password) }
+    var showCancelSyncConfirm by rememberSaveable { mutableStateOf(false) }
     SharedDialog(
         title = stringResource(R.string.prefs_lotw_title),
         // Dismissing the sheet (outside tap or system Back) only hides the UI;
-        // the ViewModel-owned sync continues until it finishes or Cancel is clicked.
+        // the ViewModel-owned sync continues until the user confirms cancellation.
         onDismissRequest = dismiss,
-        onCancel = { if (isSyncing) onCancelSync() else dismiss() },
+        onCancel = {
+            if (isSyncing) showCancelSyncConfirm = true else dismiss()
+        },
         // The two sync buttons below are the primary actions: saving
         // credentials and fetching confirmed grids happen in one step.
         onAccept = null
@@ -485,6 +488,24 @@ fun LoTWDialog(
             )
         }
         Spacer(modifier = Modifier.height(0.dp))
+    }
+    if (showCancelSyncConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCancelSyncConfirm = false },
+            title = { Text(stringResource(R.string.lotw_sync_cancel_title)) },
+            text = { Text(stringResource(R.string.lotw_sync_cancel_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCancelSyncConfirm = false
+                    onCancelSync()
+                }) { Text(stringResource(R.string.btn_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelSyncConfirm = false }) {
+                    Text(stringResource(R.string.btn_cancel))
+                }
+            }
+        )
     }
 }
 
