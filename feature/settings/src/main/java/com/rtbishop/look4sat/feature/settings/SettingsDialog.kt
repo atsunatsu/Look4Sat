@@ -100,6 +100,9 @@ import com.rtbishop.look4sat.core.presentation.LocalSpacing
 import com.rtbishop.look4sat.core.presentation.MainTheme
 import com.rtbishop.look4sat.core.presentation.R
 import com.rtbishop.look4sat.core.presentation.SharedDialog
+import com.rtbishop.look4sat.core.presentation.SheetDialogTitle
+import com.rtbishop.look4sat.core.presentation.sheetDialogContainerColor
+import com.rtbishop.look4sat.core.presentation.sheetDialogShape
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -495,7 +498,9 @@ fun LoTWDialog(
     if (showCancelSyncConfirm) {
         AlertDialog(
             onDismissRequest = { showCancelSyncConfirm = false },
-            title = { Text(stringResource(R.string.lotw_sync_cancel_title)) },
+            shape = sheetDialogShape(),
+            containerColor = sheetDialogContainerColor(),
+            title = { SheetDialogTitle(stringResource(R.string.lotw_sync_cancel_title)) },
             text = { Text(stringResource(R.string.lotw_sync_cancel_message)) },
             confirmButton = {
                 TextButton(onClick = {
