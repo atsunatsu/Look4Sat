@@ -4,6 +4,7 @@
     <string name="app_name" translatable="false">Look4Sat-BA7OPF</string>
     <string name="btn_accept">Accept</string>
     <string name="btn_cancel">Cancel</string>
+    <string name="btn_confirm">Confirm</string>
     <string name="empty_list_message">No data to show</string>
 
     <!-- Navigation -->
@@ -251,6 +252,8 @@
     <string name="lotw_sync_progress_saving">Processing downloaded data…</string>
     <string name="lotw_sync_progress_count">Syncing %1$d QSOs…</string>
     <string name="lotw_sync_progress_qso">Syncing %1$d QSOs, ~%2$d s remaining</string>
+    <string name="lotw_sync_cancel_title">Cancel LoTW sync?</string>
+    <string name="lotw_sync_cancel_message">Canceling will stop this sync. The next sync will need to start from the beginning. Do you want to cancel?</string>
     <string name="prefs_locator_text">Set station\'s position using locator</string>
 
     <string name="btn_delete">Delete</string>
