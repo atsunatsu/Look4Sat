@@ -200,6 +200,7 @@
     <string name="prefs_wavelog_upload_rights_rw">密钥：读写 — 可上传</string>
     <string name="prefs_wavelog_upload_rights_r">密钥只读 — 请在 Wavelog → API 生成「读写」密钥</string>
     <string name="prefs_wavelog_upload_hint">点「获取站点」选择上传使用的台站档案；密钥需要「读写」权限。</string>
+    <string name="prefs_lotw_sync_title">LoTW 同步日志</string>
     <string name="prefs_lotw_title">LoTW 已确认网格</string>
     <string name="prefs_lotw_callsign">LoTW 呼号</string>
     <string name="prefs_lotw_password">LoTW 密码</string>
