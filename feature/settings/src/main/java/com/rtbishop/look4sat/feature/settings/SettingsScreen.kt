@@ -551,6 +551,8 @@ private fun SettingsScreen(
                     settings = uiState.lotwSettings,
                     workedGridsCount = uiState.workedGridsCount,
                     lastSyncEpochMs = uiState.lotwLastSyncEpochMs,
+                    isSyncing = uiState.lotwSyncing,
+                    syncProgress = uiState.lotwProgress,
                     enabled = !wavelogMode,
                     showLoTWDialog = { dialogs.lotw = true }
                 )
@@ -954,6 +956,8 @@ private fun LoTWCard(
     settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings,
     workedGridsCount: Int,
     lastSyncEpochMs: Long,
+    isSyncing: Boolean,
+    syncProgress: com.rtbishop.look4sat.core.domain.repository.LoTWProgress?,
     enabled: Boolean = true,
     showLoTWDialog: () -> Unit
 ) {
@@ -963,10 +967,20 @@ private fun LoTWCard(
                 .padding(horizontal = 8.dp, vertical = 4.dp)
                 .alpha(if (enabled) 1f else 0.5f)
         ) {
-            Text(
-                text = stringResource(id = R.string.prefs_lotw_title),
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(id = R.string.prefs_lotw_sync_title),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                // Keep the card indicator determinate even before byte counts arrive.
+                LinearProgressIndicator(
+                    progress = {
+                        if (isSyncing) (syncProgress?.fraction ?: 0f).coerceIn(0f, 1f) else 0f
+                    },
+                    drawStopIndicator = {},
+                    modifier = Modifier.weight(1f).padding(start = 6.dp)
+                )
+            }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = if (settings.isConfigured) {
