@@ -376,7 +376,7 @@ fun LoTWDialog(
     progress: com.rtbishop.look4sat.core.domain.repository.LoTWProgress?,
     message: String?,
     dismiss: () -> Unit,
-    /** Called on cancel/back while a sync is running: aborts the job. */
+    /** Called only after the user confirms cancellation of an active sync. */
     onCancelSync: () -> Unit,
     onSave: (com.rtbishop.look4sat.core.domain.model.LoTWSettings) -> Unit,
     onSyncFull: (com.rtbishop.look4sat.core.domain.model.LoTWSettings) -> Unit,
@@ -385,6 +385,9 @@ fun LoTWDialog(
     val call = rememberSaveable { mutableStateOf(initialSettings.callsign) }
     val pass = rememberSaveable { mutableStateOf(initialSettings.password) }
     var showCancelSyncConfirm by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(isSyncing) {
+        if (!isSyncing) showCancelSyncConfirm = false
+    }
     SharedDialog(
         title = stringResource(R.string.prefs_lotw_title),
         // Dismissing the sheet (outside tap or system Back) only hides the UI;
@@ -497,7 +500,7 @@ fun LoTWDialog(
             confirmButton = {
                 TextButton(onClick = {
                     showCancelSyncConfirm = false
-                    onCancelSync()
+                    if (isSyncing) onCancelSync()
                 }) { Text(stringResource(R.string.btn_confirm)) }
             },
             dismissButton = {
