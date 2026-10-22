@@ -386,9 +386,9 @@ fun LoTWDialog(
     val pass = rememberSaveable { mutableStateOf(initialSettings.password) }
     SharedDialog(
         title = stringResource(R.string.prefs_lotw_title),
-        // While syncing, cancel/back aborts the download instead of merely
-        // hiding the dialog — a full sync started by mistake must be stoppable.
-        onDismissRequest = { if (isSyncing) onCancelSync() else dismiss() },
+        // Dismissing the sheet (outside tap or system Back) only hides the UI;
+        // the ViewModel-owned sync continues until it finishes or Cancel is clicked.
+        onDismissRequest = dismiss,
         onCancel = { if (isSyncing) onCancelSync() else dismiss() },
         // The two sync buttons below are the primary actions: saving
         // credentials and fetching confirmed grids happen in one step.
