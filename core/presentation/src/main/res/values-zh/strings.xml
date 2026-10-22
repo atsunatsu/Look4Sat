@@ -3,6 +3,7 @@
     <!-- Commmon -->
     <string name="btn_accept">确定</string>
     <string name="btn_cancel">取消</string>
+    <string name="btn_confirm">确认</string>
     <string name="empty_list_message">没有数据可显示</string>
 
     <!-- Navigation -->
@@ -222,6 +223,8 @@
     <string name="lotw_sync_progress_saving">正在处理下载的数据…</string>
     <string name="lotw_sync_progress_count">本次同步 %1$d 条 QSO…</string>
     <string name="lotw_sync_progress_qso">本次同步 %1$d 条 QSO，预计还需 %2$d 秒</string>
+    <string name="lotw_sync_cancel_title">取消 LoTW 同步？</string>
+    <string name="lotw_sync_cancel_message">取消后，本次同步将停止。下次同步时需要从头开始。确定要取消吗？</string>
     <string name="prefs_locator_text">使用梅登黑德网格设置站点位置</string>
 
     <string name="btn_delete">删除</string>
