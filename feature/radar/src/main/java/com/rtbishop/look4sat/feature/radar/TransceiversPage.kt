@@ -111,6 +111,7 @@ import kotlin.time.Duration.Companion.milliseconds
 fun TransceiversPage(
     transceivers: List<SatRadio>,
     selectedUuid: String?,
+    favoriteUuids: Set<String> = emptySet(),
     radioControl: RadioControlSubState,
     onAction: (RadarAction) -> Unit,
     modifier: Modifier = Modifier
@@ -150,6 +151,10 @@ fun TransceiversPage(
                     radio = radio,
                     isExpanded = isExpanded,
                     radioControl = radioControl,
+                    isFavorite = radio.uuid in favoriteUuids,
+                    onToggleFavorite = {
+                        radio.catnum?.let { onAction(RadarAction.ToggleFavoriteTransponder(radio.uuid, it)) }
+                    },
                     onAction = onAction,
                     onToggle = { onAction(RadarAction.SelectTransmitter(radio.uuid)) }
                 )
@@ -282,6 +287,8 @@ private fun TransceiverItem(
     radio: SatRadio,
     isExpanded: Boolean,
     radioControl: RadioControlSubState,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     onAction: (RadarAction) -> Unit,
     onToggle: () -> Unit
 ) {
@@ -333,7 +340,25 @@ private fun TransceiverItem(
                         .weight(1f)
                         .infiniteMarquee()
                 )
-                // Right arrow slot — always reserved
+                // Toggle the satellite-specific favorite without expanding the row.
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onToggleFavorite() }
+                ) {
+                    Text(
+                        text = if (isFavorite) "★" else "☆",
+                        color = if (isFavorite) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 22.sp,
+                        lineHeight = 24.sp
+                    )
+                }
+                // Right radio icon slot
                 val iconTint = if (isExpanded) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.outlineVariant
                 Box(

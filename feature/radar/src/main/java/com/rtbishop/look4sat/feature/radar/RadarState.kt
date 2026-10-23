@@ -85,6 +85,7 @@ data class RadarState(
     val sunPosition: CelestialComputer.SunPosition? = null,
     val moonPosition: CelestialComputer.MoonPosition? = null,
     val transceivers: TransceiverSubState = TransceiverSubState(),
+    val favoriteTransponderUuids: Set<String> = emptySet(),
     val radioControl: RadioControlSubState = RadioControlSubState(),
     val sstv: SstvSubState = SstvSubState(),
     val cw: CwSubState = CwSubState(),
@@ -130,6 +131,7 @@ data class CwSubState(
 sealed interface RadarAction {
     data class AddToCalendar(val name: String, val aosTime: Long, val losTime: Long) : RadarAction
     data class SelectTransmitter(val uuid: String) : RadarAction
+    data class ToggleFavoriteTransponder(val uuid: String, val catnum: Int) : RadarAction
 
     // Radio control actions
     data class SetBaseFrequencies(val bases:com.rtbishop.look4sat.core.domain.repository.RadioBaseFrequencies):RadarAction

@@ -1157,6 +1157,32 @@ class SettingsRepo(
     }
     //endregion
 
+    //region # Per-satellite favorite transponders
+    private val keyFavoriteTransponders = "favoriteTransponders"
+
+    override fun getFavoriteTransponders(catnum: Int): List<String> {
+        val json = preferences.getString(keyFavoriteTransponders, "{}") ?: "{}"
+        return try {
+            val array = JSONObject(json).optJSONArray(catnum.toString()) ?: return emptyList()
+            (0 until array.length()).mapNotNull { index -> array.optString(index).takeIf { it.isNotBlank() } }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    override fun setFavoriteTransponders(catnum: Int, uuids: List<String>) {
+        val json = preferences.getString(keyFavoriteTransponders, "{}") ?: "{}"
+        val obj = try { JSONObject(json) } catch (_: Exception) { JSONObject() }
+        val normalized = uuids.filter { it.isNotBlank() }.distinct()
+        if (normalized.isEmpty()) {
+            obj.remove(catnum.toString())
+        } else {
+            obj.put(catnum.toString(), org.json.JSONArray(normalized))
+        }
+        preferences.edit { putString(keyFavoriteTransponders, obj.toString()) }
+    }
+    //endregion
+
     //region # AMSAT status report settings
     private val keyAmSatCallsign = "amSatCallsign"
 

@@ -106,6 +106,9 @@ interface ISettingsRepo {
     /** Last selected logbook mode (CW/SSB/FT4) for a satellite; empty when unset. */
     fun getSatelliteMode(catnum: Int): String
     fun setSatelliteMode(catnum: Int, mode: String)
+    /** Favorite transponder UUIDs for a satellite (NORAD catalog number). */
+    fun getFavoriteTransponders(catnum: Int): List<String> = emptyList()
+    fun setFavoriteTransponders(catnum: Int, uuids: List<String>) = Unit
     //endregion
 
     //region # AMSAT status report settings

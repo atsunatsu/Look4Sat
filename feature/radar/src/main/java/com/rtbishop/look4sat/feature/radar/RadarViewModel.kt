@@ -168,13 +168,16 @@ class RadarViewModel(
     private suspend fun loadPassData(pass: OrbitalPass): List<SatRadio> {
         _uiState.update { it.copy(currentPass = pass) }
         val allRadios = satelliteRepo.getRadiosWithId(pass.catNum)
+        val favorites = settingsRepo.getFavoriteTransponders(pass.catNum).toSet()
+        _uiState.update { it.copy(favoriteTransponderUuids = favorites) }
         transponders = allRadios.filter { it.downlinkLow != null }
-        if (allRadios.isNotEmpty()) {
-            val firstUuid = allRadios.first().uuid
+            .sortedWith(compareByDescending<SatRadio> { it.uuid in favorites })
+        val initialTransponder = transponders.firstOrNull()
+        if (initialTransponder != null) {
             _uiState.update {
-                it.copy(transceivers = it.transceivers.copy(selectedUuid = firstUuid))
+                it.copy(transceivers = it.transceivers.copy(selectedUuid = initialTransponder.uuid))
             }
-            transponders.find { it.uuid == firstUuid }?.let { trackingService.setTransponder(it) }
+            trackingService.setTransponder(initialTransponder)
         }
         if (!pass.isDeepSpace) {
             val track = satelliteRepo.getTrack(pass.orbitalObject, stationPos, pass.aosTime, pass.losTime)
@@ -266,6 +269,20 @@ class RadarViewModel(
         })return
         when (action) {
             is RadarAction.AddToCalendar -> addToCalendar(action.name, action.aosTime, action.losTime)
+            is RadarAction.ToggleFavoriteTransponder -> {
+                val pass = _uiState.value.currentPass ?: return
+                if (pass.catNum != action.catnum) return
+                val current = settingsRepo.getFavoriteTransponders(action.catnum).toMutableList()
+                if (action.uuid in current) current.remove(action.uuid) else current.add(action.uuid)
+                settingsRepo.setFavoriteTransponders(action.catnum, current)
+                val favorites = current.toSet()
+                _uiState.update { it.copy(favoriteTransponderUuids = favorites) }
+                transponders = transponders.sortedWith(compareByDescending<SatRadio> { it.uuid in favorites })
+                viewModelScope.launch {
+                    val radios = satelliteRepo.getRadiosWithId(pass.catNum)
+                    processRadios(radios, pass.orbitalObject, System.currentTimeMillis())
+                }
+            }
             is RadarAction.SelectTransmitter -> {
                 // Compute toggle state before the update so we don't read post-update value
                 val isTogglingOff = _uiState.value.transceivers.selectedUuid == action.uuid
@@ -427,7 +444,9 @@ class RadarViewModel(
     }
 
     private suspend fun processRadios(radios: List<SatRadio>, orbitalObject: OrbitalObject, time: Long) {
+        val favorites = _uiState.value.favoriteTransponderUuids
         val transmitters = satelliteRepo.getRadios(orbitalObject, stationPos, radios, time)
+            .sortedWith(compareByDescending<SatRadio> { it.uuid in favorites })
         _uiState.update { state ->
             val freq = if (state.transceivers.selectedUuid != null) {
                 val selectedRadio = transmitters.firstOrNull { it.uuid == state.transceivers.selectedUuid }
