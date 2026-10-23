@@ -443,7 +443,7 @@ private fun MapScreen(
     onNavigateBack: () -> Unit = {}
 ) {
     val uiState = if (gridPickerMode) {
-        sourceState.copy(isGridMode = true, showFirstCallLabels = false)
+        sourceState.copy(isGridMode = true)
     } else {
         sourceState
     }
@@ -471,7 +471,7 @@ private fun MapScreen(
     // survives page switches; defaults to VUCC only once per process (cold start).
     var selectedAward by mapFilterViewModel.selectedAward
     // The picker always uses ordinary Maidenhead grid cells without award overlays.
-    val activeAward = if (gridPickerMode) AwardType.VUCC else selectedAward
+    val activeAward = selectedAward
     // 台址名单: QSOs grouped by the 台址's GRID SET. A station location (台址)
     // can span several grids (MY_GRIDSQUARE + MY_VUCC_GRIDS), and QSOs whose
     // location covers the same grid set belong to the same 台址; groups with an
@@ -553,7 +553,7 @@ private fun MapScreen(
                 // tiny islands stay reachable while zoomed out (Tianditu tiles
                 // have no zoom cap, so "just zoom in" is not an answer).
                 val awardMode = activeAward?.takeIf { it != AwardType.VUCC }
-                if (awardMode != null) {
+                if (awardMode != null && !gridPickerMode) {
                     val overlay = mapView.overlays.getOrNull(OVERLAY_GRID) as? AwardBoundaryOverlay
                         ?: return false
                     val region = overlay.regionAt(p.latitude, p.longitude, mapView.zoomLevelDouble)
@@ -716,7 +716,7 @@ private fun MapScreen(
                             uiState.stationPosition,
                             centerOnStation = shouldCenter,
                             // 首通呼号标签只作用于 VUCC 视图(用户要求); "All"/其他奖状不过滤.
-                            showFirstCallLabels = !gridPickerMode && uiState.showFirstCallLabels && activeAward == AwardType.VUCC,
+                            showFirstCallLabels = uiState.showFirstCallLabels && activeAward == AwardType.VUCC,
                             firstCallsByGrid = firstCallsByGrid,
                             markedGrids = uiState.markedGrids
                         )
@@ -801,7 +801,7 @@ private fun MapScreen(
                 }
                 // Top-left: 台址 selector for VUCC counting (grid mode only).
                 // Shown whenever per-grid QSO data exists; empty selection means All.
-                if (!gridPickerMode && uiState.isGridMode && activeAward == AwardType.VUCC && stationGroups.isNotEmpty()) {
+                if (uiState.isGridMode && activeAward == AwardType.VUCC && stationGroups.isNotEmpty()) {
                     VuccGridSelector(
                         stations = stationGroups,
                         allCount = uiState.workedGrids.size,
