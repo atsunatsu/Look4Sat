@@ -14,7 +14,7 @@ name: Build Look4Sat APK
 # Local Gradle builds keep using the catalog unchanged. Most runs are manual; only the specific release commit has a guarded push trigger.
 
 on:
-  # One-shot v16.3 release automation; only the specific release commit runs on push.
+  # One-shot v16.4 release automation; only the specific release commit runs on push.
   push:
     branches: [main]
   workflow_dispatch:
@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   build:
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'release: v4.4.8-ba7opf.16.3') }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'release: v4.4.8-ba7opf.16.4') }}"
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -206,7 +206,7 @@ jobs:
           CODE: ${{ steps.version.outputs.code }}
           TAG: ${{ steps.version.outputs.tag }}
           ASSET: ${{ steps.version.outputs.asset }}
-          NOTES_IN: "${{ github.event_name == 'push' && 'v16.3: Added a dedicated Maidenhead grid picker to the Match page. The picker forces VUCC fills, preserves the saved station filter, hides Award and satellite/first-call toggles, fills the selected station grid and restores Match page scroll.' || inputs.notes }}"
+          NOTES_IN: "${{ github.event_name == 'push' && 'v16.4: LoTW log sync continues when the sync window is dismissed. Added a determinate sync progress indicator to Settings and a confirmation dialog before cancellation, warning that the next sync must start from the beginning.' || inputs.notes }}"
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
