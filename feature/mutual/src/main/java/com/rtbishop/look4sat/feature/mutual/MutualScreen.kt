@@ -333,7 +333,7 @@ private fun MutualContent(
                         onLatChange = onStationALat,
                         onLonChange = onStationALon,
                         onGridChange = onStationAGrid,
-                            onPickGrid = pickGridA,
+                        onPickGrid = pickGridA,
                         onMinElevChange = onStationAMinElev,
                         currentPositionAction = onUseCurrentPosition
                     )
@@ -350,7 +350,7 @@ private fun MutualContent(
                         onLatChange = onStationBLat,
                         onLonChange = onStationBLon,
                         onGridChange = onStationBGrid,
-                            onPickGrid = pickGridB,
+                        onPickGrid = pickGridB,
                         onMinElevChange = onStationBMinElev
                     )
                 } else {
@@ -371,7 +371,7 @@ private fun MutualContent(
                             onLatChange = onStationALat,
                             onLonChange = onStationALon,
                             onGridChange = onStationAGrid,
-                            onPickGrid = pickGridA,
+                        onPickGrid = pickGridA,
                             onMinElevChange = onStationAMinElev,
                             currentPositionAction = onUseCurrentPosition,
                             modifier = Modifier.weight(1f)
@@ -389,7 +389,7 @@ private fun MutualContent(
                             onLatChange = onStationBLat,
                             onLonChange = onStationBLon,
                             onGridChange = onStationBGrid,
-                            onPickGrid = pickGridB,
+                        onPickGrid = pickGridB,
                             onMinElevChange = onStationBMinElev,
                             modifier = Modifier.weight(1f)
                         )
