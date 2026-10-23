@@ -647,7 +647,7 @@ private fun MapScreen(
             }
         } else if (isGridMode) {
             // Grid mode: replace the satellite-selection top bar with the
-            // award filter chips (All / DXCC / VUCC / WAPC / WAJA / WAZ / WAS).
+            // award filter chips (All / DXCC / VUCC / WAPC / WAJA / WAIPA / WAZ / WAS).
             AwardChipsRow(
                 progress = awardProgress,
                 selected = selectedAward,
