@@ -470,8 +470,8 @@ private fun MapScreen(
     // Selected award filter. Lives in an Activity-scoped ViewModel so it
     // survives page switches; defaults to VUCC only once per process (cold start).
     var selectedAward by mapFilterViewModel.selectedAward
-    // The picker always uses ordinary Maidenhead grid cells without award overlays.
-    val activeAward = selectedAward
+    // Grid picking always shows the VUCC grid fill, while keeping the user's saved station selection.
+    val activeAward = if (gridPickerMode) AwardType.VUCC else selectedAward
     // 台址名单: QSOs grouped by the 台址's GRID SET. A station location (台址)
     // can span several grids (MY_GRIDSQUARE + MY_VUCC_GRIDS), and QSOs whose
     // location covers the same grid set belong to the same 台址; groups with an
