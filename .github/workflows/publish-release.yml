@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   build:
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'release: v4.4.8-ba7opf.16.4') }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.16.4')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
