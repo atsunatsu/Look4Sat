@@ -264,13 +264,31 @@ fun MapDestination(
     onMatchGrid: (String) -> Unit = {},
     // True while the map "Match" query is running (the page only navigates
     // once the query finished, so the match page opens with results ready).
-    matchCalculating: Boolean = false
+    matchCalculating: Boolean = false,
+    // Dedicated picker opened from the Match page's station grid field.
+    gridPickerMode: Boolean = false,
+    onPickGrid: (String) -> Unit = {},
+    onNavigateBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val container = (context.applicationContext as IContainerProvider).getMainContainer()
     val viewModel: MapViewModel = viewModel(factory = MapViewModel.factory(container))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val mapView = rememberMapViewWithLifecycle(mapFilterViewModel, restoreViewport = uiState.isGridMode)
+    val mapView = rememberMapViewWithLifecycle(
+        mapFilterViewModel,
+        restoreViewport = gridPickerMode || uiState.isGridMode
+    )
+    // The picker needs visible 4-character grid cells immediately; keep the
+    // last grid viewport when available, but never open below the grid-label zoom.
+    LaunchedEffect(gridPickerMode, mapView) {
+        if (gridPickerMode) {
+            mapView.post {
+                if (mapView.zoomLevelDouble < MaidenheadGridOverlay.GRID_ZOOM_SUB) {
+                    mapView.controller.setZoom(MaidenheadGridOverlay.GRID_ZOOM_SUB)
+                }
+            }
+        }
+    }
     // The VUCC station selector is saved in the existing SharedPreferences settings
     // store, so it survives page switches and a full app restart. Empty = All.
     var selectedStationIds by remember(container) {
@@ -285,9 +303,9 @@ fun MapDestination(
     // satellite mode intentionally keeps its original behavior (default center,
     // follow the selected satellite), so a satellite-mode exit must not
     // overwrite the last grid-mode viewport.
-    DisposableEffect(mapView, uiState.isGridMode) {
+    DisposableEffect(mapView, uiState.isGridMode, gridPickerMode) {
         onDispose {
-            if (uiState.isGridMode) {
+            if (gridPickerMode || uiState.isGridMode) {
                 mapFilterViewModel.saveMapViewState(
                     mapView.mapCenter.latitude,
                     mapView.mapCenter.longitude,
@@ -311,14 +329,17 @@ fun MapDestination(
         }
     }
     MapScreen(
-        uiState = uiState,
+        sourceState = uiState,
         onAction = viewModel::onAction,
         mapView = mapView,
         mapFilterViewModel = mapFilterViewModel,
         selectedStationIds = selectedStationIds,
         onSelectedStationIdsChange = updateSelectedStationIds,
         onMatchGrid = onMatchGrid,
-        matchCalculating = matchCalculating
+        matchCalculating = matchCalculating,
+        gridPickerMode = gridPickerMode,
+        onPickGrid = onPickGrid,
+        onNavigateBack = onNavigateBack
     )
 }
 
@@ -384,7 +405,7 @@ fun RadarPassMapScreenDestination(
         }
     }
     MapScreen(
-        uiState = uiState,
+        sourceState = uiState,
         onAction = viewModel::onAction,
         mapView = mapView,
         mapFilterViewModel = mapFilter,
@@ -403,7 +424,7 @@ fun RadarPassMapScreenDestination(
 
 @Composable
 private fun MapScreen(
-    uiState: MapState,
+    sourceState: MapState,
     onAction: (MapAction) -> Unit,
     mapView: MapView,
     mapFilterViewModel: MapFilterViewModel,
@@ -416,8 +437,16 @@ private fun MapScreen(
     nextPass: RadarPassMapDestination? = null,
     onSwitchPass: (RadarPassMapDestination) -> Unit = {},
     otherStationPosition: GeoPos? = null,
-    otherStationGrid: String? = null
+    otherStationGrid: String? = null,
+    gridPickerMode: Boolean = false,
+    onPickGrid: (String) -> Unit = {},
+    onNavigateBack: () -> Unit = {}
 ) {
+    val uiState = if (gridPickerMode) {
+        sourceState.copy(isGridMode = true, showFirstCallLabels = false)
+    } else {
+        sourceState
+    }
     val rotateMod = Modifier.rotate(180f)
     val timeString = uiState.mapData?.aosTime ?: "00:00:00"
     val isTimeAos = uiState.mapData?.isTimeAos ?: true
@@ -441,6 +470,8 @@ private fun MapScreen(
     // Selected award filter. Lives in an Activity-scoped ViewModel so it
     // survives page switches; defaults to VUCC only once per process (cold start).
     var selectedAward by mapFilterViewModel.selectedAward
+    // The picker always uses ordinary Maidenhead grid cells without award overlays.
+    val activeAward = if (gridPickerMode) AwardType.VUCC else selectedAward
     // 台址名单: QSOs grouped by the 台址's GRID SET. A station location (台址)
     // can span several grids (MY_GRIDSQUARE + MY_VUCC_GRIDS), and QSOs whose
     // location covers the same grid set belong to the same 台址; groups with an
@@ -512,7 +543,7 @@ private fun MapScreen(
     val restoredViewport = remember {
         isGridMode && mapFilterViewModel.mapCenterLat != null && mapFilterViewModel.mapZoom != null
     }
-    DisposableEffect(isGridMode, workedGrids) {
+    DisposableEffect(isGridMode, workedGrids, gridPickerMode, activeAward, onPickGrid) {
         val receiver = object : org.osmdroid.events.MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
                 if (!isGridMode || p == null) return false
@@ -521,7 +552,7 @@ private fun MapScreen(
                 // dialog. No zoom gate here — unlike the grid path below — so
                 // tiny islands stay reachable while zoomed out (Tianditu tiles
                 // have no zoom cap, so "just zoom in" is not an answer).
-                val awardMode = selectedAward?.takeIf { it != AwardType.VUCC }
+                val awardMode = activeAward?.takeIf { it != AwardType.VUCC }
                 if (awardMode != null) {
                     val overlay = mapView.overlays.getOrNull(OVERLAY_GRID) as? AwardBoundaryOverlay
                         ?: return false
@@ -537,7 +568,11 @@ private fun MapScreen(
                 val grid = gridOfPoint(p.latitude, p.longitude) ?: return false
                 // Every grid is tappable: worked grids show their confirmed QSOs,
                 // unworked grids open the same dialog with an empty list.
-                selectedGrid = grid
+                if (gridPickerMode) {
+                    onPickGrid(grid)
+                } else {
+                    selectedGrid = grid
+                }
                 return true
             }
 
@@ -601,9 +636,18 @@ private fun MapScreen(
                 )
             }
             TopBar { NextPassRow(pass = uiState.orbitalPass, isUtc = uiState.isUtc) }
+        } else if (gridPickerMode) {
+            TopBar {
+                IconCard(action = onNavigateBack, resId = R.drawable.ic_back)
+                Text(
+                    text = stringResource(R.string.mutual_pick_grid_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         } else if (isGridMode) {
             // Grid mode: replace the satellite-selection top bar with the
-            // award filter chips (All / DXCC / VUCC / WAPC / WAJA / WAIPA / WAZ / WAS).
+            // award filter chips (All / DXCC / VUCC / WAPC / WAJA / WAZ / WAS).
             AwardChipsRow(
                 progress = awardProgress,
                 selected = selectedAward,
@@ -649,7 +693,7 @@ private fun MapScreen(
                     }
                     // Award filter mode: show the selected award's regions with
                     // worked ones filled green; hide satellite layers like grid mode.
-                    val awardMode = selectedAward?.takeIf { it != AwardType.VUCC }
+                    val awardMode = activeAward?.takeIf { it != AwardType.VUCC }
                     if (uiState.isGridMode && awardMode != null) {
                         setAwardMode(
                             awardMode,
@@ -672,7 +716,7 @@ private fun MapScreen(
                             uiState.stationPosition,
                             centerOnStation = shouldCenter,
                             // 首通呼号标签只作用于 VUCC 视图(用户要求); "All"/其他奖状不过滤.
-                            showFirstCallLabels = uiState.showFirstCallLabels && selectedAward == AwardType.VUCC,
+                            showFirstCallLabels = !gridPickerMode && uiState.showFirstCallLabels && activeAward == AwardType.VUCC,
                             firstCallsByGrid = firstCallsByGrid,
                             markedGrids = uiState.markedGrids
                         )
@@ -757,7 +801,7 @@ private fun MapScreen(
                 }
                 // Top-left: 台址 selector for VUCC counting (grid mode only).
                 // Shown whenever per-grid QSO data exists; empty selection means All.
-                if (uiState.isGridMode && selectedAward == AwardType.VUCC && stationGroups.isNotEmpty()) {
+                if (!gridPickerMode && uiState.isGridMode && activeAward == AwardType.VUCC && stationGroups.isNotEmpty()) {
                     VuccGridSelector(
                         stations = stationGroups,
                         allCount = uiState.workedGrids.size,
@@ -777,12 +821,12 @@ private fun MapScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     horizontalAlignment = Alignment.End
                 ) {
-                    if (passWindow == null) GridModeToggle(
+                    if (passWindow == null && !gridPickerMode) GridModeToggle(
                         isGridMode = uiState.isGridMode,
                         onToggle = { onAction(MapAction.ToggleGridMode(it)) }
                     )
                     // 首通呼号开关仅 VUCC 视图显示(与 VuccGridSelector 同条件).
-                    if (uiState.isGridMode && selectedAward == AwardType.VUCC) {
+                    if (!gridPickerMode && uiState.isGridMode && activeAward == AwardType.VUCC) {
                         FirstCallToggle(
                             checked = uiState.showFirstCallLabels,
                             onToggle = { onAction(MapAction.ToggleFirstCallLabels(it)) }

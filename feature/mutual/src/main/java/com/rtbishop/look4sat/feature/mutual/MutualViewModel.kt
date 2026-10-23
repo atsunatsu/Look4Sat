@@ -86,7 +86,9 @@ data class MutualUiState(
     // pre-filled query to finish, then navigates to the match page so the very
     // first frame already contains the results (time-range card + pass curves,
     // no scroll flicker). consumePendingNavigation() clears it.
-    val pendingNavigation: Boolean = false
+    val pendingNavigation: Boolean = false,
+    /** Incremented when returning from the grid picker so the exact list viewport is restored. */
+    val scrollRestoreGeneration: Long = 0L
 )
 
 class MutualViewModel(
@@ -328,6 +330,11 @@ class MutualViewModel(
     fun consumeScrollToTimeRange() {
         android.util.Log.d(TAG, "consumeScrollToTimeRange")
         _uiState.update { it.copy(scrollToTimeRange = false) }
+    }
+
+    /** Request an explicit scroll restoration after the Match page returns from a picker. */
+    fun requestListScrollRestore() {
+        _uiState.update { it.copy(scrollRestoreGeneration = it.scrollRestoreGeneration + 1L) }
     }
 
     /**

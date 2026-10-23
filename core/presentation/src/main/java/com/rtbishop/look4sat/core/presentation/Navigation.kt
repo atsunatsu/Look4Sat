@@ -59,6 +59,10 @@ data class RadarMatchDestination(
 @Serializable
 data class RadarPassMapDestination(val catNum: Int, val aosTime: Long, val losTime: Long) : NavKey
 
+/** Grid picker opened from either station's grid field on the Match page. */
+@Serializable
+data class MatchGridPickerDestination(val stationA: Boolean) : NavKey
+
 /** Full-screen field tool: guides the operator onto a VUCC grid line or corner. */
 @Serializable
 data object GridFinderDestination : NavKey

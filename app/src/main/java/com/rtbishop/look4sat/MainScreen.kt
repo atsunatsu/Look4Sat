@@ -78,6 +78,7 @@ import com.rtbishop.look4sat.core.presentation.ElevationThresholds
 import com.rtbishop.look4sat.core.presentation.GridFinderDestination
 import com.rtbishop.look4sat.core.presentation.LocalElevationThresholds
 import com.rtbishop.look4sat.core.presentation.LoTWUploadDestination
+import com.rtbishop.look4sat.core.presentation.MatchGridPickerDestination
 import com.rtbishop.look4sat.core.presentation.RadarDestination
 import com.rtbishop.look4sat.core.presentation.RadarPassMapDestination
 import com.rtbishop.look4sat.core.presentation.RadarMatchDestination
@@ -314,7 +315,11 @@ fun MainScreen(
 ) {
     val backStack = rememberNavBackStack(Screen.Passes)
     val currentKey = backStack.lastOrNull()
-    val navigateBack: () -> Unit = { backStack.removeLastOrNull() }
+    val navigateBack: () -> Unit = {
+        val leavingGridPicker = backStack.lastOrNull() is MatchGridPickerDestination
+        backStack.removeLastOrNull()
+        if (leavingGridPicker) mutualViewModel.requestListScrollRestore()
+    }
     val fadeTransition = fadeIn(animationSpec = tween(350)) togetherWith fadeOut(animationSpec = tween(350))
     // Root-level dedicated map toolbar tabs target this nested main navigation.
     LaunchedEffect(requestedTab) {
@@ -369,8 +374,10 @@ fun MainScreen(
             selectedScreen = currentKey as? Screen,
             onSelectScreen = { screen ->
                 if (currentKey != screen) {
+                    val leavingGridPicker = backStack.lastOrNull() is MatchGridPickerDestination
                     while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                     if (screen !is Screen.Passes) backStack.add(screen)
+                    if (leavingGridPicker) mutualViewModel.requestListScrollRestore()
                 }
             }
         ) {
@@ -415,6 +422,18 @@ fun MainScreen(
                                 }
                             )
                         }
+                        entry<MatchGridPickerDestination> { picker ->
+                            MapDestination(
+                                mapFilterViewModel = mapFilterViewModel,
+                                gridPickerMode = true,
+                                onPickGrid = { grid ->
+                                    if (picker.stationA) mutualViewModel.onStationAGrid(grid)
+                                    else mutualViewModel.onStationBGrid(grid)
+                                    navigateBack()
+                                },
+                                onNavigateBack = navigateBack
+                            )
+                        }
                         entry<Screen.Mutual> {
                             MutualScreen(
                                 viewModel = mutualViewModel,
@@ -422,6 +441,9 @@ fun MainScreen(
                                     container.setMutualPassData(pass ?: MutualPassData())
                                     container.satelliteRepo.selectPass(catNum, aosTime)
                                     navigateToRadar()
+                                },
+                                onPickGrid = { stationA ->
+                                    backStack.add(MatchGridPickerDestination(stationA))
                                 }
                             )
                         }

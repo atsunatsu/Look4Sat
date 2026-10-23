@@ -431,6 +431,8 @@
     <string name="mutual_lon">经度</string>
     <string name="mutual_grid">网格</string>
     <string name="mutual_grid_hint">支持 4/6/8 位 Maidenhead 网格；也可直接输入经纬度</string>
+    <string name="mutual_pick_grid_on_map">在地图上选择网格</string>
+    <string name="mutual_pick_grid_title">选择网格</string>
     <string name="mutual_min_elevation">最小仰角：%d°</string>
     <string name="mutual_time_range">时间范围</string>
     <string name="mutual_filter_transponder">转发器</string>

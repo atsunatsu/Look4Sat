@@ -88,6 +88,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 fun MutualScreen(
     viewModel: MutualViewModel,
     navigateToRadar: (Int, Long, MutualPassData?) -> Unit = { _, _, _ -> },
+    onPickGrid: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -170,10 +171,12 @@ fun MutualScreen(
             onStationALat = viewModel::onStationALat,
             onStationALon = viewModel::onStationALon,
             onStationAGrid = viewModel::onStationAGrid,
+            onPickGridA = { onPickGrid(true) },
             onStationAMinElev = viewModel::onStationAMinElev,
             onStationBLat = viewModel::onStationBLat,
             onStationBLon = viewModel::onStationBLon,
             onStationBGrid = viewModel::onStationBGrid,
+            onPickGridB = { onPickGrid(false) },
             onStationBMinElev = viewModel::onStationBMinElev,
             onUseCurrentPosition = viewModel::onUseCurrentPosition,
             onHoursAhead = viewModel::onHoursAhead,
@@ -197,10 +200,12 @@ private fun MutualContent(
     onStationALat: (String) -> Unit,
     onStationALon: (String) -> Unit,
     onStationAGrid: (String) -> Unit,
+    onPickGridA: () -> Unit,
     onStationAMinElev: (Double) -> Unit,
     onStationBLat: (String) -> Unit,
     onStationBLon: (String) -> Unit,
     onStationBGrid: (String) -> Unit,
+    onPickGridB: () -> Unit,
     onStationBMinElev: (Double) -> Unit,
     onUseCurrentPosition: () -> Unit,
     onHoursAhead: (Int) -> Unit,
@@ -224,6 +229,21 @@ private fun MutualContent(
             firstVisibleItemScrollOffset = viewModel.listScrollOffset
         )
     }
+    // Save the exact viewport synchronously before the picker is pushed, rather
+    // than relying on snapshotFlow's next frame to persist a just-completed scroll.
+    val pickGridA: () -> Unit = {
+        viewModel.listScrollIndex = listState.firstVisibleItemIndex
+        viewModel.listScrollOffset = listState.firstVisibleItemScrollOffset
+        onPickGridA()
+    }
+    val pickGridB: () -> Unit = {
+        viewModel.listScrollIndex = listState.firstVisibleItemIndex
+        viewModel.listScrollOffset = listState.firstVisibleItemScrollOffset
+        onPickGridB()
+    }
+    val scrollRestoreTarget = remember(state.scrollRestoreGeneration) {
+        viewModel.listScrollIndex to viewModel.listScrollOffset
+    }
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .distinctUntilChanged()
@@ -240,6 +260,18 @@ private fun MutualContent(
     // page stays at the top). onGloballyPositioned fires on the first real
     // layout, so the subsequent scrollToItem always has a measured list.
     var listReady by remember { mutableStateOf(false) }
+    LaunchedEffect(state.scrollRestoreGeneration, listReady) {
+        if (state.scrollRestoreGeneration > 0L && listReady) {
+            val itemCount = listState.layoutInfo.totalItemsCount
+            if (itemCount > 0) {
+                val (index, offset) = scrollRestoreTarget
+                listState.scrollToItem(
+                    index.coerceIn(0, itemCount - 1),
+                    offset.coerceAtLeast(0)
+                )
+            }
+        }
+    }
     Log.d(TAG, "composed: scrollToTimeRange=${state.scrollToTimeRange} matchIndex=${if (state.errorMessage != null) 2 else 1} listReady=$listReady")
 
     // Match the Passes page's swipe behavior: focus one satellite or clear
@@ -301,6 +333,7 @@ private fun MutualContent(
                         onLatChange = onStationALat,
                         onLonChange = onStationALon,
                         onGridChange = onStationAGrid,
+                            onPickGrid = pickGridA,
                         onMinElevChange = onStationAMinElev,
                         currentPositionAction = onUseCurrentPosition
                     )
@@ -317,6 +350,7 @@ private fun MutualContent(
                         onLatChange = onStationBLat,
                         onLonChange = onStationBLon,
                         onGridChange = onStationBGrid,
+                            onPickGrid = pickGridB,
                         onMinElevChange = onStationBMinElev
                     )
                 } else {
@@ -337,6 +371,7 @@ private fun MutualContent(
                             onLatChange = onStationALat,
                             onLonChange = onStationALon,
                             onGridChange = onStationAGrid,
+                            onPickGrid = pickGridA,
                             onMinElevChange = onStationAMinElev,
                             currentPositionAction = onUseCurrentPosition,
                             modifier = Modifier.weight(1f)
@@ -354,6 +389,7 @@ private fun MutualContent(
                             onLatChange = onStationBLat,
                             onLonChange = onStationBLon,
                             onGridChange = onStationBGrid,
+                            onPickGrid = pickGridB,
                             onMinElevChange = onStationBMinElev,
                             modifier = Modifier.weight(1f)
                         )
@@ -523,6 +559,7 @@ private fun StationInputCard(
     onLatChange: (String) -> Unit,
     onLonChange: (String) -> Unit,
     onGridChange: (String) -> Unit,
+    onPickGrid: () -> Unit,
     onMinElevChange: (Double) -> Unit,
     modifier: Modifier = Modifier,
     currentPositionAction: (() -> Unit)? = null
@@ -580,6 +617,14 @@ private fun StationInputCard(
                 label = { Text(stringResource(R.string.mutual_grid)) },
                 placeholder = { Text(gridPlaceholder) },
                 supportingText = { Text(stringResource(R.string.mutual_grid_hint)) },
+                trailingIcon = {
+                    IconButton(onClick = onPickGrid) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_map),
+                            contentDescription = stringResource(R.string.mutual_pick_grid_on_map)
+                        )
+                    }
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )

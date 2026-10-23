@@ -459,6 +459,8 @@ Upstream: https://github.com/rt-bishop/Look4Sat</string>
     <string name="mutual_lon">Lon</string>
     <string name="mutual_grid">Grid</string>
     <string name="mutual_grid_hint">Supports 4/6/8-char Maidenhead grid; or enter lat/lon directly</string>
+    <string name="mutual_pick_grid_on_map">Choose grid on map</string>
+    <string name="mutual_pick_grid_title">Select a grid</string>
     <string name="mutual_min_elevation">Min elevation: %d°</string>
     <string name="mutual_time_range">Time range</string>
     <string name="mutual_filter_transponder">Transponders</string>
