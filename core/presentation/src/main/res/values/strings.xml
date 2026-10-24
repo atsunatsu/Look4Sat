@@ -108,7 +108,7 @@
     <string name="radar_match_grid_hint">4/6/8-character Maidenhead locator (e.g. OL62)</string>
     <string name="radar_match_grid_invalid">Enter a valid 4, 6 or 8-character Maidenhead locator.</string>
     <string name="radar_match_searching">Searching for a common satellite pass…</string>
-    <string name="radar_match_no_pass">No common pass found in the next 24 hours. Check the grid and selected satellites.</string>
+    <string name="radar_match_no_pass">No simultaneous visibility with the entered grid during this radar pass.</string>
     <string name="radar_az_text">Azimuth</string>
     <string name="radar_az_value" translatable="false">%.1f°</string>
     <string name="radar_el_text">Elevation</string>
