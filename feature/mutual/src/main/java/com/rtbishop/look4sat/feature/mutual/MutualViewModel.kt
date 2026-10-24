@@ -238,39 +238,49 @@ class MutualViewModel(
     }
 
     /**
-     * Run the existing two-station pass calculation from the radar overflow menu,
-     * then return the earliest mutual pass that is still active or upcoming.
-     * This does not request navigation to the Match tab.
+     * Match only the pass displayed on the originating radar, using its exact
+     * satellite and AOS–LOS interval. Never substitute the next available pass.
      */
     fun prepareRadarMatchFromGrid(
         grid: String,
+        radarPass: OrbitalPass,
         onComplete: (RadarMatchSelection?) -> Unit
     ) {
         val normalized = grid.trim().uppercase()
         val target = qthToPosition(normalized)
-        if (target == null) {
+        if (target == null || radarPass.losTime <= radarPass.aosTime) {
             onComplete(null)
             return
         }
         _uiState.update { state ->
-            val enableBothFilters = !state.filterFM && !state.filterLinear
             state.copy(
                 stationBGrid = normalized,
                 stationBLat = "%.4f".format(target.latitude),
                 stationBLon = "%.4f".format(target.longitude),
-                hoursAhead = 24,
                 pendingNavigation = false,
                 scrollToTimeRange = false,
-                filterFM = state.filterFM || enableBothFilters,
-                filterLinear = state.filterLinear || enableBothFilters
+                mutualPasses = emptyList(),
+                hasSearched = false,
+                selectedPassIndex = -1,
+                errorMessage = null
             )
         }
-        queryMutualPasses(onCompleted = { passes ->
-            val selected = nextUpcomingMutualPass(passes, nowMillis())
-            val selection = selected?.let { pass ->
+        val stationA = settingsRepo.stationPosition.value
+        viewModelScope.launch {
+            val matched = try {
+                withContext(computeDispatcher) {
+                    findRadarMutualPass(radarPass, stationA, target)
+                }
+            } catch (t: Throwable) {
+                android.util.Log.e(TAG, "Radar match calculation failed", t)
+                null
+            }
+            onComplete(matched?.let { pass ->
                 RadarMatchSelection(
-                    catNum = pass.catNum,
-                    aosTime = pass.startTime,
+                    catNum = radarPass.catNum,
+                    // selectPass() requires the radar's original AOS, not the later
+                    // time at which both stations first see the satellite.
+                    aosTime = radarPass.aosTime,
                     stationBGrid = normalized,
                     mutualPassData = MutualPassData(
                         samples = pass.elevationSamples,
@@ -293,9 +303,29 @@ class MutualViewModel(
                         stationBLongitude = target.longitude
                     )
                 )
-            }
-            onComplete(selection)
-        })
+            })
+        }
+    }
+
+    /** Compute simultaneous visibility strictly inside this radar pass. */
+    private fun findRadarMutualPass(
+        radarPass: OrbitalPass,
+        stationA: GeoPos,
+        stationB: GeoPos
+    ): MutualPass? {
+        val satellite = radarPass.orbitalObject
+        if (satellite.data.meanmo < 1e-8) return null
+        val (commonAos, commonLos) = radarMutualVisibilityWindow(
+            radarPass.aosTime,
+            radarPass.losTime
+        ) { time ->
+            elevationDeg(satellite, stationA, time) > 0.0 &&
+                elevationDeg(satellite, stationB, time) > 0.0
+        } ?: return null
+        return sampleMutualPass(
+            satellite, stationA, stationB, commonAos, commonLos,
+            minElevADeg = 0.0, minElevBDeg = 0.0, sampleInterval = 5_000L
+        )
     }
 
     /**
