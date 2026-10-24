@@ -71,6 +71,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
 import com.rtbishop.look4sat.core.domain.repository.IContainerProvider
 import com.rtbishop.look4sat.core.domain.repository.MutualPassData
 import com.rtbishop.look4sat.core.presentation.DeeplinkResolver
@@ -135,8 +136,8 @@ fun NavRoot(deeplink: String? = null) {
     }
     val navigateToGridFinder: () -> Unit = { rootBackStack.add(GridFinderDestination) }
     val navigateToLoTWStation: () -> Unit = { rootBackStack.add(LoTWUploadDestination) }
-    val startRadarMatch: (String, (Boolean) -> Unit) -> Unit = { grid, onComplete ->
-        mutualViewModel.prepareRadarMatchFromGrid(grid) { selection ->
+    val startRadarMatch: (String, OrbitalPass, (Boolean) -> Unit) -> Unit = { grid, radarPass, onComplete ->
+        mutualViewModel.prepareRadarMatchFromGrid(grid, radarPass) { selection ->
             if (selection == null) {
                 onComplete(false)
             } else {

@@ -52,11 +52,34 @@ data class TrackSample(
     val elevationB: Double
 )
 
-/** Earliest common pass that has not ended yet (currently active or upcoming). */
-internal fun nextUpcomingMutualPass(passes: List<MutualPass>, nowMs: Long): MutualPass? =
-    passes.asSequence()
-        .filter { it.endTime > nowMs }
-        .minByOrNull { it.startTime }
+/**
+ * Find the first continuous interval of simultaneous visibility within the
+ * radar page's selected pass. Sampling never crosses into a later pass.
+ */
+internal fun radarMutualVisibilityWindow(
+    radarAosTime: Long,
+    radarLosTime: Long,
+    bothVisibleAt: (Long) -> Boolean
+): Pair<Long, Long>? {
+    if (radarLosTime <= radarAosTime) return null
+    val interval = 5_000L
+    var firstVisible: Long? = null
+    var lastVisible: Long? = null
+    var time = radarAosTime
+    while (true) {
+        if (bothVisibleAt(time)) {
+            if (firstVisible == null) firstVisible = time
+            lastVisible = time
+        } else if (firstVisible != null) {
+            break
+        }
+        if (time >= radarLosTime) break
+        time = minOf(time + interval, radarLosTime)
+    }
+    val start = firstVisible ?: return null
+    val end = lastVisible ?: return null
+    return if (end > start) start to end else null
+}
 
 /**
  * Applies the optional swipe-to-focus filter while preserving each pass's index

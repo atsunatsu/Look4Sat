@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 import com.rtbishop.look4sat.core.domain.repository.IContainerProvider
@@ -200,7 +201,7 @@ fun RadarDestination(
     navigateToMap: () -> Unit = {},
     onOpenLoTWStation: () -> Unit = {},
     onOpenPassMap: (Int, Long, Long) -> Unit = { _, _, _ -> },
-    onStartMatch: (String, (Boolean) -> Unit) -> Unit = { _, complete -> complete(false) }
+    onStartMatch: (String, OrbitalPass, (Boolean) -> Unit) -> Unit = { _, _, complete -> complete(false) }
 ) {
     val context = LocalContext.current
     val container = (context.applicationContext as IContainerProvider).getMainContainer()
@@ -308,7 +309,7 @@ private fun RadarScreen(
     requestMicPermission: () -> Unit,
     onFixGrid: (List<String>) -> Unit,
     onOpenPassMap: (Int, Long, Long) -> Unit,
-    onStartMatch: (String, (Boolean) -> Unit) -> Unit
+    onStartMatch: (String, OrbitalPass, (Boolean) -> Unit) -> Unit
 ) {
     val upcomingPass = uiState.currentPass ?: getDefaultPass()
     // 日程功能: 把当前过境写入系统日历(原仓库的 addToCalendar, ic_calendar 按钮)
@@ -509,12 +510,15 @@ private fun RadarScreen(
                     enabled = !matchLoading,
                     onClick = {
                         val normalized = matchGrid.trim().uppercase()
+                        val radarPass = uiState.currentPass
                         if (qthToPosition(normalized) == null) {
                             matchError = context.getString(R.string.radar_match_grid_invalid)
+                        } else if (radarPass == null) {
+                            matchError = context.getString(R.string.radar_match_no_pass)
                         } else {
                             matchLoading = true
                             matchError = null
-                            onStartMatch(normalized) { success ->
+                            onStartMatch(normalized, radarPass) { success ->
                                 matchLoading = false
                                 if (success) {
                                     showMatchDialog = false
@@ -587,6 +591,7 @@ private fun RadarActionsMenu(
             RadarToolMenuItem(
                 iconRes = R.drawable.ic_radio_tower,
                 label = stringResource(R.string.radar_menu_match),
+                enabled = hasPass,
                 onClick = onMatch
             )
             RadarToolMenuItem(
