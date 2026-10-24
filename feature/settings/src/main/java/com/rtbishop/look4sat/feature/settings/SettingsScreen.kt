@@ -131,7 +131,8 @@ private fun SettingsScreen(
 ) {
     val foregroundStatus by LoTWForegroundSyncStatus.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val syncLauncher = context.applicationContext as? ILoTWForegroundSyncLauncher
+    // MainApplication owns the only LoTW sync path; no ViewModel fallback.
+    val syncLauncher = context.applicationContext as ILoTWForegroundSyncLauncher
     // Android 13+ requires notification permission for the progress item to
     // appear in the status bar. A denial must not cancel the data-sync job;
     // Android still exposes the foreground service via its task manager.
@@ -309,44 +310,28 @@ private fun SettingsScreen(
         )
     }
     if (dialogs.lotw) {
-        // LoTW sync failures are typed codes from the ViewModel; render them
-        // through string resources so the dialog follows the system language.
-        val lotwErrorMessage = uiState.lotwError?.let { error ->
-            when (error) {
-                LoTWError.NotConfigured -> stringResource(R.string.lotw_sync_error_not_configured)
-                LoTWError.BadCredentials -> stringResource(R.string.lotw_sync_error_credentials)
-                LoTWError.RateLimited -> stringResource(R.string.lotw_sync_error_rate_limited)
-                LoTWError.Timeout -> stringResource(R.string.lotw_sync_error_timeout)
-                is LoTWError.Network -> stringResource(R.string.lotw_sync_error_network, error.detail)
-            }
-        }
         LoTWDialog(
             initialSettings = uiState.lotwSettings,
             workedGridsCount = uiState.workedGridsCount,
-            isSyncing = uiState.lotwSyncing || foregroundStatus.running,
-            syncMode = foregroundStatus.mode ?: uiState.lotwSyncMode,
-            progress = foregroundStatus.progress ?: uiState.lotwProgress,
-            message = foregroundStatus.message ?: lotwErrorMessage,
+            isSyncing = foregroundStatus.running,
+            syncMode = foregroundStatus.mode,
+            progress = foregroundStatus.progress,
+            message = foregroundStatus.message,
             dismiss = { dialogs.lotw = false },
             onCancelSync = {
-                if (foregroundStatus.running) syncLauncher?.cancelManualLoTWSync()
-                else onAction(SettingsAction.CancelLoTWSync)
+                syncLauncher.cancelManualLoTWSync()
                 dialogs.lotw = false
             },
             onSave = { onAction(SettingsAction.UpdateLoTW(it)) },
             onSyncFull = {
-                if (syncLauncher != null) {
-                    if (!foregroundStatus.running) startWithNotificationConsent {
-                        syncLauncher.startManualLoTWSync(it, LoTWSyncMode.Full)
-                    }
-                } else onAction(SettingsAction.SyncLoTWGrids(it, LoTWSyncMode.Full))
+                if (!foregroundStatus.running) startWithNotificationConsent {
+                    syncLauncher.startManualLoTWSync(it, LoTWSyncMode.Full)
+                }
             },
             onSyncIncremental = {
-                if (syncLauncher != null) {
-                    if (!foregroundStatus.running) startWithNotificationConsent {
-                        syncLauncher.startManualLoTWSync(it, LoTWSyncMode.Incremental)
-                    }
-                } else onAction(SettingsAction.SyncLoTWGrids(it, LoTWSyncMode.Incremental))
+                if (!foregroundStatus.running) startWithNotificationConsent {
+                    syncLauncher.startManualLoTWSync(it, LoTWSyncMode.Incremental)
+                }
             }
         )
     }
@@ -588,8 +573,9 @@ private fun SettingsScreen(
                     settings = uiState.lotwSettings,
                     workedGridsCount = uiState.workedGridsCount,
                     lastSyncEpochMs = uiState.lotwLastSyncEpochMs,
-                    isSyncing = uiState.lotwSyncing,
-                    syncProgress = uiState.lotwProgress,
+                    // Both manual and automatic LoTW downloads use the foreground service.
+                    isSyncing = foregroundStatus.running,
+                    syncProgress = foregroundStatus.progress,
                     enabled = !wavelogMode,
                     showLoTWDialog = { dialogs.lotw = true }
                 )

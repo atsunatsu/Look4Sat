@@ -30,12 +30,7 @@ import com.rtbishop.look4sat.core.domain.repository.ISatelliteRepo
 import com.rtbishop.look4sat.core.domain.repository.ISensorsRepo
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.repository.IUpdateRepository
-import com.rtbishop.look4sat.core.domain.repository.LoTWResult
-import com.rtbishop.look4sat.core.domain.repository.LoTWSyncMode
-import com.rtbishop.look4sat.core.domain.repository.applyLoTWGridResult
-import com.rtbishop.look4sat.core.domain.repository.lotwIncrementalSince
 import com.rtbishop.look4sat.core.domain.repository.lotwCursorEpochMs
-import com.rtbishop.look4sat.core.domain.repository.resolveLoTWSyncMode
 import com.rtbishop.look4sat.core.domain.repository.positionWarning
 import com.rtbishop.look4sat.core.domain.repository.IWavelogUploadRepository
 import com.rtbishop.look4sat.core.domain.repository.IWavelogSyncRepository
@@ -52,7 +47,6 @@ import com.rtbishop.look4sat.core.domain.utility.VersionComparator
 import com.rtbishop.look4sat.core.domain.logbook.label
 import com.rtbishop.look4sat.core.domain.logbook.needsPreviewForConflicts
 import com.rtbishop.look4sat.core.domain.logbook.resubmitCandidates
-import com.rtbishop.look4sat.core.domain.logbook.toConfirmedRecord
 import com.rtbishop.look4sat.core.domain.logbook.unavailableUploadSummary
 import com.rtbishop.look4sat.core.domain.logbook.wavelogConfirmedSegment
 import com.rtbishop.look4sat.core.domain.logbook.wavelogIdleSegment
@@ -72,7 +66,6 @@ class SettingsViewModel(
     private val updateRepo: IUpdateRepository,
     private val wavelogSyncRepository: IWavelogSyncRepository,
     private val wavelogUploadRepository: IWavelogUploadRepository,
-    private val lotwRepo: com.rtbishop.look4sat.core.domain.repository.ILoTWRepository,
     private val qsoRepository: com.rtbishop.look4sat.core.domain.logbook.IQsoRepository,
     private val lotwUploadRepository: com.rtbishop.look4sat.core.domain.repository.ILoTWUploadRepository,
     private val satelliteRepo: ISatelliteRepo,
@@ -85,8 +78,6 @@ class SettingsViewModel(
 
     private val defaultPosSettings = PositionSettings(false, settingsRepo.stationPosition.value, 0)
     private val defaultDataSettings = DataSettings(false, 0, 0, 0L)
-    /** In-flight LoTW sync job, cancelled by CancelLoTWSync. */
-    private var lotwSyncJob: kotlinx.coroutines.Job? = null
     /** 指南针校准: 传感器原始方位(未加磁偏角/偏置), 校准对话框实时显示校正后航向. */
     private var rawCompassHeading = sensorsRepo.sensorData.value.first
     private val _uiState = MutableStateFlow(
@@ -268,8 +259,6 @@ class SettingsViewModel(
             is SettingsAction.SetLogbookStationFilter -> _uiState.update { it.copy(logbookStationFilter = action.stationId) }
             // LoTW confirmed grids
             is SettingsAction.UpdateLoTW -> settingsRepo.updateLoTWSettings(action.settings)
-            is SettingsAction.SyncLoTWGrids -> syncLoTWGrids(action.settings, action.mode)
-            SettingsAction.CancelLoTWSync -> cancelLoTWSync()
             // Logbook
             SettingsAction.RefreshLogbook -> refreshLogbook()
             is SettingsAction.DeleteLogbookRecord -> viewModelScope.launch { qsoRepository.delete(action.id) }
@@ -500,104 +489,6 @@ class SettingsViewModel(
         wavelogConfirmedSegment(outcome, preview)
     } catch (_: Exception) {
         wavelogTransportFailureSegment()
-    }
-
-    private fun syncLoTWGrids(
-        settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings,
-        mode: LoTWSyncMode
-    ) {
-        if (!settings.isConfigured) {
-            _uiState.update { it.copy(lotwError = LoTWError.NotConfigured) }
-            return
-        }
-        // Persist the credentials first, then sync with the freshly-typed values.
-        settingsRepo.updateLoTWSettings(settings)
-        // Incremental only makes sense for the same callsign as the last sync;
-        // a first sync, an unknown/empty record or a callsign change must fall
-        // back to a full report so no stale grids from another account linger.
-        val callsign = settings.callsign.trim().uppercase()
-        val effectiveMode = resolveLoTWSyncMode(settingsRepo.getLastLotwSyncCallsign(), callsign, mode)
-        val since = if (effectiveMode == LoTWSyncMode.Incremental) {
-            lotwIncrementalSince(settingsRepo)
-        } else ""
-        _uiState.update {
-            it.copy(lotwSyncing = true, lotwSyncMode = effectiveMode, lotwProgress = null, lotwError = null)
-        }
-        lotwSyncJob = viewModelScope.launch {
-            val result = lotwRepo.fetchConfirmedGridQsos(callsign, settings.password, since) { progress ->
-                _uiState.update { it.copy(lotwProgress = progress) }
-            }
-            when (result) {
-                is LoTWResult.Success -> {
-                    // Incremental: merge new grids/QSOs into the stored set (dedup
-                    // by call + QSO time); full: the fresh report replaces it all.
-                    // Shared with the automatic sync on app start (MainApplication).
-                    // Import before advancing the cursor; do not clear existing
-                    // downloaded rows on HTTP failure, parsing error or DB failure.
-                    val confirmed = result.qsos.values.flatten()
-                        .map { it.toConfirmedRecord(callsign) }
-                    try {
-                        qsoRepository.mergeLoTW(
-                            confirmed, callsign,
-                            replaceExisting = effectiveMode == LoTWSyncMode.Full
-                        )
-                    } catch (cancel: kotlinx.coroutines.CancellationException) {
-                        throw cancel
-                    } catch (error: Exception) {
-                        // Do not advance the LoTW cursor or claim success if the
-                        // transaction failed. The old download is still intact.
-                        _uiState.update { it.copy(
-                            lotwSyncing = false, lotwSyncMode = null, lotwProgress = null,
-                            lotwError = LoTWError.Network(error.message ?: "Logbook transaction failed")
-                        ) }
-                        return@launch
-                    }
-                    val mergedGridsCount = applyLoTWGridResult(settingsRepo, result, effectiveMode, callsign)
-                    _uiState.update { state ->
-                        state.copy(
-                            lotwSyncing = false, lotwSyncMode = null, lotwProgress = null,
-                            workedGridsCount = mergedGridsCount, lotwError = null,
-                            lotwLastSyncEpochMs = lotwCursorEpochMs(settingsRepo.getLastLotwSyncDate())
-                        )
-                    }
-                }
-                is LoTWResult.BadCredentials ->
-                    _uiState.update { state ->
-                        state.copy(
-                            lotwSyncing = false, lotwSyncMode = null, lotwProgress = null,
-                            lotwError = LoTWError.BadCredentials
-                        )
-                    }
-                is LoTWResult.RateLimited ->
-                    _uiState.update { state ->
-                        state.copy(
-                            lotwSyncing = false, lotwSyncMode = null, lotwProgress = null,
-                            lotwError = LoTWError.RateLimited
-                        )
-                    }
-                is LoTWResult.Timeout ->
-                    _uiState.update { state ->
-                        state.copy(
-                            lotwSyncing = false, lotwSyncMode = null, lotwProgress = null,
-                            lotwError = LoTWError.Timeout
-                        )
-                    }
-                is LoTWResult.NetworkError ->
-                    _uiState.update { state ->
-                        state.copy(
-                            lotwSyncing = false, lotwSyncMode = null, lotwProgress = null,
-                            lotwError = LoTWError.Network(result.detail)
-                        )
-                    }
-            }
-        }
-    }
-
-    /** Abort the in-flight LoTW sync job and reset its progress state. */
-    private fun cancelLoTWSync() {
-        lotwSyncJob?.cancel()
-        lotwSyncJob = null
-        _uiState.update { it.copy(lotwSyncing = false, lotwSyncMode = null, lotwProgress = null) }
     }
 
     // endregion
@@ -1091,7 +982,6 @@ class SettingsViewModel(
                     updateRepo = container.updateRepo,
                     wavelogSyncRepository = container.wavelogSyncRepository,
                     wavelogUploadRepository = container.wavelogUploadRepository,
-                    lotwRepo = container.lotwRepo,
                     qsoRepository = container.qsoRepository,
                     lotwUploadRepository = container.lotwUploadRepository,
                     satelliteRepo = container.satelliteRepo,

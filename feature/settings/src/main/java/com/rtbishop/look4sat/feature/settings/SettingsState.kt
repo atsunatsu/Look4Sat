@@ -25,7 +25,6 @@ import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 import com.rtbishop.look4sat.core.domain.model.WavelogUploadSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.repository.CompassAccuracy
-import com.rtbishop.look4sat.core.domain.repository.LoTWSyncMode
 import java.io.File
 
 data class PositionSettings(
@@ -80,10 +79,6 @@ data class SettingsState(
     /** Wavelog-mode logbook upload: prepared batch awaiting confirmation. */
     val logbookWavelogPreview: com.rtbishop.look4sat.core.domain.repository.WavelogUploadPreview? = null,
     val lotwSettings: com.rtbishop.look4sat.core.domain.model.LoTWSettings = com.rtbishop.look4sat.core.domain.model.LoTWSettings(),
-    val lotwSyncing: Boolean = false,
-    val lotwSyncMode: LoTWSyncMode? = null,
-    val lotwProgress: com.rtbishop.look4sat.core.domain.repository.LoTWProgress? = null,
-    val lotwError: LoTWError? = null,
     /** Epoch ms of the last successful LoTW sync (0 = never) — shown like the ephemeris update time. */
     val lotwLastSyncEpochMs: Long = 0L,
     /** Logbook (QSO records + LoTW confirmations), newest first. */
@@ -119,15 +114,6 @@ data class SettingsState(
     val compassHeadingDegrees: Float = 0f,
     val updateChecker: UpdateCheckerState = UpdateCheckerState()
 )
-
-/** LoTW sync failure, kept as a translatable code until the UI renders it. */
-sealed interface LoTWError {
-    data object NotConfigured : LoTWError
-    data object BadCredentials : LoTWError
-    data object RateLimited : LoTWError
-    data object Timeout : LoTWError
-    data class Network(val detail: String) : LoTWError
-}
 
 enum class LoTWUploadError { PASSWORD, INVALID_FILE, EXPIRED, FORMAT, UNKNOWN }
 
@@ -184,12 +170,6 @@ sealed interface SettingsAction {
 
     // LoTW confirmed grids
     data class UpdateLoTW(val settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings) : SettingsAction
-    data class SyncLoTWGrids(
-        val settings: com.rtbishop.look4sat.core.domain.model.LoTWSettings,
-        val mode: LoTWSyncMode
-    ) : SettingsAction
-    /** Abort an in-flight LoTW sync (wrong button / changed mind). */
-    data object CancelLoTWSync : SettingsAction
 
     // Logbook (QSO records + LoTW confirmations)
     data object RefreshLogbook : SettingsAction
