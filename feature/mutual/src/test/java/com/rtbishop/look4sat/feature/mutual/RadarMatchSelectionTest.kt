@@ -5,29 +5,33 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class RadarMatchSelectionTest {
-    private fun pass(start: Long, end: Long) = MutualPass(
-        catNum = 100,
-        name = "SO-50",
-        startTime = start,
-        endTime = end,
-        maxElevationA = 40.0,
-        maxElevationB = 35.0,
-        elevationSamples = emptyList()
-    )
-
     @Test
-    fun selectsEarliestPassThatHasNotEnded() {
-        val passes = listOf(pass(100, 200), pass(900, 1_100), pass(1_200, 1_400))
-        assertEquals(900L, nextUpcomingMutualPass(passes, nowMs = 1_000L)?.startTime)
+    fun selectsOnlySimultaneousVisibilityInsideDisplayedRadarPass() {
+        val window = radarMutualVisibilityWindow(100_000L, 300_000L) { time ->
+            time in 180_000L..220_000L
+        }
+        assertEquals(180_000L to 220_000L, window)
     }
 
     @Test
-    fun skipsEndedPassesAndReturnsNullWhenAllHaveEnded() {
-        assertNull(nextUpcomingMutualPass(listOf(pass(100, 200), pass(300, 400)), nowMs = 500L))
+    fun doesNotSwitchToUpcomingPassOnTheSameSatellite() {
+        val window = radarMutualVisibilityWindow(100_000L, 200_000L) { time ->
+            time in 250_000L..300_000L
+        }
+        assertNull(window)
     }
 
     @Test
-    fun emptyResultHasNoSelection() {
-        assertNull(nextUpcomingMutualPass(emptyList(), nowMs = 0L))
+    fun clipsCommonVisibilityToRadarPassBounds() {
+        val window = radarMutualVisibilityWindow(100_000L, 150_000L) { time ->
+            time >= 120_000L
+        }
+        assertEquals(120_000L to 150_000L, window)
+    }
+
+    @Test
+    fun returnsNullWhenThereIsNoCommonVisibility() {
+        assertNull(radarMutualVisibilityWindow(100_000L, 200_000L) { false })
+        assertNull(radarMutualVisibilityWindow(200_000L, 100_000L) { true })
     }
 }
