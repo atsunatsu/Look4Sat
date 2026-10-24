@@ -96,7 +96,7 @@
     <string name="radar_match_grid_hint">输入 4/6/8 位 Maidenhead 网格，例如 OL62</string>
     <string name="radar_match_grid_invalid">请输入有效的 4、6 或 8 位 Maidenhead 网格。</string>
     <string name="radar_match_searching">正在查找双方共同可见的卫星过境…</string>
-    <string name="radar_match_no_pass">未来 24 小时没有找到双方共同可见的过境，请检查网格和已选择的卫星。</string>
+    <string name="radar_match_no_pass">此雷达页显示的过境期间，与输入网格没有共同可见时段。</string>
     <string name="radar_notify">通知</string>
     <string name="radar_az_text">方位角</string>
     <string name="radar_el_text">仰角</string>
