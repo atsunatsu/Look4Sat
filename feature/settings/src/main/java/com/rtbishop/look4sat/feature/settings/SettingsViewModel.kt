@@ -618,7 +618,13 @@ class SettingsViewModel(
             val msg = when (result) {
                 is com.rtbishop.look4sat.core.domain.repository.LoTWUploadResult.Accepted -> "Uploaded ${result.count} QSO(s) — accepted by LoTW"
                 is com.rtbishop.look4sat.core.domain.repository.LoTWUploadResult.Rejected -> "Rejected: ${result.message}"
-                com.rtbishop.look4sat.core.domain.repository.LoTWUploadResult.Unknown -> "Unknown result — will not auto-retry"
+                is com.rtbishop.look4sat.core.domain.repository.LoTWUploadResult.Unknown -> buildString {
+                    append("LoTW upload result is unknown. The server may have received these QSOs, so they were not retried automatically.\n\n")
+                    append(result.reason)
+                    result.httpStatus?.let { append("\nHTTP status: ").append(it) }
+                    result.technicalDetail.takeIf { it.isNotBlank() }?.let { append("\n\nTechnical details: ").append(it) }
+                    append("\n\nCheck LoTW before manually resubmitting these QSOs.")
+                }
                 com.rtbishop.look4sat.core.domain.repository.LoTWUploadResult.ExpiredPreview -> "Preview expired — tap upload again"
             }
             _uiState.update {
