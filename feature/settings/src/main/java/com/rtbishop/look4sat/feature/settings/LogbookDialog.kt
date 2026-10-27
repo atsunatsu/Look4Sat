@@ -43,6 +43,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -333,6 +335,7 @@ fun LogbookDialog(
         )
     }
     if (uploadMessage.isNotBlank()) {
+        val uploadClipboard = LocalClipboardManager.current
         var uploadDetailsExpanded by remember(uploadMessage) { mutableStateOf(false) }
         val detailMarker = "\n\nTechnical details: "
         val detailStart = uploadMessage.indexOf(detailMarker)
@@ -346,6 +349,9 @@ fun LogbookDialog(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(uploadSummary)
+                    TextButton(onClick = { uploadClipboard.setText(AnnotatedString(uploadMessage)) }) {
+                        Text("Copy error details")
+                    }
                     if (uploadDetails.isNotBlank()) {
                         TextButton(onClick = { uploadDetailsExpanded = !uploadDetailsExpanded }) {
                             Text(if (uploadDetailsExpanded) "Hide technical details" else "Show technical details")
