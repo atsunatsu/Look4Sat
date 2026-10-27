@@ -170,6 +170,25 @@ class LoTWUploadRepositoryPreviewTest {
         }
     }
 
+    @Test
+    fun `explicit LoTW rejection is preserved even with an HTTP error status`() {
+        val result = parseLoTWUploadResponse(
+            "<!-- .UPL. rejected --><!-- .UPLMESSAGE. Invalid callsign -->",
+            count = 1,
+            httpStatus = 500
+        )
+        assertTrue(result is LoTWUploadResult.Rejected)
+        assertEquals("Invalid callsign", (result as LoTWUploadResult.Rejected).message)
+    }
+
+    @Test
+    fun `unrecognized LoTW response retains status and diagnostic summary`() {
+        val result = parseLoTWUploadResponse("<html>Gateway error</html>", count = 2, httpStatus = 502)
+        assertTrue(result is LoTWUploadResult.Unknown)
+        assertEquals(502, (result as LoTWUploadResult.Unknown).httpStatus)
+        assertTrue(result.technicalDetail.contains("Gateway error"))
+    }
+
     private fun sampleRecord(start: Long, call: String, myCallsign: String) = QsoRecord(
         id = start,
         startUtcMillis = start,
