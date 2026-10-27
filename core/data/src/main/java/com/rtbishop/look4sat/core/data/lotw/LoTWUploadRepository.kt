@@ -406,14 +406,40 @@ class LoTWUploadRepository internal constructor(
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                if (continuation.isActive) continuation.resume(LoTWUploadResult.Unknown)
+                if (continuation.isActive) continuation.resume(
+                    LoTWUploadResult.Unknown(
+                        reason = "The network request failed; LoTW may still have received the upload.",
+                        technicalDetail = (e.javaClass.simpleName + ": " + e.message.orEmpty()).take(500)
+                    )
+                )
             }
             override fun onResponse(call: Call, response: Response) {
                 val result = try {
                     response.use {
-                        if (!it.isSuccessful) LoTWUploadResult.Unknown else parseLoTWUploadResponse(readBoundedBody(it, 256 * 1024), count)
+                        val responseText = try {
+                            readBoundedBody(it, 256 * 1024)
+                        } catch (readError: Exception) {
+                            return@use LoTWUploadResult.Unknown(
+                                reason = "LoTW returned a response that could not be read.",
+                                httpStatus = it.code,
+                                technicalDetail = (readError.javaClass.simpleName + ": " + readError.message.orEmpty()).take(500)
+                            )
+                        }
+                        // Prefer explicit LoTW result markers over HTTP status alone.
+                        val parsed = parseLoTWUploadResponse(responseText, count, it.code)
+                        if (!it.isSuccessful && parsed is LoTWUploadResult.Unknown) {
+                            parsed.copy(
+                                reason = "LoTW returned HTTP " + it.code + " without a definitive upload result.",
+                                httpStatus = it.code
+                            )
+                        } else parsed
                     }
-                } catch (_: Exception) { LoTWUploadResult.Unknown }
+                } catch (e: Exception) {
+                    LoTWUploadResult.Unknown(
+                        reason = "The LoTW response could not be interpreted.",
+                        technicalDetail = (e.javaClass.simpleName + ": " + e.message.orEmpty()).take(500)
+                    )
+                }
                 if (continuation.isActive) continuation.resume(result)
             }
         })
@@ -438,7 +464,7 @@ class LoTWUploadRepository internal constructor(
     }
 }
 
-internal fun parseLoTWUploadResponse(body: String, count: Int): LoTWUploadResult {
+internal fun parseLoTWUploadResponse(body: String, count: Int, httpStatus: Int? = null): LoTWUploadResult {
     val markers = Regex("<!--\\s*\\.UPL\\.\\s*(accepted|rejected)\\s*-->", RegexOption.IGNORE_CASE)
         .findAll(body).map { it.groupValues[1].lowercase() }.toList()
     return when (markers.singleOrNull()) {
@@ -449,7 +475,12 @@ internal fun parseLoTWUploadResponse(body: String, count: Int): LoTWUploadResult
                 .replace(Regex("[\\p{Cc}\\s]+"), " ").trim().take(500)
             LoTWUploadResult.Rejected(message)
         }
-        else -> LoTWUploadResult.Unknown
+        else -> LoTWUploadResult.Unknown(
+            reason = "LoTW's response did not contain a single accepted or rejected marker.",
+            httpStatus = httpStatus,
+            technicalDetail = body.replace(Regex("<[^>]*>"), " ")
+                .replace(Regex("[\\p{Cc}\\s]+"), " ").trim().take(500)
+        )
     }
 }
 
