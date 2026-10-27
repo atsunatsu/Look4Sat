@@ -333,12 +333,27 @@ fun LogbookDialog(
         )
     }
     if (uploadMessage.isNotBlank()) {
+        var uploadDetailsExpanded by remember(uploadMessage) { mutableStateOf(false) }
+        val detailMarker = "\n\nTechnical details: "
+        val detailStart = uploadMessage.indexOf(detailMarker)
+        val uploadSummary = if (detailStart >= 0) uploadMessage.substring(0, detailStart) else uploadMessage
+        val uploadDetails = if (detailStart >= 0) uploadMessage.substring(detailStart + detailMarker.length) else ""
         AlertDialog(
             onDismissRequest = onDismissMessage,
             shape = sheetDialogShape(),
             containerColor = sheetDialogContainerColor(),
             title = { SheetDialogTitle(if (wavelogMode) "Wavelog Upload" else "LoTW Upload") },
-            text = { Text(uploadMessage) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(uploadSummary)
+                    if (uploadDetails.isNotBlank()) {
+                        TextButton(onClick = { uploadDetailsExpanded = !uploadDetailsExpanded }) {
+                            Text(if (uploadDetailsExpanded) "Hide technical details" else "Show technical details")
+                        }
+                        if (uploadDetailsExpanded) Text(uploadDetails)
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = onDismissMessage) { Text("OK") }
             }
