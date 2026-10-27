@@ -353,7 +353,7 @@ class LogViewModel(
                             audit.unavailable, audit.reasons, audit.details, audit.duplicates, audit.incomplete
                         )
 
-                        audit.unknown > 0 -> "${audit.unknown} QSO(s) had an unknown upload result — not retried automatically"
+                        audit.unknown > 0 -> "${audit.unknown} QSO(s) have an unknown LoTW upload result. Check LoTW before manually resubmitting; automatic retry is disabled to avoid duplicates."
                         else -> "No pending QSOs to upload"
                     }
                     _uiState.update { it.copy(busy = false, message = msg) }
