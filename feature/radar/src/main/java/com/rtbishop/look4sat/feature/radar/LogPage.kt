@@ -276,12 +276,27 @@ fun LogPage(
     }
 
     if (logUiState.message.isNotBlank()) {
+        var uploadDetailsExpanded by remember(logUiState.message) { mutableStateOf(false) }
+        val detailMarker = "\n\nTechnical details: "
+        val detailStart = logUiState.message.indexOf(detailMarker)
+        val uploadSummary = if (detailStart >= 0) logUiState.message.substring(0, detailStart) else logUiState.message
+        val uploadDetails = if (detailStart >= 0) logUiState.message.substring(detailStart + detailMarker.length) else ""
         AlertDialog(
             onDismissRequest = logViewModel::clearMessage,
             shape = sheetDialogShape(),
             containerColor = sheetDialogContainerColor(),
             title = { SheetDialogTitle(if (logUiState.wavelogMode) "Wavelog Upload" else "LoTW Upload") },
-            text = { Text(logUiState.message) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(uploadSummary)
+                    if (uploadDetails.isNotBlank()) {
+                        TextButton(onClick = { uploadDetailsExpanded = !uploadDetailsExpanded }) {
+                            Text(if (uploadDetailsExpanded) "Hide technical details" else "Show technical details")
+                        }
+                        if (uploadDetailsExpanded) Text(uploadDetails)
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = logViewModel::clearMessage) { Text("OK") }
             }
