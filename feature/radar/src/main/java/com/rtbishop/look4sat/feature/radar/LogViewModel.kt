@@ -410,7 +410,13 @@ class LogViewModel(
             val msg = when (result) {
                 is LoTWUploadResult.Accepted -> "Uploaded ${result.count} QSO(s) — accepted by LoTW"
                 is LoTWUploadResult.Rejected -> "Rejected: ${result.message}"
-                LoTWUploadResult.Unknown -> "Unknown result — will not auto-retry"
+                is LoTWUploadResult.Unknown -> buildString {
+                    append("LoTW upload result is unknown. The server may have received these QSOs, so they were not retried automatically.\n\n")
+                    append(result.reason)
+                    result.httpStatus?.let { append("\nHTTP status: ").append(it) }
+                    result.technicalDetail.takeIf { it.isNotBlank() }?.let { append("\n\nTechnical details: ").append(it) }
+                    append("\n\nCheck LoTW before manually resubmitting these QSOs.")
+                }
                 LoTWUploadResult.ExpiredPreview -> "Preview expired — tap upload again"
             }
             _uiState.update { it.copy(busy = false, preview = null, message = msg) }
