@@ -276,6 +276,7 @@ fun LogPage(
     }
 
     if (logUiState.message.isNotBlank()) {
+        val uploadClipboard = LocalClipboardManager.current
         var uploadDetailsExpanded by remember(logUiState.message) { mutableStateOf(false) }
         val detailMarker = "\n\nTechnical details: "
         val detailStart = logUiState.message.indexOf(detailMarker)
@@ -289,6 +290,9 @@ fun LogPage(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(uploadSummary)
+                    TextButton(onClick = { uploadClipboard.setText(AnnotatedString(logUiState.message)) }) {
+                        Text("Copy error details")
+                    }
                     if (uploadDetails.isNotBlank()) {
                         TextButton(onClick = { uploadDetailsExpanded = !uploadDetailsExpanded }) {
                             Text(if (uploadDetailsExpanded) "Hide technical details" else "Show technical details")
