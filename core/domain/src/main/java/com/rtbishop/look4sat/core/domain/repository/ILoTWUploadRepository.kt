@@ -145,8 +145,12 @@ data class LoTWUploadAudit(
 sealed interface LoTWUploadResult {
     data class Accepted(val count: Int) : LoTWUploadResult
     data class Rejected(val message: String = "") : LoTWUploadResult
-    /** May have reached LoTW. Do not retry automatically. */
-    data object Unknown : LoTWUploadResult
+    /** May have reached LoTW. Keep the receipt unknown and never retry automatically. */
+    data class Unknown(
+        val reason: String = "The server response did not confirm whether the upload was accepted.",
+        val httpStatus: Int? = null,
+        val technicalDetail: String = ""
+    ) : LoTWUploadResult
     data object ExpiredPreview : LoTWUploadResult
 }
 
