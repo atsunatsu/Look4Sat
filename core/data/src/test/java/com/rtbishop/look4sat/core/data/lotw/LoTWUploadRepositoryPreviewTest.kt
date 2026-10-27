@@ -185,8 +185,9 @@ class LoTWUploadRepositoryPreviewTest {
     fun `unrecognized LoTW response retains status and diagnostic summary`() {
         val result = parseLoTWUploadResponse("<html>Gateway error</html>", count = 2, httpStatus = 502)
         assertTrue(result is LoTWUploadResult.Unknown)
-        assertEquals(502, (result as LoTWUploadResult.Unknown).httpStatus)
-        assertTrue(result.technicalDetail.contains("Gateway error"))
+        val unknown = result as LoTWUploadResult.Unknown
+        assertEquals(502, unknown.httpStatus)
+        assertTrue(unknown.technicalDetail.contains("Gateway error"))
     }
 
     private fun sampleRecord(start: Long, call: String, myCallsign: String) = QsoRecord(
