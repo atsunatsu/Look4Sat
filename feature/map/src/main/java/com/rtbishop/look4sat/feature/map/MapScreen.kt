@@ -64,6 +64,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -78,6 +79,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -156,7 +158,9 @@ private const val OVERLAY_TERMINATOR = 6
 private const val OVERLAY_SUN = 7
 private const val OVERLAY_MOON = 8
 private const val OVERLAY_OTHER_STATION = 9
-private const val OVERLAY_COUNT = 10
+private const val OVERLAY_ELEVATION_CONTOURS = 10
+private const val OVERLAY_STATION_ELEVATION = 11
+private const val OVERLAY_COUNT = 12
 
 private val minLat = MapView.getTileSystem().minLatitude
 private val maxLat = MapView.getTileSystem().maxLatitude
@@ -467,6 +471,19 @@ private fun MapScreen(
     // paired with the award type it was tapped under. Local UI state like the
     // grid selection above: the map is the only consumer.
     var selectedRegion by remember { mutableStateOf<Pair<AwardType, AwardRegion>?>(null) }
+    // The contours belong to satellite mode; leave the configured angles alone when changing modes.
+    var showElevationContours by rememberSaveable { mutableStateOf(false) }
+    var elevationInputs by rememberSaveable { mutableStateOf(listOf("10")) }
+    var elevationDraft by remember { mutableStateOf(elevationInputs) }
+    var elevationDialogVisible by remember { mutableStateOf(false) }
+    var elevationEnabledBeforeDialog by remember { mutableStateOf(false) }
+    val elevationAngles = remember(showElevationContours, elevationInputs) {
+        if (showElevationContours) elevationInputs.mapNotNull { it.toDoubleOrNull() } else emptyList()
+    }
+    val closeElevationDialog: () -> Unit = {
+        if (!elevationEnabledBeforeDialog) showElevationContours = false
+        elevationDialogVisible = false
+    }
     // Selected award filter. Lives in an Activity-scoped ViewModel so it
     // survives page switches; defaults to VUCC only once per process (cold start).
     var selectedAward by mapFilterViewModel.selectedAward
@@ -746,6 +763,20 @@ private fun MapScreen(
                         setTerminator(uiState.sunLatDeg, uiState.sunLonDeg, view)
                         setSubSolarPoint(uiState.sunLatDeg, uiState.sunLonDeg, view, uiState.isLightUi)
                         setMoonPosition(uiState.moonLatDeg, uiState.moonLonDeg, view, uiState.isLightUi)
+                        // Both use the selected satellite's prediction at mapTimeMs, including scrubs.
+                        (view.overlays[OVERLAY_ELEVATION_CONTOURS] as ElevationContourOverlay).apply {
+                            isEnabled = showElevationContours
+                            update(
+                                if (showElevationContours) uiState.footprint else null,
+                                elevationAngles,
+                                view.resources.displayMetrics.density
+                            )
+                        }
+                        (view.overlays[OVERLAY_STATION_ELEVATION] as StationElevationOverlay).apply {
+                            isEnabled = true
+                            station = uiState.stationPosition
+                            elevationDeg = uiState.mapData?.elevation
+                        }
                         // Time scrub: keep the scrubbed satellite centred, in the same pass that
                         // moves its marker so the two can never disagree. The pan is applied
                         // directly instead of as an osmdroid animation: the eased clock advances
@@ -761,6 +792,10 @@ private fun MapScreen(
                             }
                             lastFollowedScrubSerial = uiState.scrubSerial
                         }
+                    }
+                    if (uiState.isGridMode) {
+                        view.overlays[OVERLAY_ELEVATION_CONTOURS].isEnabled = false
+                        view.overlays[OVERLAY_STATION_ELEVATION].isEnabled = false
                     }
                     scrubInProgress = uiState.isScrubbing
                     view.invalidate()
@@ -799,6 +834,26 @@ private fun MapScreen(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }
+                // Satellite mode: a semi-transparent pill mirroring the mode switch on the right.
+                if (!uiState.isGridMode && !gridPickerMode) {
+                    ElevationContourToggle(
+                        checked = showElevationContours,
+                        onToggle = { checked ->
+                            if (checked) {
+                                elevationEnabledBeforeDialog = showElevationContours
+                                elevationDraft = elevationInputs
+                                showElevationContours = true
+                                elevationDialogVisible = true
+                            } else showElevationContours = false
+                        },
+                        onConfigure = {
+                            elevationEnabledBeforeDialog = true
+                            elevationDraft = elevationInputs
+                            elevationDialogVisible = true
+                        },
+                        modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                    )
+                }
                 // Top-left: 台址 selector for VUCC counting (grid mode only).
                 // Shown whenever per-grid QSO data exists; empty selection means All.
                 if (uiState.isGridMode && activeAward == AwardType.VUCC && stationGroups.isNotEmpty()) {
@@ -835,6 +890,18 @@ private fun MapScreen(
                 }
             }
         }
+    }
+    if (elevationDialogVisible) {
+        ElevationContourSettingsDialog(
+            draft = elevationDraft,
+            onDraftChange = { elevationDraft = it },
+            onDismiss = closeElevationDialog,
+            onConfirm = {
+                elevationInputs = elevationDraft
+                showElevationContours = true
+                elevationDialogVisible = false
+            }
+        )
     }
     // Centered dialog listing the tapped worked grid's confirmed satellite QSOs.
     // Dismissed by tapping outside (no explicit close button). Unworked grids
@@ -1844,6 +1911,111 @@ private fun GridModeToggle(
     }
 }
 
+/** Map top-left switch; tapping its label while enabled reopens the contour editor. */
+@Composable
+private fun ElevationContourToggle(
+    checked: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onConfigure: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = ComposeColor.Black.copy(alpha = 0.45f),
+        shape = RoundedCornerShape(percent = 50),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier
+                .clickable { if (checked) onConfigure() else onToggle(true) }
+                .padding(start = 12.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.map_elevation_contours),
+                color = ComposeColor.White,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(end = 2.dp)
+            )
+            Switch(
+                checked = checked,
+                onCheckedChange = onToggle,
+                modifier = Modifier.scale(0.75f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ElevationContourSettingsDialog(
+    draft: List<String>,
+    onDraftChange: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val parsed = draft.map { it.trim().toDoubleOrNull() }
+    val valid = parsed.isNotEmpty() && parsed.all { it != null && it.isFinite() && it >= 0.0 && it < 90.0 } &&
+        parsed.distinct().size == parsed.size
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = sheetDialogShape(),
+        containerColor = sheetDialogContainerColor(),
+        title = { SheetDialogTitle(stringResource(R.string.map_elevation_contours_title)) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 350.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                draft.forEachIndexed { index, value ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .background(
+                                    ComposeColor(ELEVATION_CONTOUR_COLORS[index]),
+                                    RoundedCornerShape(3.dp)
+                                )
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = value,
+                            onValueChange = { next ->
+                                onDraftChange(draft.toMutableList().apply { this[index] = next })
+                            },
+                            label = { Text(stringResource(R.string.map_elevation_angle, index + 1)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (draft.size > 1) {
+                            TextButton(onClick = {
+                                onDraftChange(draft.toMutableList().apply { removeAt(index) })
+                            }) { Text("−") }
+                        }
+                    }
+                }
+                TextButton(
+                    enabled = draft.size < ELEVATION_CONTOUR_COLORS.size,
+                    onClick = { onDraftChange(draft + "") }
+                ) { Text("+ " + stringResource(R.string.map_elevation_add_circle)) }
+                if (!valid) {
+                    Text(
+                        stringResource(R.string.map_elevation_angle_hint),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = valid) {
+                Text(stringResource(R.string.btn_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.btn_cancel)) }
+        }
+    )
+}
+
 /**
  * 网格模式下的"首通呼号"开关: 打开后绿格(worked)的标签显示该格第一个通联的
  * 呼号, 非绿格不显示任何文字. 仅在网格模式下显示(与网格模式开关叠放).
@@ -2610,6 +2782,8 @@ private fun rememberMapViewWithLifecycle(
             setScrollableAreaLimitLatitude(maxLat, minLat, 0)
             overlays.addAll(Array(OVERLAY_COUNT) { FolderOverlay() })
             overlays[OVERLAY_GRID] = MaidenheadGridOverlay().apply { applyTheme(mapIsLightUi == true) }
+            overlays[OVERLAY_ELEVATION_CONTOURS] = ElevationContourOverlay()
+            overlays[OVERLAY_STATION_ELEVATION] = StationElevationOverlay()
             currentMapView = this
         }
     }
