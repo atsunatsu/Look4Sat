@@ -652,4 +652,9 @@
     <string name="lotw_upload_result_copy_details">复制错误详情</string>
     <string name="lotw_upload_result_retry">安全重试</string>
     <string name="lotw_upload_result_close">关闭</string>
+    <string name="map_elevation_contours">仰角圆</string>
+    <string name="map_elevation_contours_title">设置仰角圆</string>
+    <string name="map_elevation_angle">仰角 %1$d（°）</string>
+    <string name="map_elevation_add_circle">添加仰角圆</string>
+    <string name="map_elevation_angle_hint">请输入 0° 至小于 90° 的不同仰角。</string>
 </resources>
