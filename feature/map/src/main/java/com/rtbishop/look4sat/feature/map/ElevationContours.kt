@@ -47,7 +47,9 @@ internal val ELEVATION_CONTOUR_COLORS = intArrayOf(
  * All coordinates use the SAME timestamp/sub-satellite point as the map's footprint.
  */
 internal fun elevationContourPoints(position: OrbitalPos, elevationDeg: Double): List<GeoPos> {
-    if (!elevationDeg.isFinite() || elevationDeg !in 0.0..90.0 || position.altitude <= 0.0) {
+    if (!elevationDeg.isFinite() || elevationDeg !in 0.0..90.0 ||
+        !position.altitude.isFinite() || position.altitude <= 0.0 ||
+        !position.latitude.isFinite() || !position.longitude.isFinite()) {
         return emptyList()
     }
     val elevation = elevationDeg * DEG2RAD
@@ -78,8 +80,14 @@ private fun normalizeContourLongitude(longitude: Double): Double =
  */
 internal class ElevationContourOverlay : FolderOverlay() {
     private val linePool = ArrayList<Polyline>()
+    private var previousDensity = Float.NaN
+    private var dashEffect = DashPathEffect(floatArrayOf(9f, 7f), 0f)
 
     fun update(position: OrbitalPos?, elevations: List<Double>, density: Float) {
+        if (previousDensity != density) {
+            dashEffect = DashPathEffect(floatArrayOf(9f * density, 7f * density), 0f)
+            previousDensity = density
+        }
         items.clear()
         if (position == null || elevations.isEmpty()) return
         var lineIndex = 0
@@ -96,7 +104,7 @@ internal class ElevationContourOverlay : FolderOverlay() {
                         color = ELEVATION_CONTOUR_COLORS[colorIndex]
                         strokeWidth = 2.5f * density
                         style = Paint.Style.STROKE
-                        pathEffect = DashPathEffect(floatArrayOf(9f * density, 7f * density), 0f)
+                        pathEffect = dashEffect
                     }
                     line.setPoints(arc.map { GeoPoint(it.latitude, it.longitude + turn * 360.0) })
                     add(line)
