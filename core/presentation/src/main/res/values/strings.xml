@@ -680,4 +680,9 @@ Upstream: https://github.com/rt-bishop/Look4Sat</string>
     <string name="lotw_upload_result_copy_details">Copy error details</string>
     <string name="lotw_upload_result_retry">Retry safely</string>
     <string name="lotw_upload_result_close">Close</string>
+    <string name="map_elevation_contours">Elevation circles</string>
+    <string name="map_elevation_contours_title">Elevation circles</string>
+    <string name="map_elevation_angle">Elevation %1$d (°)</string>
+    <string name="map_elevation_add_circle">Add circle</string>
+    <string name="map_elevation_angle_hint">Enter distinct angles from 0° up to (but not including) 90°.</string>
 </resources>
