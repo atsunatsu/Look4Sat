@@ -102,7 +102,7 @@ jobs:
           test -d "$ANDROID_HOME/ndk/28.2.13676358"
 
       - name: Run unit tests before official Release
-        if: ${{ inputs.mode == 'release' || (github.event_name == 'push' && github.ref_name == 'main') }}
+        if: ${{ inputs.mode == 'release' || github.event_name == 'push' }}
         working-directory: source
         run: |
           set -euo pipefail
@@ -217,7 +217,7 @@ jobs:
           echo "Published prerelease $TAG"
 
       - name: Publish the official Release
-        if: ${{ inputs.mode == 'release' || github.event_name == 'push' }}
+        if: ${{ inputs.mode == 'release' || (github.event_name == 'push' && github.ref_name == 'main') }}
         working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
