@@ -16,7 +16,7 @@ name: Build Look4Sat APK
 on:
   # One-shot v18.2 release automation; only the specific release commit runs on push.
   push:
-    branches: [main]
+    branches: [main, artifact/pr41-dateline-projection]
   workflow_dispatch:
     inputs:
       mode:
@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   build:
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.18.2')) }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && ((github.ref_name == 'main' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.18.2')) || github.ref_name == 'artifact/pr41-dateline-projection')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -52,7 +52,7 @@ jobs:
         working-directory: source
         env:
           BUILD_RUN_NUMBER: ${{ github.run_number }}
-          BUILD_MODE: ${{ github.event_name == 'push' && 'release' || inputs.mode }}
+          BUILD_MODE: ${{ github.event_name == 'push' && (github.ref_name == 'main' && 'release' || 'artifact') || inputs.mode }}
         run: |
           set -euo pipefail
           VERSION="$(sed -nE 's/^appVersionName *= *"([^"]+)".*/\1/p' gradle/libs.versions.toml | head -n 1)"
@@ -102,7 +102,7 @@ jobs:
           test -d "$ANDROID_HOME/ndk/28.2.13676358"
 
       - name: Run unit tests before official Release
-        if: ${{ inputs.mode == 'release' || github.event_name == 'push' }}
+        if: ${{ inputs.mode == 'release' || (github.event_name == 'push' && github.ref_name == 'main') }}
         working-directory: source
         run: |
           set -euo pipefail
@@ -184,11 +184,11 @@ jobs:
       # This local JavaScript action uses GitHub's own artifact toolkit and receives
       # the runtime artifact token from the runner, without publishing a Release.
       - name: Install local artifact client
-        if: ${{ inputs.mode == 'artifact' }}
+        if: ${{ inputs.mode == 'artifact' || (github.event_name == 'push' && github.ref_name != 'main') }}
         run: npm install --prefix source/.github/actions/local-artifact --no-save --no-audit --no-fund @actions/artifact@2.3.2
 
       - name: Upload signed test APK without creating any Release
-        if: ${{ inputs.mode == 'artifact' }}
+        if: ${{ inputs.mode == 'artifact' || (github.event_name == 'push' && github.ref_name != 'main') }}
         uses: ./source/.github/actions/local-artifact
         env:
           ARTIFACT_NAME: Look4Sat-test-${{ steps.version.outputs.code }}-${{ steps.version.outputs.short_sha }}
@@ -217,7 +217,7 @@ jobs:
           echo "Published prerelease $TAG"
 
       - name: Publish the official Release
-        if: ${{ inputs.mode == 'release' || github.event_name == 'push' }}
+        if: ${{ inputs.mode == 'release' || (github.event_name == 'push' && github.ref_name == 'main') }}
         working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
