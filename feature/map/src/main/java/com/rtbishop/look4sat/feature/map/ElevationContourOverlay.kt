@@ -9,7 +9,9 @@ import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
 import com.rtbishop.look4sat.core.domain.utility.clipLon
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.TileSystem
 import org.osmdroid.views.MapView
+import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.FolderOverlay
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
@@ -74,6 +76,17 @@ internal fun elevationContourLongitudeInMapWorld(
         (mapCenterLongitudeDegrees - canonicalLongitude) / 360.0
     )
 }
+
+/**
+ * Project the *unwrapped* longitude to screen pixels. OSMDroid Projection.toPixels()
+ * clips longitude to −180°..180° when horizontal repetition is enabled: a label
+ * at 183° thus gets projected to exactly 180°, even if the ring continues east.
+ * The no-wrap Projection methods preserve the same world copy as the polyline.
+ */
+internal fun elevationContourToPixels(projection: Projection, position: GeoPoint): Point = Point(
+    TileSystem.truncateToInt(projection.getLongPixelXFromLongitude(position.longitude)),
+    TileSystem.truncateToInt(projection.getLongPixelYFromLatitude(position.latitude))
+)
 
 /** Normalize contour points and split a polyline wherever it crosses the antimeridian. */
 internal fun elevationContourSplitAtAntimeridian(points: List<GeoPoint>): List<List<GeoPoint>> {
@@ -163,7 +176,7 @@ internal class ElevationContourOverlay : FolderOverlay() {
                 anchorPoint.latitude,
                 elevationContourLongitudeInMapWorld(anchorPoint.longitude, mapCenterLongitude)
             )
-            val anchorPx = mapView.projection.toPixels(anchorProjectionGeo, Point())
+            val anchorPx = elevationContourToPixels(mapView.projection, anchorProjectionGeo)
             val labelTextSizePx = 12f * mapView.context.resources.displayMetrics.scaledDensity
             val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = labelTextSizePx }
             val halfGapPx = labelPaint.measureText(text) / 2f + 9f
@@ -178,7 +191,7 @@ internal class ElevationContourOverlay : FolderOverlay() {
                         sample.latitude,
                         elevationContourLongitudeInMapWorld(sample.longitude, mapCenterLongitude)
                     )
-                    val p = mapView.projection.toPixels(sampleGeo, Point())
+                    val p = elevationContourToPixels(mapView.projection, sampleGeo)
                     val distance = kotlin.math.hypot(
                         (p.x - anchorPx.x).toDouble(), (p.y - anchorPx.y).toDouble()
                     )
@@ -252,7 +265,7 @@ private class ElevationCircleLabelOverlay(
             anchor.latitude,
             elevationContourLongitudeInMapWorld(anchor.longitude, mapView.mapCenter.longitude)
         )
-        val point = mapView.projection.toPixels(visibleWorldAnchor, Point())
+        val point = elevationContourToPixels(mapView.projection, visibleWorldAnchor)
         // Paint baseline shifted so the number sits centrally in the missing section.
         val baseline = point.y - (fill.ascent() + fill.descent()) / 2f
         canvas.drawText(text, point.x.toFloat(), baseline, outline)
