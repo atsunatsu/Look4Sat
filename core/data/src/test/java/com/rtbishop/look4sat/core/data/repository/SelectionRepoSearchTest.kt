@@ -244,12 +244,9 @@ class SelectionRepoSearchTest {
     }
 
     @Test
-    fun `All type resolves to persisted CelesTrak active ids`() = runTest {
-        // Regression: "All" is a real TLE source type (CelesTrak active). Its
-        // ids are persisted on sync like any other type; selecting it must
-        // show the synced satellites, NOT an empty list.
+    fun `All displays all local satellites despite incomplete CelesTrak cached ids`() = runTest {
         val fake = FakeSettingsRepoForSearch()
-        fake.setSatelliteTypeIds("All", sampleItems.map { it.catnum })
+        fake.setSatelliteTypeIds("All", listOf(25544))
         val repo = SelectionRepo(
             dispatcher = Dispatchers.Unconfined,
             localSource = FakeLocalSourceForSearch(sampleItems),
@@ -258,13 +255,13 @@ class SelectionRepoSearchTest {
         repo.setTypes(listOf("All"))
         val results = repo.getEntriesFlow().first()
         assertEquals(sampleItems.map { it.catnum }.toSet(), results.map { it.catnum }.toSet())
+        repo.setTypes(listOf("Amsat", "All"))
+        assertEquals(sampleItems.map { it.catnum }.toSet(), repo.getEntriesFlow().first().map { it.catnum }.toSet())
     }
 
     @Test
     fun `All with empty persisted ids falls back to no filtering`() = runTest {
-        // CelesTrak answers 403 to a repeated download inside its 2-hour update window,
-        // so the persisted "All" id list can be empty. Selecting All then means "all
-        // satellites" (no filtering) instead of blanking the list.
+        // "All" is never restricted by the CelesTrak source's cached IDs.
         val repo = createRepo(sampleItems)
         repo.setTypes(listOf(Sources.allSourceType))
         val results = repo.getEntriesFlow().first()
@@ -273,10 +270,9 @@ class SelectionRepoSearchTest {
 
     @Test
     fun `other source type with empty persisted ids still shows empty`() = runTest {
-        // Only "All" falls back to no filtering; a regular source without persisted ids
-        // keeps the previous behaviour (empty list).
+        // A regular source without persisted ids still shows no matches.
         val repo = createRepo(sampleItems)
-        repo.setTypes(listOf("Amateur"))
+        repo.setTypes(listOf("Amsat"))
         assertTrue(repo.getEntriesFlow().first().isEmpty())
     }
 
@@ -285,7 +281,7 @@ class SelectionRepoSearchTest {
         val repo = createRepo(sampleItems)
         val types = repo.getTypesList()
         // All real TLE source types must be selectable, including "All"
-        // (CelesTrak active) and "ARISS" (removed by the old removeAt(0)).
+        // (whole local catalogue) and "ARISS" (removed by the old removeAt(0)).
         assertTrue("All" in types)
         assertTrue("ARISS" in types)
         assertTrue("R4UAB" in types)
