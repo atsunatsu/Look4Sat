@@ -98,8 +98,12 @@ class DatabaseRepo(
         val parsedPerSource = tleResults.map { (rawUrl, result) ->
             val normUrl = normalizeUrl(rawUrl)
             val entries = result.stream?.let { parseSatelliteStream(normUrl, unwrapIfZipped(normUrl, it)) }.orEmpty()
-            val type = builtinTypesByUrl[normUrl] ?: customSourceType
-            importedTypeIds.getOrPut(type) { mutableListOf() }.addAll(entries.map { it.catnum })
+            // Keep the last good classification on HTTP errors and empty/invalid feeds.
+            // Replacing it with an empty list hides otherwise stored satellites.
+            if (entries.isNotEmpty()) {
+                val type = builtinTypesByUrl[normUrl] ?: customSourceType
+                importedTypeIds.getOrPut(type) { mutableListOf() }.addAll(entries.map { it.catnum })
+            }
             entries
         }
         importedTypeIds.forEach { (type, ids) -> settingsRepo.setSatelliteTypeIds(type, ids.distinct()) }

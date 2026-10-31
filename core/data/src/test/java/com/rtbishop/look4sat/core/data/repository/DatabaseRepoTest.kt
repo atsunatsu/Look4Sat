@@ -156,6 +156,34 @@ class DatabaseRepoTest {
     }
 
     @Test
+    fun `failed and empty remote source preserve the last good type cache`() = runTest(dispatcher) {
+        val amsatUrl = Sources.satelliteDataUrls.getValue("Amsat")
+        val settingsRepo = FakeSettingsRepo(
+            dataSources = DataSourcesSettings(
+                satelliteUrls = listOf(amsatUrl),
+                transceiversUrls = emptyList()
+            )
+        )
+        settingsRepo.setSatelliteTypeIds("Amsat", listOf(25544, 40931))
+        val remoteSource = FakeRemoteSource()
+        val repository = DatabaseRepo(dispatcher, dataParser, FakeLocalSource(), remoteSource, settingsRepo)
+
+        // Missing source -> 404; do not wipe the previous classification.
+        repository.updateFromRemote()
+        assertEquals(listOf(25544, 40931), settingsRepo.satelliteTypeIdsByType["Amsat"])
+
+        // HTTP 200 with no parseable entries must also preserve the cache.
+        remoteSource.networkStreams[amsatUrl] = { "".byteInputStream() }
+        repository.updateFromRemote()
+        assertEquals(listOf(25544, 40931), settingsRepo.satelliteTypeIdsByType["Amsat"])
+
+        // A valid refresh replaces the old cache.
+        remoteSource.networkStreams[amsatUrl] = { validTleStream() }
+        repository.updateFromRemote()
+        assertEquals(listOf(25544), settingsRepo.satelliteTypeIdsByType["Amsat"])
+    }
+
+    @Test
     fun `remote update takes the freshest elements and the preferred name`() = runTest(dispatcher) {
         val primaryUrl = "https://example.com/primary.txt"
         val secondaryUrl = "https://example.com/secondary.txt"

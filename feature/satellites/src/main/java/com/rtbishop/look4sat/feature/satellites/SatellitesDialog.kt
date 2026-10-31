@@ -47,7 +47,7 @@ import com.rtbishop.look4sat.core.domain.source.Sources
 @Preview(showBackground = true)
 @Composable
 private fun MultiTypesDialogPreview() {
-    val types = listOf("Amateur", "Geostationary", "Military", "Weather")
+    val types = listOf("All", "Amsat", "SatNOGS", "AMSAT Live FM")
     MainTheme { MultiTypesDialog(types, emptyList(), {}) {} }
 }
 
@@ -55,19 +55,23 @@ private fun MultiTypesDialogPreview() {
 internal fun MultiTypesDialog(
     allTypes: List<String>, types: List<String>, cancel: () -> Unit, accept: (List<String>) -> Unit
 ) {
-    // 虚拟类型(转发器/活动筛选)与普通 TLE 源类型互斥: 勾虚拟类型时取消普通类型,
-    // 勾普通类型时取消虚拟类型. 虚拟类型之间可多选组合.
+    // Activity filters and source filters are mutually exclusive. "All" is
+    // also exclusive: selecting a narrower source should turn off "All".
     val virtualTypes = Sources.virtualTypeNames
-    val selected = remember { mutableStateOf(types.toSet()) }
+    val supportedTypes = allTypes.toSet()
+    val selected = remember(types, allTypes) {
+        mutableStateOf(types.filter { it in supportedTypes }.toSet())
+    }
     val toggle = { type: String ->
-        selected.value = if (type in selected.value) {
-            selected.value - type
-        } else if (type in virtualTypes) {
-            // 勾选虚拟类型: 移除所有普通类型, 保留已勾的虚拟类型.
-            (selected.value.filterTo(mutableSetOf()) { it in virtualTypes }) + type
-        } else {
-            // 勾选普通类型: 移除所有虚拟类型, 保留已勾的普通类型.
-            (selected.value.filterTo(mutableSetOf()) { it !in virtualTypes }) + type
+        selected.value = when {
+            type in selected.value -> selected.value - type
+            type == Sources.allSourceType -> setOf(type)
+            type in virtualTypes ->
+                selected.value.filterTo(mutableSetOf()) { it in virtualTypes } + type
+            else ->
+                selected.value.filterTo(mutableSetOf()) {
+                    it !in virtualTypes && it != Sources.allSourceType
+                } + type
         }
     }
     val onAccept = { accept(selected.value.toList()) }
