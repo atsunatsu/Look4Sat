@@ -14,7 +14,7 @@ name: Build Look4Sat APK
 # Local Gradle builds keep using the catalog unchanged. Most runs are manual; only the specific release commit has a guarded push trigger.
 
 on:
-  # One-shot v18.5 release automation; only the specific release commit runs on push.
+  # One-shot v18.6 release automation; only the specific release commit runs on push.
   push:
     branches: [main]
   workflow_dispatch:
@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   build:
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.18.5')) }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.18.6')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -239,15 +239,17 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.5 — English
-          - Fixed the matched-pass radar unexpectedly returning to the main screen when the opposite station loses satellite visibility (mutual LOS).
-          - Keep the radar open after the mutual pass ends, including after local LOS; users can return manually when ready.
-          - Preserve cleanup of the mutual-pass data when leaving the radar through its navigation controls.
+          ## v18.6 — English
+          - Fixed the satellite selection screen showing only amateur satellites due to an invisible, retired "Amateur" filter; new installs default to "All".
+          - Selecting "All" now shows every satellite stored in the local database, regardless of TLE source. Migrated legacy filters without changing users' selected satellites or pass predictions.
+          - Preserved each source's last valid satellite classification when a download fails or returns no entries; kept "All" mutually exclusive with narrower filters.
+          - Verification: Release CI runs unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest), and checks signed APK certificate, version, and both ARM ABIs before publishing.
 
-          ## v18.5 — 中文
-          - 修复匹配过境中友台网格卫星落下（共同可见窗口结束）时，雷达页面自动跳回主界面的问题。
-          - 匹配过境结束或本地卫星落下后仍保留雷达页面，用户可自行决定何时返回。
-          - 保留主动离开雷达页面时清理匹配过境数据的行为。
+          ## v18.6 — 中文
+          - 修复已废弃但仍隐形生效的“Amateur”筛选导致卫星选择页只显示业余卫星的问题；新安装默认选择“All”。
+          - 选择“All”后显示本地数据库中的全部卫星，不再受 TLE 数据源限制；自动迁移旧筛选设置，不修改用户勾选的卫星或过境预测配置。
+          - 数据源下载失败或返回空数据时保留此前有效的卫星分类缓存，并使“All”与具体筛选类型互斥。
+          - 验证：发布 CI 在发布前运行单元测试（排除已有超时问题的 RadioConfigurationSaveTest），并检查签名证书、版本号和两个 ARM ABI。
           RELEASE_NOTES
           )"
           fi
