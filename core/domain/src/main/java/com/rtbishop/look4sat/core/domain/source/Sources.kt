@@ -89,11 +89,8 @@ object Sources {
      *  types in the picker. */
     val virtualTypeNames = listOf("AMSAT Live FM", "AMSAT Live Linear", "Live SSTV")
 
-    /** Key of the CelesTrak "active" group source in [satelliteDataUrls] — the whole
-     *  catalogue. Selecting it means "all satellites", so when its persisted id list
-     *  is empty the picker must fall back to no filtering instead of showing an empty
-     *  list. The list can legitimately be empty: CelesTrak answers 403 ("GP data has
-     *  not updated since your last successful download", groups update every 2 hours)
-     *  when a group is re-requested, and the sync then persists nothing for that type. */
+    /** Selecting "All" displays every satellite stored locally, regardless of which
+     *  enabled TLE source supplied it. The CelesTrak active-group ID cache is not
+     *  used to restrict this filter. */
     val allSourceType = "All"
 }
