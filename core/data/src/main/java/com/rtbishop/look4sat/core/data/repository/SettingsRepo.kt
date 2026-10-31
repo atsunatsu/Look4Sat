@@ -133,9 +133,23 @@ class SettingsRepo(
     }
 
     override fun setSelectedTypes(types: List<String>) {
-        val typesString = types.joinToString(separatorComma)
-        preferences.edit { putString(keySelectedTypes, typesString) }
-        _typesSelection.value = types
+        val validTypes = sanitizeSelectedTypes(types)
+        preferences.edit { putString(keySelectedTypes, validTypes.joinToString(separatorComma)) }
+        _typesSelection.value = validTypes
+    }
+
+    /** Remove retired source labels before persisting any user selection. */
+    private fun sanitizeSelectedTypes(types: List<String>): List<String> {
+        if (types.isEmpty()) return emptyList() // An explicit empty selection also shows all.
+        val supported = (Sources.virtualTypeNames +
+            Sources.satelliteDataUrls.keys.filterNot { it == "Other" }).toSet()
+        val valid = types.map { it.trim() }.filter { it in supported }.distinct()
+        // "All" overrides every narrower source or activity filter.
+        return when {
+            Sources.allSourceType in valid -> listOf(Sources.allSourceType)
+            valid.isNotEmpty() -> valid
+            else -> listOf(Sources.allSourceType)
+        }
     }
 
     private fun getSelectedIds(): List<Int> {
@@ -145,9 +159,22 @@ class SettingsRepo(
     }
 
     private fun getSelectedTypes(): List<String> {
-        val typesString = preferences.getString(keySelectedTypes, "Amateur")
-        if (typesString.isNullOrEmpty()) return emptyList()
-        return typesString.split(separatorComma)
+        val stored = preferences.getString(keySelectedTypes, null)
+        val types = when {
+            stored == null -> listOf(Sources.allSourceType) // New installs start with all satellites.
+            stored.isEmpty() -> emptyList() // Preserve a user's deliberately empty filter.
+            else -> sanitizeSelectedTypes(stored.split(separatorComma))
+        }
+        // Migrate old invisible "Amateur" selections, and drop their obsolete
+        // cached catnums. Never touch selectedIds (the satellites used for passes).
+        val normalized = types.joinToString(separatorComma)
+        if (stored != normalized || preferences.contains("typeAmateur")) {
+            preferences.edit {
+                putString(keySelectedTypes, normalized)
+                remove("typeAmateur")
+            }
+        }
+        return types
     }
     //endregion
 
