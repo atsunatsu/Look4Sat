@@ -86,10 +86,12 @@ class SatelliteRepo(
         combine(
             settingsRepo.selectedIds,
             settingsRepo.stationPosition,
+            // Re-load the freshly persisted ephemerides after manual/automatic updates.
+            settingsRepo.databaseState,
             // Recalculate passes when the UTC display toggle changes, so an existing
             // AOS time window is reapplied in the newly selected timezone.
             settingsRepo.otherSettings.map { it.stateOfUtc }.distinctUntilChanged()
-        ) { selectedIds, _, _ -> selectedIds }
+        ) { selectedIds, _, _, _ -> selectedIds }
             .collect { selectedIds ->
                 _satellites.update { localStorage.getEntriesWithIds(selectedIds) }
                 val settings = settingsRepo.passesSettings.value

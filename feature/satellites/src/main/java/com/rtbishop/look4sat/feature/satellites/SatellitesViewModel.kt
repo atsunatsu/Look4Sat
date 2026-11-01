@@ -27,6 +27,7 @@ import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -50,7 +51,15 @@ class SatellitesViewModel(
         viewModelScope.launch {
             selectionRepo.setQuery(String())
             selectionRepo.setTypes(defaultTypes)
-            selectionRepo.getEntriesFlow().collectLatest { items ->
+            // Refresh the satellite selector when a new ephemeris database is committed.
+            // Keep the live item observer while reloading the underlying catalogue.
+            val entries = selectionRepo.getEntriesFlow()
+            launch {
+                settingsRepo.databaseState.drop(1).collectLatest {
+                    selectionRepo.getEntriesFlow()
+                }
+            }
+            entries.collectLatest { items ->
                 _uiState.update { it.copy(isLoading = false, itemsList = items) }
             }
         }
