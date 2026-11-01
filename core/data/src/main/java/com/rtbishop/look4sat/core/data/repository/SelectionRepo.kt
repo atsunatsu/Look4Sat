@@ -29,9 +29,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalCoroutinesApi::class)
 internal fun mergeReloadedSatellites(
     existing: List<SatItem>,
     refreshed: List<SatItem>,
@@ -43,6 +43,7 @@ internal fun mergeReloadedSatellites(
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SelectionRepo(
     private val dispatcher: CoroutineDispatcher,
     private val localSource: ILocalSource,
