@@ -168,12 +168,10 @@ fun ElevationCurveChart(
                 ptsA.add(Offset(x, yA))
                 ptsB.add(Offset(x, yB))
             }
-            drawElevationThresholdTrack(
-                ptsA, samples.map { it.second.first }, minElevationA, colorA, 2.5f
-            )
-            drawElevationThresholdTrack(
-                ptsB, samples.map { it.second.second }, minElevationB, colorB, 2.5f
-            )
+            val (smoothA, smoothElevA) = smoothElevationCurve(ptsA, samples.map { it.second.first })
+            val (smoothB, smoothElevB) = smoothElevationCurve(ptsB, samples.map { it.second.second })
+            drawElevationThresholdTrack(smoothA, smoothElevA, minElevationA, colorA, 2.5f)
+            drawElevationThresholdTrack(smoothB, smoothElevB, minElevationB, colorB, 2.5f)
 
             // Drag indicator
             val dragX = plotLeft + progress * plotWidth
