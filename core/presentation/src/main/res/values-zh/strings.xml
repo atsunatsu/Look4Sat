@@ -652,5 +652,4 @@
     <string name="lotw_upload_result_copy_details">复制错误详情</string>
     <string name="lotw_upload_result_retry">安全重试</string>
     <string name="lotw_upload_result_close">关闭</string>
-    <string name="mutual_threshold_line_legend">实线 &gt; 最低仰角 · 虚线 ≤ 最低仰角</string>
 </resources>

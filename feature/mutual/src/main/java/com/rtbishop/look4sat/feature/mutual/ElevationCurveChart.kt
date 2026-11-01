@@ -226,12 +226,6 @@ fun ElevationCurveChart(
             Text(stringResource(R.string.mutual_station_a), color = colorA, fontSize = 12.sp)
             Text(stringResource(R.string.mutual_station_b), color = colorB, fontSize = 12.sp)
         }
-        Text(
-            stringResource(R.string.mutual_threshold_line_legend),
-            color = textColor,
-            fontSize = 11.sp,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-        )
     }
 }
 

@@ -32,8 +32,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import com.rtbishop.look4sat.core.presentation.R
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -138,12 +136,6 @@ fun MutualRadarView(
             Text("● $labelA", color = colorA, fontSize = 12.sp)
             Text("● $labelB", color = colorB, fontSize = 12.sp)
         }
-        Text(
-            stringResource(R.string.mutual_threshold_line_legend),
-            color = textColor,
-            fontSize = 11.sp,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-        )
     }
 }
 
