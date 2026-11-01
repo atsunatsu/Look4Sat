@@ -36,8 +36,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.isActive
 
 /**
  * The OS-visible status-bar entry is backed by a data-sync foreground service.
@@ -86,7 +84,7 @@ class LoTWForegroundSyncService : Service() {
 
         // Android requires the initial foreground notification immediately,
         // before the first network or database operation.
-        val starting = notification("Preparing LoTW synchronization", null)
+        val starting = notification("Preparing LoTW synchronization", null, indeterminate = true)
         if (Build.VERSION.SDK_INT >= 29) {
             startForeground(NOTIFICATION_ID, starting, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
@@ -100,9 +98,15 @@ class LoTWForegroundSyncService : Service() {
             } catch (e: Exception) {
                 report(run, "LoTW synchronization failed", null)
                 android.util.Log.e("LoTWForegroundSync", "Synchronization failed", e)
-            } finally {
-                val cancelled = !currentCoroutineContext().isActive
-                main.post { finish(run, if (cancelled) "LoTW synchronization cancelled" else null) }
+            }
+        }.also { job ->
+            // Completion callbacks also run when cancellation happens before the
+            // coroutine body is dispatched; a finally block alone cannot cover it.
+            job.invokeOnCompletion { cause ->
+                main.post {
+                    finish(run, if (cause is kotlinx.coroutines.CancellationException)
+                        "LoTW synchronization cancelled" else null)
+                }
             }
         }
         // Do not restart an interrupted LoTW download without user intent:
@@ -136,7 +140,7 @@ class LoTWForegroundSyncService : Service() {
                 LoTWForegroundSyncStatus.state.value.copy(mode = mode))
         }
         val since = if (mode == LoTWSyncMode.Incremental) lotwIncrementalSince(settings) else ""
-        report(run, "Connecting to LoTW", null)
+        report(run, "Connecting to LoTW", null, indeterminate = true)
         val result = container.lotwRepo.fetchConfirmedGridQsos(
             callsign, account.password, since
         ) { progress ->
@@ -163,19 +167,19 @@ class LoTWForegroundSyncService : Service() {
         }
     }
 
-    private fun report(run: Long, message: String, progress: LoTWProgress?) {
+    private fun report(run: Long, message: String, progress: LoTWProgress?, indeterminate: Boolean = false) {
         main.post {
             if (currentRun != run) return@post
             LoTWForegroundSyncStatus.publish(
                 LoTWForegroundSyncStatus.state.value.copy(progress = progress, message = message))
             runCatching {
                 getSystemService(NotificationManager::class.java)
-                    .notify(NOTIFICATION_ID, notification(message, progress))
+                    .notify(NOTIFICATION_ID, notification(message, progress, indeterminate))
             }
         }
     }
 
-    private fun notification(message: String, progress: LoTWProgress?): Notification {
+    private fun notification(message: String, progress: LoTWProgress?, indeterminate: Boolean = false): Notification {
         val openApp = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -191,10 +195,15 @@ class LoTWForegroundSyncService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .apply {
-                if (progress != null && progress.expectedBytes > 0) {
-                    setProgress(100, (progress.fraction * 100).toInt(), false)
-                } else {
-                    setProgress(0, 0, true)
+                when {
+                    progress?.phase == LoTWPhase.Downloading && progress.expectedBytes > 0 ->
+                        setProgress(100, (progress.fraction * 100).toInt(), false)
+                    indeterminate || progress != null ->
+                        setProgress(0, 0, true)
+                    // Download ended: parsing / database merge may still be in
+                    // progress. Keep the foreground notification, but do not
+                    // present that processing phase as an ongoing download.
+                    else -> setProgress(0, 0, false)
                 }
             }
             .build()
