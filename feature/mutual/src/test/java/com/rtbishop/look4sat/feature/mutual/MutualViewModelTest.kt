@@ -118,13 +118,13 @@ class MutualViewModelTest {
     }
 
     @Test
-    fun `invalid grid leaves lat and lon untouched`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+    fun `invalid grid clears stale coordinates instead of using an old location`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
         val vm = createVm(position = TestOrbits.GUANGZHOU)
-        val before = vm.uiState.value.stationALat
-        vm.onStationAGrid("ZZ99") // valid shape, out-of-range letters
+        vm.onStationAGrid("ZZ99") // Invalid Maidenhead field letters.
 
         assertEquals("ZZ99", vm.uiState.value.stationAGrid)
-        assertEquals(before, vm.uiState.value.stationALat)
+        assertEquals("", vm.uiState.value.stationALat)
+        assertEquals("", vm.uiState.value.stationALon)
     }
 
     @Test
