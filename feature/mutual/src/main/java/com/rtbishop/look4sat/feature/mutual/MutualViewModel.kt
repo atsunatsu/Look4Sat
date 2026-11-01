@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.roundToInt
 
@@ -121,8 +122,8 @@ class MutualViewModel(
         val grid = positionToQth(pos.latitude, pos.longitude) ?: ""
         _uiState.update { it.copy(
             stationAGrid = grid,
-            stationALat = "%.4f".format(pos.latitude),
-            stationALon = "%.4f".format(pos.longitude),
+            stationALat = "%.4f".format(Locale.US, pos.latitude),
+            stationALon = "%.4f".format(Locale.US, pos.longitude),
             stationAMinElev = 0.0,
             stationBMinElev = 0.0,
             isUtc = settingsRepo.otherSettings.value.stateOfUtc
@@ -171,9 +172,12 @@ class MutualViewModel(
         val pos = qthToPosition(newGrid)
         if (pos != null) {
             _uiState.update { it.copy(
-                stationALat = "%.4f".format(pos.latitude),
-                stationALon = "%.4f".format(pos.longitude)
+                stationALat = "%.4f".format(Locale.US, pos.latitude),
+                stationALon = "%.4f".format(Locale.US, pos.longitude)
             )}
+        } else {
+            // Do not calculate with coordinates left over from an older grid.
+            _uiState.update { it.copy(stationALat = "", stationALon = "") }
         }
     }
 
@@ -207,9 +211,11 @@ class MutualViewModel(
         val pos = qthToPosition(newGrid)
         if (pos != null) {
             _uiState.update { it.copy(
-                stationBLat = "%.4f".format(pos.latitude),
-                stationBLon = "%.4f".format(pos.longitude)
+                stationBLat = "%.4f".format(Locale.US, pos.latitude),
+                stationBLon = "%.4f".format(Locale.US, pos.longitude)
             )}
+        } else {
+            _uiState.update { it.copy(stationBLat = "", stationBLon = "") }
         }
     }
     fun onStationAMinElev(value: Double) = _uiState.update { it.copy(stationAMinElev = value) }
@@ -217,8 +223,8 @@ class MutualViewModel(
     fun onUseCurrentPosition() {
         val pos = settingsRepo.stationPosition.value
         _uiState.update { it.copy(
-            stationALat = "%.4f".format(pos.latitude),
-            stationALon = "%.4f".format(pos.longitude),
+            stationALat = "%.4f".format(Locale.US, pos.latitude),
+            stationALon = "%.4f".format(Locale.US, pos.longitude),
             stationAGrid = positionToQth(pos.latitude, pos.longitude) ?: ""
         ) }
     }
@@ -259,8 +265,8 @@ class MutualViewModel(
             val enableBothFilters = !state.filterFM && !state.filterLinear
             state.copy(
                 stationBGrid = normalized,
-                stationBLat = "%.4f".format(target.latitude),
-                stationBLon = "%.4f".format(target.longitude),
+                stationBLat = "%.4f".format(Locale.US, target.latitude),
+                stationBLon = "%.4f".format(Locale.US, target.longitude),
                 hoursAhead = 24,
                 pendingNavigation = false,
                 scrollToTimeRange = false,
@@ -315,8 +321,8 @@ class MutualViewModel(
         _uiState.update {
             it.copy(
                 stationBGrid = g,
-                stationBLat = pos?.let { p -> "%.4f".format(p.latitude) } ?: it.stationBLat,
-                stationBLon = pos?.let { p -> "%.4f".format(p.longitude) } ?: it.stationBLon,
+                stationBLat = pos?.let { p -> "%.4f".format(Locale.US, p.latitude) } ?: it.stationBLat,
+                stationBLon = pos?.let { p -> "%.4f".format(Locale.US, p.longitude) } ?: it.stationBLon,
                 hoursAhead = 24,
                 scrollToTimeRange = true,
                 pendingNavigation = true
@@ -462,15 +468,16 @@ class MutualViewModel(
         }
     }
 
-    /** Resolve a position from lat/lon text or grid square text. */
+    /** The coordinate fields are authoritative. Entering/picking a grid fills them
+     * with its centre; editing either coordinate preserves the exact input instead
+     * of silently snapping back to the six-character Maidenhead centre.
+     * Invalid coordinates must not fall back to a stale grid value.
+     */
     private fun resolvePosition(latText: String, lonText: String, gridText: String): GeoPos? {
-        val trimmed = gridText.trim().uppercase()
-        if (trimmed.length in listOf(4, 6, 8) && trimmed.all { it.isLetterOrDigit() }) {
-            return qthToPosition(trimmed)
-        }
-        val lat = latText.toDoubleOrNull()
-        val lon = lonText.toDoubleOrNull()
-        return if (lat != null && lon != null) GeoPos(lat, lon) else null
+        val lat = latText.toDoubleOrNull() ?: return null
+        val lon = lonText.toDoubleOrNull() ?: return null
+        if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return null
+        return GeoPos(lat, lon)
     }
 
     private fun findMutualPasses(

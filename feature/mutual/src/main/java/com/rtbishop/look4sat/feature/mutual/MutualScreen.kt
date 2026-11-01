@@ -438,10 +438,8 @@ private fun MutualContent(
                 labelA = stringResource(R.string.mutual_label_you),
                 labelB = stringResource(R.string.mutual_label_opposite),
                 stationBGrid = state.stationBGrid.trim().uppercase(),
-                stationBLatitude = com.rtbishop.look4sat.core.domain.utility.qthToPosition(state.stationBGrid)?.latitude
-                    ?: state.stationBLat.toDoubleOrNull(),
-                stationBLongitude = com.rtbishop.look4sat.core.domain.utility.qthToPosition(state.stationBGrid)?.longitude
-                    ?: state.stationBLon.toDoubleOrNull()
+                stationBLatitude = state.stationBLat.toDoubleOrNull(),
+                stationBLongitude = state.stationBLon.toDoubleOrNull()
             )
             SwipeableItem(
                 onSwipeRight = { onFocusCatNum(pass.catNum) },
