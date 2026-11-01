@@ -86,10 +86,12 @@ class SatelliteRepo(
         combine(
             settingsRepo.selectedIds,
             settingsRepo.stationPosition,
+            // Re-load the freshly persisted ephemerides after manual/automatic updates.
+            settingsRepo.databaseState,
             // Recalculate passes when the UTC display toggle changes, so an existing
             // AOS time window is reapplied in the newly selected timezone.
             settingsRepo.otherSettings.map { it.stateOfUtc }.distinctUntilChanged()
-        ) { selectedIds, _, _ -> selectedIds }
+        ) { selectedIds, _, _, _ -> selectedIds }
             .collect { selectedIds ->
                 _satellites.update { localStorage.getEntriesWithIds(selectedIds) }
                 val settings = settingsRepo.passesSettings.value
@@ -160,10 +162,13 @@ class SatelliteRepo(
         withContext(dispatcher) {
             val idsWithModes = localStorage.getIdsWithModes(modes)
             val stationPos = settingsRepo.stationPosition.value
-            val filteredSatellites = if (idsWithModes.isEmpty()) {
+            // An empty mode selection means "all"; a selected mode with no matching
+            // transmitter means no passes, not every satellite in the database.
+            val filteredSatellites = if (modes.isEmpty()) {
                 currentSatellites
             } else {
-                currentSatellites.filter { it.data.catnum in idsWithModes }
+                val allowedIds = idsWithModes.toHashSet()
+                currentSatellites.filter { it.data.catnum in allowedIds }
             }
             // Compute passes for each satellite in parallel
             val passLists = coroutineScope {

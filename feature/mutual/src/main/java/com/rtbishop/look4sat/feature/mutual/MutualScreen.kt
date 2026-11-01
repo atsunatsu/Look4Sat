@@ -438,10 +438,8 @@ private fun MutualContent(
                 labelA = stringResource(R.string.mutual_label_you),
                 labelB = stringResource(R.string.mutual_label_opposite),
                 stationBGrid = state.stationBGrid.trim().uppercase(),
-                stationBLatitude = com.rtbishop.look4sat.core.domain.utility.qthToPosition(state.stationBGrid)?.latitude
-                    ?: state.stationBLat.toDoubleOrNull(),
-                stationBLongitude = com.rtbishop.look4sat.core.domain.utility.qthToPosition(state.stationBGrid)?.longitude
-                    ?: state.stationBLon.toDoubleOrNull()
+                stationBLatitude = state.stationBLat.toDoubleOrNull(),
+                stationBLongitude = state.stationBLon.toDoubleOrNull()
             )
             SwipeableItem(
                 onSwipeRight = { onFocusCatNum(pass.catNum) },
@@ -450,6 +448,8 @@ private fun MutualContent(
                 MutualPassCard(
                     pass = pass,
                     isExpanded = state.selectedPassIndex == index,
+                    minElevationA = state.stationAMinElev,
+                    minElevationB = state.stationBMinElev,
                     timeFormat = timeFormat,
                     isUtc = state.isUtc,
                     onClick = { onSelectPass(if (state.selectedPassIndex == index) -1 else index) },
@@ -725,6 +725,8 @@ private fun MatchSearchCard(
 private fun MutualPassCard(
     pass: MutualPass,
     isExpanded: Boolean,
+    minElevationA: Double,
+    minElevationB: Double,
     timeFormat: SimpleDateFormat,
     isUtc: Boolean,
     onClick: () -> Unit,
@@ -827,6 +829,8 @@ private fun MutualPassCard(
                         )
                         MutualRadarView(
                             trackSamples = visibleTracks,
+                            minElevationA = minElevationA,
+                            minElevationB = minElevationB,
                             progress = dragProgress,
                             labelA = stringResource(R.string.mutual_label_you),
                             labelB = stringResource(R.string.mutual_label_opposite)
@@ -839,6 +843,8 @@ private fun MutualPassCard(
                             startTime = visibleStart,
                             endTime = visibleEnd,
                             maxElev = adjustedMaxElev,
+                            minElevationA = minElevationA,
+                            minElevationB = minElevationB,
                             isUtc = isUtc,
                             progress = dragProgress,
                             onProgressChange = { dragProgress = it }

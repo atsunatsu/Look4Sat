@@ -31,6 +31,7 @@ import com.rtbishop.look4sat.core.domain.predict.OrbitalObject
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
+import com.rtbishop.look4sat.core.domain.repository.MutualPassData
 import com.rtbishop.look4sat.core.domain.repository.IRadioTrackingService
 import com.rtbishop.look4sat.core.domain.repository.IReporter
 import com.rtbishop.look4sat.core.domain.repository.ISatelliteRepo
@@ -68,7 +69,8 @@ class RadarViewModel(
     private val trackingService: IRadioTrackingService,
     private val audioHub: IAudioHub,
     private val saveImage: ISaveImage,
-    private val showToast: IShowToast
+    private val showToast: IShowToast,
+    private val mutualSession: MutualPassData = MutualPassData()
 ) : ViewModel() {
 
     private val stationPos = settingsRepo.stationPosition.value
@@ -169,10 +171,32 @@ class RadarViewModel(
     private fun findCurrentPass(): OrbitalPass? {
         val passes = satelliteRepo.passes.value
         val (catNum, aosTime) = satelliteRepo.selectedPass.value
+
+        // Mutual passes are calculated independently of the main pass filters.
+        // Their AOS is the common-visibility start, not necessarily the local AOS.
+        // Keep that exact session instead of falling back to an unrelated pass.
+        if (mutualSession.startTime == aosTime && mutualSession.endTime > aosTime) {
+            val satellite = satelliteRepo.satellites.value.firstOrNull { it.data.catnum == catNum }
+                ?: passes.firstOrNull { it.catNum == catNum }?.orbitalObject
+                ?: return null
+            val first = mutualSession.trackSamples.firstOrNull()
+            val last = mutualSession.trackSamples.lastOrNull()
+            val midTime = aosTime + (mutualSession.endTime - aosTime) / 2L
+            return OrbitalPass(
+                aosTime = aosTime,
+                aosAzimuth = first?.azimuthA ?: 0.0,
+                losTime = mutualSession.endTime,
+                losAzimuth = last?.azimuthA ?: 0.0,
+                altitude = satellite.getFullPosition(settingsRepo.stationPosition.value, midTime).altitude.toInt(),
+                maxElevation = mutualSession.samples.maxOfOrNull { it.second.first } ?: 0.0,
+                orbitalObject = satellite
+            )
+        }
+
+        // A filtered-out or expired pass must not silently turn into some other
+        // satellite's pass (nor an arbitrary future pass of the same satellite).
         return passes.find { it.catNum == catNum && it.aosTime == aosTime }
             ?: passes.find { it.catNum == catNum && aosTime in it.aosTime..it.losTime }
-            ?: passes.find { it.catNum == catNum }
-            ?: passes.firstOrNull()
     }
 
     // Loads transmitters and satellite track for pass, sets initial state, returns full radio list
@@ -664,7 +688,8 @@ class RadarViewModel(
                     trackingService = container.radioTrackingService,
                     audioHub = container.audioHub,
                     saveImage = container.provideSaveImage(),
-                    showToast = container.provideShowToast()
+                    showToast = container.provideShowToast(),
+                    mutualSession = container.mutualPassData.value
                 )
             }
         }

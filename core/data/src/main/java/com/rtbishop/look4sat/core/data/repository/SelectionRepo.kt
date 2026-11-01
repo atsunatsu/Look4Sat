@@ -25,6 +25,7 @@ import com.rtbishop.look4sat.core.domain.source.Sources
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -46,7 +47,8 @@ class SelectionRepo(
     // The three virtual types ("AMSAT Live FM", "AMSAT Live Linear", "Live SSTV")
     // are resolved from hardcoded FM/Linear catnum sets (Sources) or live
     // SSTV transponder data instead of SharedPreferences.
-    private val itemsWithTypes = currentTypes.flatMapLatest { types: List<String> ->
+    private val itemsWithTypes = combine(currentTypes, settingsRepo.databaseState) { types, _ -> types }
+        .flatMapLatest { types: List<String> ->
         // "All" includes every satellite stored locally, not just the
         // CelesTrak active source's last downloaded catnum list.
         val catnumSet: Set<Int>? = if (types.isEmpty() || Sources.allSourceType in types) {

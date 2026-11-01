@@ -57,8 +57,10 @@ fun qthToPosition(locator: String): GeoPos? {
  * square and subsquare letters). Returns null for out-of-range positions.
  */
 fun positionToQth(latitude: Double, longitude: Double): String? {
-    if (!isValidPosition(latitude, longitude)) return null
-    val newLongitude = if (longitude > 180.0) longitude else longitude + 180
+    // The north pole has no valid first-row Maidenhead square. Wrap 180°E
+    // (and legacy 0..360° inputs) rather than emitting fields beyond R.
+    if (!isValidPosition(latitude, longitude) || latitude >= 90.0) return null
+    val newLongitude = normalizeLongitude(longitude) + 180.0
     val newLatitude = latitude + 90
     val lonFirst = (65 + (newLongitude / 20)).toInt().toChar()
     val latFirst = (65 + (newLatitude / 10)).toInt().toChar()
@@ -113,11 +115,11 @@ private fun isValidPosition(lat: Double, lon: Double): Boolean {
 }
 
 private fun isValidLocator(locator: String): Boolean {
-    // 4 chars: [A-X][A-X]\d\d ; 6 chars: + [A-X][A-X] ; 8 chars: + \d\d
+    // 4 chars: [A-R][A-R]\\d\\d ; 6 chars: + [A-X][A-X] ; 8 chars: + \\d\\d
     return when (locator.length) {
-        4 -> Regex("[A-X]{2}\\d{2}").matches(locator)
-        6 -> Regex("[A-X]{2}\\d{2}[A-X]{2}").matches(locator)
-        8 -> Regex("[A-X]{2}\\d{2}[A-X]{2}\\d{2}").matches(locator)
+        4 -> Regex("[A-R]{2}\\d{2}").matches(locator)
+        6 -> Regex("[A-R]{2}\\d{2}[A-X]{2}").matches(locator)
+        8 -> Regex("[A-R]{2}\\d{2}[A-X]{2}\\d{2}").matches(locator)
         else -> false
     }
 }
