@@ -14,7 +14,7 @@ name: Build Look4Sat APK
 # Local Gradle builds keep using the catalog unchanged. Most runs are manual; only the specific release commit has a guarded push trigger.
 
 on:
-  # One-shot v18.6 release automation; only the specific release commit runs on push.
+  # One-shot v18.7 release automation; only the specific release commit runs on push.
   push:
     branches: [main]
   workflow_dispatch:
@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   build:
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.18.6')) }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.18.7')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -239,17 +239,21 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.6 — English
-          - Fixed the satellite selection screen showing only amateur satellites due to an invisible, retired "Amateur" filter; new installs default to "All".
-          - Selecting "All" now shows every satellite stored in the local database, regardless of TLE source. Migrated legacy filters without changing users' selected satellites or pass predictions.
-          - Preserved each source's last valid satellite classification when a download fails or returns no entries; kept "All" mutually exclusive with narrower filters.
-          - Verification: Release CI runs unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest), and checks signed APK certificate, version, and both ARM ABIs before publishing.
+          ## v18.7 — English
+          - Fixed TLE update refresh so satellite selection and pass predictions re-read the latest orbit data.
+          - Corrected radio-mode filtering: if no satellite matches a selected mode, the pass list remains empty rather than showing all satellites.
+          - Fixed radar navigation from mutual-pass matches so it opens the intended pass rather than a different/filtered pass.
+          - Preserved precise user-entered coordinates in dual-station matching instead of snapping them back to Maidenhead grid centres; tightened Maidenhead field and longitude-boundary validation.
+          - Dual-station radar tracks and elevation curves now use solid lines above each station's own minimum elevation and dashed lines below or equal to it, without changing mutual-pass filtering.
+          - Release CI verifies unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest), signed APK certificate, version and both ARM ABIs.
 
-          ## v18.6 — 中文
-          - 修复已废弃但仍隐形生效的“Amateur”筛选导致卫星选择页只显示业余卫星的问题；新安装默认选择“All”。
-          - 选择“All”后显示本地数据库中的全部卫星，不再受 TLE 数据源限制；自动迁移旧筛选设置，不修改用户勾选的卫星或过境预测配置。
-          - 数据源下载失败或返回空数据时保留此前有效的卫星分类缓存，并使“All”与具体筛选类型互斥。
-          - 验证：发布 CI 在发布前运行单元测试（排除已有超时问题的 RadioConfigurationSaveTest），并检查签名证书、版本号和两个 ARM ABI。
+          ## v18.7 — 中文
+          - 修复 TLE 更新后卫星选择页与过境预测未及时重载最新轨道数据的问题。
+          - 修复筛选转发器模式但无匹配卫星时错误显示全部过境的问题。
+          - 修复双站匹配结果跳转雷达时可能打开其他过境的问题。
+          - 双站匹配保留用户输入的精确经纬度，不再强制退回 Maidenhead 网格中心；同时修正网格首字段及经度边界校验。
+          - 双方轨迹线及仰角曲线独立按各方最低仰角绘制：超过门限为实线，未超过为虚线。匹配筛选规则保持不变。
+          - 发布 CI 在发布前检查单元测试（排除已有超时问题的 RadioConfigurationSaveTest）、APK 签名、版本号及两种 ARM ABI。
           RELEASE_NOTES
           )"
           fi
