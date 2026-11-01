@@ -58,10 +58,12 @@ data class MutualUiState(
     val stationALat: String = "",
     val stationALon: String = "",
     val stationAGrid: String = "",
+    val stationAGridInvalid: Boolean = false,
     val stationAMinElev: Double = 10.0,
     val stationBLat: String = "",
     val stationBLon: String = "",
     val stationBGrid: String = "",
+    val stationBGridInvalid: Boolean = false,
     val stationBMinElev: Double = 10.0,
     val hoursAhead: Int = 24,
     /** 历史过境回看窗口(小时), 跟随主页面 Passes 设置; 匹配查询从
@@ -148,7 +150,7 @@ class MutualViewModel(
         val lon = _uiState.value.stationALon.toDoubleOrNull()
         if (lat != null && lon != null) {
             positionToQth(lat, lon)?.let { grid ->
-                _uiState.update { it.copy(stationAGrid = grid) }
+                _uiState.update { it.copy(stationAGrid = grid, stationAGridInvalid = false) }
             }
         }
     }
@@ -159,25 +161,22 @@ class MutualViewModel(
         val lon = value.toDoubleOrNull()
         if (lat != null && lon != null) {
             positionToQth(lat, lon)?.let { grid ->
-                _uiState.update { it.copy(stationAGrid = grid) }
+                _uiState.update { it.copy(stationAGrid = grid, stationAGridInvalid = false) }
             }
         }
     }
 
     fun onStationAGrid(value: String) {
-        val old = _uiState.value.stationAGrid
         val newGrid = value.trim().uppercase()
-        _uiState.update { it.copy(stationAGrid = newGrid) }
-        if (newGrid == old.trim().uppercase()) return
         val pos = qthToPosition(newGrid)
-        if (pos != null) {
-            _uiState.update { it.copy(
+        _uiState.update { state ->
+            if (pos != null) state.copy(
+                stationAGrid = newGrid, stationAGridInvalid = false,
                 stationALat = "%.4f".format(Locale.US, pos.latitude),
                 stationALon = "%.4f".format(Locale.US, pos.longitude)
-            )}
-        } else {
-            // Do not calculate with coordinates left over from an older grid.
-            _uiState.update { it.copy(stationALat = "", stationALon = "") }
+            ) else state.copy(stationAGrid = newGrid, stationAGridInvalid = true)
+            // Keep the previous precise coordinate inputs through partial edits,
+            // but block searching until the grid is valid again.
         }
     }
 
@@ -187,7 +186,7 @@ class MutualViewModel(
         val lon = _uiState.value.stationBLon.toDoubleOrNull()
         if (lat != null && lon != null) {
             positionToQth(lat, lon)?.let { grid ->
-                _uiState.update { it.copy(stationBGrid = grid) }
+                _uiState.update { it.copy(stationBGrid = grid, stationBGridInvalid = false) }
             }
         }
     }
@@ -198,24 +197,20 @@ class MutualViewModel(
         val lon = value.toDoubleOrNull()
         if (lat != null && lon != null) {
             positionToQth(lat, lon)?.let { grid ->
-                _uiState.update { it.copy(stationBGrid = grid) }
+                _uiState.update { it.copy(stationBGrid = grid, stationBGridInvalid = false) }
             }
         }
     }
 
     fun onStationBGrid(value: String) {
-        val old = _uiState.value.stationBGrid
         val newGrid = value.trim().uppercase()
-        _uiState.update { it.copy(stationBGrid = newGrid) }
-        if (newGrid == old.trim().uppercase()) return
         val pos = qthToPosition(newGrid)
-        if (pos != null) {
-            _uiState.update { it.copy(
+        _uiState.update { state ->
+            if (pos != null) state.copy(
+                stationBGrid = newGrid, stationBGridInvalid = false,
                 stationBLat = "%.4f".format(Locale.US, pos.latitude),
                 stationBLon = "%.4f".format(Locale.US, pos.longitude)
-            )}
-        } else {
-            _uiState.update { it.copy(stationBLat = "", stationBLon = "") }
+            ) else state.copy(stationBGrid = newGrid, stationBGridInvalid = true)
         }
     }
     fun onStationAMinElev(value: Double) = _uiState.update { it.copy(stationAMinElev = value) }
@@ -225,7 +220,8 @@ class MutualViewModel(
         _uiState.update { it.copy(
             stationALat = "%.4f".format(Locale.US, pos.latitude),
             stationALon = "%.4f".format(Locale.US, pos.longitude),
-            stationAGrid = positionToQth(pos.latitude, pos.longitude) ?: ""
+            stationAGrid = positionToQth(pos.latitude, pos.longitude) ?: "",
+            stationAGridInvalid = false
         ) }
     }
     fun onHoursAhead(value: Int) = _uiState.update { it.copy(hoursAhead = value) }
@@ -265,6 +261,7 @@ class MutualViewModel(
             val enableBothFilters = !state.filterFM && !state.filterLinear
             state.copy(
                 stationBGrid = normalized,
+                stationBGridInvalid = false,
                 stationBLat = "%.4f".format(Locale.US, target.latitude),
                 stationBLon = "%.4f".format(Locale.US, target.longitude),
                 hoursAhead = 24,
@@ -321,6 +318,7 @@ class MutualViewModel(
         _uiState.update {
             it.copy(
                 stationBGrid = g,
+                stationBGridInvalid = pos == null,
                 stationBLat = pos?.let { p -> "%.4f".format(Locale.US, p.latitude) } ?: it.stationBLat,
                 stationBLon = pos?.let { p -> "%.4f".format(Locale.US, p.longitude) } ?: it.stationBLon,
                 hoursAhead = 24,
@@ -366,7 +364,7 @@ class MutualViewModel(
         var posA = resolvePosition(state.stationALat, state.stationALon, state.stationAGrid)
         var posB = resolvePosition(state.stationBLat, state.stationBLon, state.stationBGrid)
 
-        if (posA == null || posB == null) {
+        if (state.stationAGridInvalid || state.stationBGridInvalid || posA == null || posB == null) {
             _uiState.update { it.copy(isCalculating = false, errorMessage = "Please enter valid coordinates or a Maidenhead grid (4/6/8 chars)") }
             onCompleted?.invoke(emptyList())
             return

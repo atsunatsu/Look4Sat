@@ -45,6 +45,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicLong
+
+/** Only the most recently requested prediction may publish into the shared pass list. */
+internal class PassCalculationGeneration {
+    private val next = AtomicLong()
+    fun begin(): Long = next.incrementAndGet()
+    fun isLatest(generation: Long): Boolean = next.get() == generation
+}
 
 class SatelliteRepo(
     private val dispatcher: CoroutineDispatcher,
@@ -52,6 +60,7 @@ class SatelliteRepo(
     private val settingsRepo: ISettingsRepo
 ) : ISatelliteRepo {
 
+    private val calculationGeneration = PassCalculationGeneration()
     private val _passes = MutableStateFlow<List<OrbitalPass>>(emptyList())
     override val passes: StateFlow<List<OrbitalPass>> = _passes
 
@@ -154,7 +163,9 @@ class SatelliteRepo(
         invertAosTimeWindow: Boolean,
         modes: List<String>
     ) {
+        val generation = calculationGeneration.begin()
         _isCalculating.value = true
+        try {
         // Normalize to the start of the current minute so that coarse 60-second stepping
         // in getLeoPass always begins from the same phase, producing stable AOS/LOS times
         val normalizedTime = time / 60_000L * 60_000L
@@ -194,9 +205,11 @@ class SatelliteRepo(
             }
             newPasses.sortBy { it.aosTime }
             delay(1000) // Simulate loading time for better UX
-            _passes.update { newPasses }
+            if (calculationGeneration.isLatest(generation)) _passes.value = newPasses
         }
-        _isCalculating.value = false
+        } finally {
+            if (calculationGeneration.isLatest(generation)) _isCalculating.value = false
+        }
     }
 
     private fun isAosInRange(

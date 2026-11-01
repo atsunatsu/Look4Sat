@@ -118,13 +118,28 @@ class MutualViewModelTest {
     }
 
     @Test
-    fun `invalid grid clears stale coordinates instead of using an old location`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+    fun `partial grid edits retain coordinate text but invalidate the search`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
         val vm = createVm(position = TestOrbits.GUANGZHOU)
         vm.onStationAGrid("ZZ99") // Invalid Maidenhead field letters.
 
         assertEquals("ZZ99", vm.uiState.value.stationAGrid)
-        assertEquals("", vm.uiState.value.stationALat)
-        assertEquals("", vm.uiState.value.stationALon)
+        assertEquals("23.1300", vm.uiState.value.stationALat)
+        assertEquals("113.2600", vm.uiState.value.stationALon)
+        assertTrue(vm.uiState.value.stationAGridInvalid)
+        vm.onStationAGrid("OL63")
+        assertFalse(vm.uiState.value.stationAGridInvalid)
+    }
+
+    @Test
+    fun `invalid grid can be replaced by manually entered precise coordinates`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+        val vm = createVm(position = TestOrbits.GUANGZHOU)
+        vm.onStationAGrid("OL63P")
+        assertTrue(vm.uiState.value.stationAGridInvalid)
+        vm.onStationALat("22.54321")
+        vm.onStationALon("113.12345")
+        assertFalse(vm.uiState.value.stationAGridInvalid)
+        assertEquals("22.54321", vm.uiState.value.stationALat)
+        assertEquals("113.12345", vm.uiState.value.stationALon)
     }
 
     @Test
@@ -140,6 +155,19 @@ class MutualViewModelTest {
         assertEquals("23.1300", state.stationALat)
         assertEquals("113.2600", state.stationALon)
         assertTrue(state.stationAGrid.startsWith("OL63"))
+    }
+
+    @Test
+    fun `editing longitude also clears an invalid partial grid state`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+        val vm = createVm(position = TestOrbits.GUANGZHOU)
+        vm.onStationBGrid("OL63P")
+        assertTrue(vm.uiState.value.stationBGridInvalid)
+        vm.onStationBLat("22.5")
+        vm.onStationBGrid("OL63P")
+        assertTrue(vm.uiState.value.stationBGridInvalid)
+        vm.onStationBLon("114.01")
+        assertFalse(vm.uiState.value.stationBGridInvalid)
+        assertEquals("114.01", vm.uiState.value.stationBLon)
     }
 
     @Test

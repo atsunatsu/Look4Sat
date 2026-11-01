@@ -29,7 +29,19 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+
+internal fun mergeReloadedSatellites(
+    existing: List<SatItem>,
+    refreshed: List<SatItem>,
+    savedIds: Set<Int>
+): List<SatItem> {
+    val selectionById = existing.associate { it.catnum to it.isSelected }
+    return refreshed.map { item ->
+        item.copy(isSelected = selectionById[item.catnum] ?: (item.catnum in savedIds))
+    }
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SelectionRepo(
@@ -120,9 +132,10 @@ class SelectionRepo(
 
     override suspend fun getEntriesFlow() = withContext(dispatcher) {
         val selectedIds = settingsRepo.selectedIds.value.toHashSet()
-        currentItems.value = localSource.getEntriesList().map { item ->
-            item.copy(isSelected = item.catnum in selectedIds)
-        }
+        val refreshed = localSource.getEntriesList()
+        // Atomic merge: a database refresh must not discard ticks the user has
+        // not saved yet. Newly imported satellites inherit persisted selection.
+        currentItems.update { existing -> mergeReloadedSatellites(existing, refreshed, selectedIds) }
         return@withContext itemsWithQuery
     }
 

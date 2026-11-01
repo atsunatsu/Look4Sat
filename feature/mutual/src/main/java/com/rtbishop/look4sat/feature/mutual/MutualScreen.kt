@@ -134,13 +134,9 @@ fun MutualScreen(
                         // Target-grid chip: station B grid (station A defaults to
                         // the user's own position), bearing/distance from A to B.
                         val gridB = state.stationBGrid.trim().uppercase()
-                        val posA = com.rtbishop.look4sat.core.domain.utility.qthToPosition(state.stationAGrid)
-                            ?: state.stationALat.toDoubleOrNull()?.let { lat ->
-                                state.stationALon.toDoubleOrNull()?.let { lon ->
-                                    com.rtbishop.look4sat.core.domain.predict.GeoPos(lat, lon)
-                                }
-                            }
-                        val posB = com.rtbishop.look4sat.core.domain.utility.qthToPosition(gridB)
+                        // Use exactly the coordinates used for the mutual-pass search.
+                        val posA = if (state.stationAGridInvalid) null else matchInputPosition(state.stationALat, state.stationALon)
+                        val posB = if (state.stationBGridInvalid) null else matchInputPosition(state.stationBLat, state.stationBLon)
                         if (posA != null && posB != null) {
                             GridTargetChip(
                                 grid = gridB,
@@ -543,6 +539,14 @@ private fun mutualStatusChipText(state: MutualUiState): String = when {
     state.mutualPasses.isNotEmpty() -> stringResource(R.string.mutual_chip_matches, state.mutualPasses.size)
     state.hasSearched -> stringResource(R.string.mutual_chip_none)
     else -> stringResource(R.string.mutual_chip_idle)
+}
+
+/** No implicit fallback to grid centre: it would disagree with the pass calculation. */
+internal fun matchInputPosition(latText: String, lonText: String): com.rtbishop.look4sat.core.domain.predict.GeoPos? {
+    val lat = latText.toDoubleOrNull() ?: return null
+    val lon = lonText.toDoubleOrNull() ?: return null
+    if (!lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) return null
+    return com.rtbishop.look4sat.core.domain.predict.GeoPos(lat, lon)
 }
 
 @Composable
