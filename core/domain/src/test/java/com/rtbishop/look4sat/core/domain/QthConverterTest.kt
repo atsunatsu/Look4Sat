@@ -44,6 +44,10 @@ class QthConverterTest {
         assert(qthToPosition("JN5") == null) // odd length
         assert(qthToPosition("JN58Z") == null) // 5 chars
         assert(qthToPosition("JN58ZA") == null) // Z out of A-X range
+        assert(qthToPosition("AS00") == null) // latitude fields stop at R
+        assert(qthToPosition("SA00") == null) // longitude fields stop at R
+        assert(qthToPosition("RS00AB") == null)
+        assert(qthToPosition("AA00AB12") != null) // subsquares still use A-X
     }
 
     @Test
@@ -57,5 +61,8 @@ class QthConverterTest {
     fun `Given invalid POS returns null`() {
         assert(positionToQth(91.0542, -170.1142) == null)
         assert(positionToQth(89.0542, -240.1142) == null)
+        assert(positionToQth(90.0, 100.0) == null)
+        assert(positionToQth(23.13, 180.0) == positionToQth(23.13, -180.0))
+        assert(positionToQth(23.13, 360.0) == positionToQth(23.13, 0.0))
     }
 }
