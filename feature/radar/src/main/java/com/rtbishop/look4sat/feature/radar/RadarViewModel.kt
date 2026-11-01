@@ -53,6 +53,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
@@ -160,7 +163,14 @@ class RadarViewModel(
 
     private fun collectPassAndStartTickLoop() {
         viewModelScope.launch {
-            val pass = findCurrentPass() ?: return@launch
+            // Selection/pass loading may lag navigation after a TLE refresh. Wait
+            // for the *requested* pass rather than permanently opening a blank radar.
+            val pass = combine(
+                satelliteRepo.selectedPass,
+                satelliteRepo.passes,
+                satelliteRepo.satellites,
+                trackingService.state
+            ) { _, _, _, _ -> findCurrentPass() }.filterNotNull().first()
             val allRadios = loadPassData(pass)
             while (isActive) {
                 tickPass(pass, allRadios)
@@ -194,8 +204,14 @@ class RadarViewModel(
             )
         }
 
-        // A filtered-out or expired pass must not silently turn into some other
-        // satellite's pass (nor an arbitrary future pass of the same satellite).
+        // Active radio tracking remains valid even if the latest TLE, time
+        // window or radio-mode filter no longer includes that pass.
+        // Never fall back to a different satellite or an unrelated future pass.
+        val tracked = trackingService.state.value
+        val trackedPass = tracked.currentPass
+        if (tracked.isActive && trackedPass != null && trackedPass.catNum == catNum &&
+            (trackedPass.aosTime == aosTime || aosTime in trackedPass.aosTime..trackedPass.losTime)
+        ) return trackedPass
         return passes.find { it.catNum == catNum && it.aosTime == aosTime }
             ?: passes.find { it.catNum == catNum && aosTime in it.aosTime..it.losTime }
     }
