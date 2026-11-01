@@ -228,9 +228,16 @@ jobs:
           NOTES_IN: "${{ inputs.notes }}"
         run: |
           set -euo pipefail
+          # Republishing the same version is destructive: only a deliberately
+          # labeled push release commit may replace the existing public asset.
+          REPUBLISH=false
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::error::Release $TAG already exists; refusing to replace a published APK."
-            exit 1
+            COMMIT_SUBJECT="$(git log -1 --format=%s)"
+            if [ "$GITHUB_EVENT_NAME" != "push" ] || [ "$COMMIT_SUBJECT" != "release: v4.4.8-ba7opf.18.7 [republish]" ]; then
+              echo "::error::Release $TAG already exists. Explicit [republish] commit required."
+              exit 1
+            fi
+            REPUBLISH=true
           fi
           # The asset must carry the versioned name: the in-app updater guesses
           # Look4Sat-<tag without v>.apk, and gh's `file#label` only sets a display label,
@@ -260,6 +267,28 @@ jobs:
           if [ -z "$NOTES" ]; then
             NOTES="Look4Sat $VERSION (versionCode $CODE). Signed with the fork release key; installs over the previous release."
           fi
-          gh release create "$TAG" "$ASSET" --target "$GITHUB_SHA" --title "Look4Sat $TAG" \
-            --latest --notes "$NOTES"
-          echo "Published release $TAG"
+          if [ "$REPUBLISH" = true ]; then
+            OLD_NOTES="$(gh release view "$TAG" --json body --jq '.body')"
+            AMENDMENT="$(cat <<'REVISION_NOTES'
+          ## 18.7 修订版 / Revised 18.7 (2026-11-01)
+          - 修复过境列表被空模式筛选误清空、雷达最高仰角小数异常及多余的虚实线文字说明。
+          - 修复跟踪中雷达页过境丢失、异步预测旧结果覆盖新结果、TLE 更新丢失尚未保存的卫星勾选状态。
+          - 修复双站网格编辑清空精确坐标、距离方位不一致；恢复平滑仰角曲线并保留虚实线门限效果。
+          - 转发器源部分下载失败时保留已缓存的有效数据。
+          - Same package ID, release-signing certificate and versionName; higher Android versionCode allows installation over the original 18.7 APK.
+          - If already on 18.7, download and install this revised APK manually; same-name in-app update checks may not prompt.
+          REVISION_NOTES
+          )"
+            # Replace the single published asset only after all tests, signature,
+            # versionCode, and both ARM ABIs have passed.
+            gh release upload "$TAG" "$ASSET" --clobber
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" \
+              -f sha="$GITHUB_SHA" -F force=true
+            gh release edit "$TAG" --title "Look4Sat $TAG" --latest \
+              --notes "$(printf '%s\n\n%s\n' "$OLD_NOTES" "$AMENDMENT")"
+            echo "Explicitly republished $TAG from commit $GITHUB_SHA (versionCode $CODE)"
+          else
+            gh release create "$TAG" "$ASSET" --target "$GITHUB_SHA" --title "Look4Sat $TAG" \
+              --latest --notes "$NOTES"
+            echo "Published release $TAG"
+          fi
