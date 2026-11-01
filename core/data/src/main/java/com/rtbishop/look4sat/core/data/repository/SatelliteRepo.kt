@@ -162,10 +162,13 @@ class SatelliteRepo(
         withContext(dispatcher) {
             val idsWithModes = localStorage.getIdsWithModes(modes)
             val stationPos = settingsRepo.stationPosition.value
-            val filteredSatellites = if (idsWithModes.isEmpty()) {
+            // An empty mode selection means "all"; a selected mode with no matching
+            // transmitter means no passes, not every satellite in the database.
+            val filteredSatellites = if (modes.isEmpty()) {
                 currentSatellites
             } else {
-                currentSatellites.filter { it.data.catnum in idsWithModes }
+                val allowedIds = idsWithModes.toHashSet()
+                currentSatellites.filter { it.data.catnum in allowedIds }
             }
             // Compute passes for each satellite in parallel
             val passLists = coroutineScope {
