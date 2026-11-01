@@ -1,6 +1,7 @@
 package com.rtbishop.look4sat
 
 import android.app.Application
+import android.app.Notification
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import com.rtbishop.look4sat.core.domain.repository.LoTWForegroundStatus
@@ -54,6 +55,23 @@ class LoTWForegroundSyncServiceTest {
         assertTrue(shadowOf(controller.get()).isStoppedBySelf)
         assertFalse(LoTWForegroundSyncStatus.state.value.running)
         assertTrue(LoTWForegroundSyncStatus.state.value.message.orEmpty().contains("interrupted"))
+        controller.destroy()
+    }
+
+
+    @Test fun completedDownloadProcessingDoesNotShowEndlessProgressSpinner() {
+        val controller = Robolectric.buildService(LoTWForegroundSyncService::class.java).create()
+        val service = controller.get()
+        val method = service.javaClass.getDeclaredMethod(
+            "notification", String::class.java,
+            com.rtbishop.look4sat.core.domain.repository.LoTWProgress::class.java,
+            Boolean::class.javaPrimitiveType
+        ).apply { isAccessible = true }
+        val connecting = method.invoke(service, "Connecting to LoTW", null, true) as Notification
+        assertTrue(connecting.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
+        val saving = method.invoke(service, "Saving synchronized contacts", null, false) as Notification
+        assertFalse(saving.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
+        assertEquals(0, saving.extras.getInt(Notification.EXTRA_PROGRESS_MAX))
         controller.destroy()
     }
 
