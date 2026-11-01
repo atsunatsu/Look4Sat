@@ -30,10 +30,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import com.rtbishop.look4sat.core.presentation.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -49,13 +49,16 @@ private const val STROKE_WIDTH = 2.5f
 
 /**
  * Polar radar chart showing the satellite track as seen from both stations
- * on one plot. Station A is drawn solid, station B dashed.
+ * on one plot. Both stations use solid strokes above their own minimum
+ * elevation and dashed strokes below it; color distinguishes station identity.
  * Controlled: [progress] (0..1) and [onProgressChange] are owned by the parent
  * so the time cursor can be shared with the elevation curve chart.
  */
 @Composable
 fun MutualRadarView(
     trackSamples: List<TrackSample>,
+    minElevationA: Double = 0.0,
+    minElevationB: Double = 0.0,
     progress: Float = 0.5f,
     labelA: String = "Station A",
     labelB: String = "Station B",
@@ -89,43 +92,17 @@ fun MutualRadarView(
             // Grid: elevation rings + azimuth spokes + cardinal labels
             drawRadarGrid(center, radius, gridColor, textColor, measurer)
 
-            // Track paths (only the above-horizon arc, split at the 0/360° azimuth wrap)
-            val pathA = Path()
-            val pathB = Path()
-            var firstVisibleA = true
-            var firstVisibleB = true
-            var lastAzimA: Double? = null
-            var lastAzimB: Double? = null
-            trackSamples.forEach { sample ->
-                if (sample.elevationA > 0f) {
-                    val p = sph2Cart(center, sample.azimuthA, sample.elevationA, radius)
-                    val wrapA = lastAzimA != null && kotlin.math.abs(azimuthDelta(sample.azimuthA - lastAzimA!!)) > 180.0
-                    if (firstVisibleA || wrapA) {
-                        pathA.moveTo(p.x, p.y)
-                        firstVisibleA = false
-                    } else {
-                        pathA.lineTo(p.x, p.y)
-                    }
-                    lastAzimA = sample.azimuthA
-                }
-                if (sample.elevationB > 0f) {
-                    val p = sph2Cart(center, sample.azimuthB, sample.elevationB, radius)
-                    val wrapB = lastAzimB != null && kotlin.math.abs(azimuthDelta(sample.azimuthB - lastAzimB!!)) > 180.0
-                    if (firstVisibleB || wrapB) {
-                        pathB.moveTo(p.x, p.y)
-                        firstVisibleB = false
-                    } else {
-                        pathB.lineTo(p.x, p.y)
-                    }
-                    lastAzimB = sample.azimuthB
-                }
-            }
-
-            // Solid line for station A, dashed for station B
-            drawPath(pathA, colorA, style = Stroke(STROKE_WIDTH))
-            drawPath(
-                pathB, colorB,
-                style = Stroke(STROKE_WIDTH, pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
+            // Both tracks remain above the horizon; stroke style changes exactly
+            // at each station's minimum-elevation crossing (interpolated).
+            drawElevationThresholdTrack(
+                trackSamples.map { sph2Cart(center, it.azimuthA, it.elevationA, radius) },
+                trackSamples.map { it.elevationA },
+                minElevationA, colorA, STROKE_WIDTH, horizonOnly = true
+            )
+            drawElevationThresholdTrack(
+                trackSamples.map { sph2Cart(center, it.azimuthB, it.elevationB, radius) },
+                trackSamples.map { it.elevationB },
+                minElevationB, colorB, STROKE_WIDTH, horizonOnly = true
             )
 
             // AOS / LOS markers on both tracks
@@ -159,8 +136,14 @@ fun MutualRadarView(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             Text("● $labelA", color = colorA, fontSize = 12.sp)
-            Text("- - $labelB", color = colorB, fontSize = 12.sp)
+            Text("● $labelB", color = colorB, fontSize = 12.sp)
         }
+        Text(
+            stringResource(R.string.mutual_threshold_line_legend),
+            color = textColor,
+            fontSize = 11.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+        )
     }
 }
 

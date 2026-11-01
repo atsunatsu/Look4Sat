@@ -35,8 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -69,6 +67,8 @@ fun ElevationCurveChart(
     startTime: Long,
     endTime: Long,
     maxElev: Double,
+    minElevationA: Double = 0.0,
+    minElevationB: Double = 0.0,
     isUtc: Boolean = false,
     progress: Float = 0.5f,
     onProgressChange: (Float) -> Unit = {},
@@ -157,12 +157,10 @@ fun ElevationCurveChart(
                 )
             }
 
-            // Elevation curves (smooth cubic Bezier)
-            val pathA = Path()
-            val pathB = Path()
+            // Preserve the full above-horizon curves. Each station's stroke
+            // changes at its own elevation threshold, with interpolated crossings.
             val ptsA = mutableListOf<Offset>()
             val ptsB = mutableListOf<Offset>()
-
             for ((time, elev) in samples) {
                 val x = plotLeft + ((time - minTime).toFloat() / timeRange) * plotWidth
                 val yA = plotBottom - ((elev.first.toFloat() / maxElev.toFloat()) * plotHeight).coerceIn(0f, plotHeight)
@@ -170,31 +168,12 @@ fun ElevationCurveChart(
                 ptsA.add(Offset(x, yA))
                 ptsB.add(Offset(x, yB))
             }
-
-            if (ptsA.size >= 2) {
-                pathA.moveTo(ptsA[0].x, ptsA[0].y)
-                pathB.moveTo(ptsB[0].x, ptsB[0].y)
-                for (i in 1 until ptsA.size) {
-                    val p0a = ptsA.getOrNull(i - 2) ?: ptsA[i - 1]
-                    val p1a = ptsA[i - 1]
-                    val p2a = ptsA[i]
-                    val p3a = ptsA.getOrNull(i + 1) ?: ptsA[i]
-                    val cp1a = Offset(p1a.x + (p2a.x - p0a.x) / 6f, p1a.y + (p2a.y - p0a.y) / 6f)
-                    val cp2a = Offset(p2a.x - (p3a.x - p1a.x) / 6f, p2a.y - (p3a.y - p1a.y) / 6f)
-                    pathA.cubicTo(cp1a.x, cp1a.y, cp2a.x, cp2a.y, p2a.x, p2a.y)
-
-                    val p0b = ptsB.getOrNull(i - 2) ?: ptsB[i - 1]
-                    val p1b = ptsB[i - 1]
-                    val p2b = ptsB[i]
-                    val p3b = ptsB.getOrNull(i + 1) ?: ptsB[i]
-                    val cp1b = Offset(p1b.x + (p2b.x - p0b.x) / 6f, p1b.y + (p2b.y - p0b.y) / 6f)
-                    val cp2b = Offset(p2b.x - (p3b.x - p1b.x) / 6f, p2b.y - (p3b.y - p1b.y) / 6f)
-                    pathB.cubicTo(cp1b.x, cp1b.y, cp2b.x, cp2b.y, p2b.x, p2b.y)
-                }
-            }
-
-            drawPath(pathA, colorA, style = Stroke(width = 2.5f))
-            drawPath(pathB, colorB, style = Stroke(width = 2.5f))
+            drawElevationThresholdTrack(
+                ptsA, samples.map { it.second.first }, minElevationA, colorA, 2.5f
+            )
+            drawElevationThresholdTrack(
+                ptsB, samples.map { it.second.second }, minElevationB, colorB, 2.5f
+            )
 
             // Drag indicator
             val dragX = plotLeft + progress * plotWidth
@@ -247,6 +226,12 @@ fun ElevationCurveChart(
             Text(stringResource(R.string.mutual_station_a), color = colorA, fontSize = 12.sp)
             Text(stringResource(R.string.mutual_station_b), color = colorB, fontSize = 12.sp)
         }
+        Text(
+            stringResource(R.string.mutual_threshold_line_legend),
+            color = textColor,
+            fontSize = 11.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+        )
     }
 }
 

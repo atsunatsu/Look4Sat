@@ -448,6 +448,8 @@ private fun MutualContent(
                 MutualPassCard(
                     pass = pass,
                     isExpanded = state.selectedPassIndex == index,
+                    minElevationA = state.stationAMinElev,
+                    minElevationB = state.stationBMinElev,
                     timeFormat = timeFormat,
                     isUtc = state.isUtc,
                     onClick = { onSelectPass(if (state.selectedPassIndex == index) -1 else index) },
@@ -723,6 +725,8 @@ private fun MatchSearchCard(
 private fun MutualPassCard(
     pass: MutualPass,
     isExpanded: Boolean,
+    minElevationA: Double,
+    minElevationB: Double,
     timeFormat: SimpleDateFormat,
     isUtc: Boolean,
     onClick: () -> Unit,
@@ -825,6 +829,8 @@ private fun MutualPassCard(
                         )
                         MutualRadarView(
                             trackSamples = visibleTracks,
+                            minElevationA = minElevationA,
+                            minElevationB = minElevationB,
                             progress = dragProgress,
                             labelA = stringResource(R.string.mutual_label_you),
                             labelB = stringResource(R.string.mutual_label_opposite)
@@ -837,6 +843,8 @@ private fun MutualPassCard(
                             startTime = visibleStart,
                             endTime = visibleEnd,
                             maxElev = adjustedMaxElev,
+                            minElevationA = minElevationA,
+                            minElevationB = minElevationB,
                             isUtc = isUtc,
                             progress = dragProgress,
                             onProgressChange = { dragProgress = it }
