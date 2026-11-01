@@ -160,11 +160,12 @@ class SatelliteRepo(
         val normalizedTime = time / 60_000L * 60_000L
         val currentSatellites = _satellites.value
         withContext(dispatcher) {
-            val idsWithModes = localStorage.getIdsWithModes(modes)
+            val activeModes = modes.map { it.trim() }.filter { it.isNotEmpty() }
+            val idsWithModes = if (activeModes.isEmpty()) emptyList() else localStorage.getIdsWithModes(activeModes)
             val stationPos = settingsRepo.stationPosition.value
             // An empty mode selection means "all"; a selected mode with no matching
             // transmitter means no passes, not every satellite in the database.
-            val filteredSatellites = if (modes.isEmpty()) {
+            val filteredSatellites = if (activeModes.isEmpty()) {
                 currentSatellites
             } else {
                 val allowedIds = idsWithModes.toHashSet()
