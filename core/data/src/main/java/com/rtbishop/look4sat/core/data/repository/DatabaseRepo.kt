@@ -107,17 +107,22 @@ class DatabaseRepo(
             entries
         }
         importedTypeIds.forEach { (type, ids) -> settingsRepo.setSatelliteTypeIds(type, ids.distinct()) }
-        val importedRadios = radioResults.flatMap { (rawUrl, result) ->
+        // A partial or invalid transceiver download is NOT a complete snapshot.
+        // Upsert healthy feeds without deleting radios from the failed sources.
+        // A full refresh may prune retired entries only when every configured
+        // source returned valid, non-empty data. Custom records are never pruned.
+        val radioSnapshots = radioResults.map { (rawUrl, result) ->
             val normUrl = normalizeUrl(rawUrl)
-            result.stream?.let { dataParser.parseJSONStream(unwrapIfZipped(normUrl, it)) }.orEmpty()
-        }.filter { it.uuid.isNotBlank() }.distinctBy { it.uuid }
-        // insert parsed data into the database.
-        // Transceivers are a full snapshot: sources publish active entries only, so a retired
-        // transceiver simply disappears from the feed and has to be dropped locally as well.
-        // Manually imported ones (isCustom) are kept: no source can refresh them, so nothing
-        // would bring them back if they were replaced here.
+            val rows = if (result.code in 200..299) {
+                result.stream?.let { dataParser.parseJSONStream(unwrapIfZipped(normUrl, it)) }.orEmpty()
+                    .filter { it.uuid.isNotBlank() }
+            } else emptyList()
+            (result.code in 200..299 && rows.isNotEmpty()) to rows
+        }
+        val importedRadios = radioSnapshots.flatMap { it.second }.distinctBy { it.uuid }
+        val completeRadioSnapshot = radioSnapshots.isNotEmpty() && radioSnapshots.all { it.first }
         if (importedRadios.isNotEmpty()) {
-            localSource.deleteManagedRadios()
+            if (completeRadioSnapshot) localSource.deleteManagedRadios()
             localSource.insertRadios(importedRadios)
         }
         // Elements always come from the freshest source for every satellite; only

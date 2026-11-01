@@ -301,6 +301,40 @@ class DatabaseRepoTest {
         assertEquals(listOf(25544), localSource.insertedEntries.map { it.catnum })
     }
 
+    @Test
+    fun `one failed radio feed preserves previously cached radios until all feeds recover`() = runTest(dispatcher) {
+        val feedA = "https://example.com/radio-a.json"
+        val feedB = "https://example.com/radio-b.json"
+        val source = FakeLocalSource()
+        val network = FakeRemoteSource().apply {
+            networkStreams[feedA] = { radioJson("newA") }
+        }
+        val settings = FakeSettingsRepo(DataSourcesSettings(
+            satelliteUrls = emptyList(), transceiversUrls = listOf(feedA, feedB)
+        ))
+        source.insertRadios(listOf(radio("cachedB")))
+        val repository = DatabaseRepo(dispatcher, dataParser, source, network, settings)
+        repository.updateFromRemote()
+        assertEquals(0, source.managedRadioDeletes)
+        assertTrue(source.radioIds.containsAll(listOf("cachedB", "newA")))
+
+        network.networkStreams[feedB] = { radioJson("newB") }
+        repository.updateFromRemote()
+        assertEquals(1, source.managedRadioDeletes)
+        assertTrue(source.radioIds.containsAll(listOf("newA", "newB")))
+        assertTrue("stale records are dropped only after full success", "cachedB" !in source.radioIds)
+    }
+
+    private fun radio(uuid: String): SatRadio = SatRadio(
+        uuid, uuid, true, 145800000, null, "FM", null, null, null, false, 25544
+    )
+
+    private fun radioJson(uuid: String): InputStream = """
+        [{"uuid":"$uuid","description":"$uuid","alive":true,"downlink_low":145800000,
+          "downlink_high":null,"mode":"FM","uplink_low":null,"uplink_high":null,
+          "uplink_mode":null,"invert":false,"norad_cat_id":25544}]
+    """.trimIndent().byteInputStream()
+
     private fun validCsvStream(): InputStream = """
         OBJECT_NAME,OBJECT_ID,EPOCH,MEAN_MOTION,ECCENTRICITY,INCLINATION,RA_OF_ASC_NODE,ARG_OF_PERICENTER,MEAN_ANOMALY,EPHEMERIS_TYPE,CLASSIFICATION_TYPE,NORAD_CAT_ID,ELEMENT_SET_NO,REV_AT_EPOCH,BSTAR,MEAN_MOTION_DOT,MEAN_MOTION_DDOT
         ISS (ZARYA),1998-067A,${LocalDate.now()}T12:28:09.322176,15.48582035,.0004694,51.6447,309.4881,203.6966,299.8876,0,U,25544,999,31220,.31985E-4,.1288E-4,0
@@ -344,6 +378,8 @@ private class FakeRemoteSource : IRemoteSource {
 private class FakeLocalSource : ILocalSource {
     val insertedEntries = mutableListOf<OrbitalData>()
     private val insertedRadios = mutableListOf<SatRadio>()
+    var managedRadioDeletes = 0
+    val radioIds: Set<String> get() = insertedRadios.mapTo(mutableSetOf()) { it.uuid }
 
     override suspend fun getEntriesTotal(): Int = insertedEntries.size
 
@@ -388,6 +424,7 @@ private class FakeLocalSource : ILocalSource {
     }
 
     override suspend fun deleteManagedRadios() {
+        managedRadioDeletes++
         insertedRadios.removeAll { !it.isCustom }
     }
 
