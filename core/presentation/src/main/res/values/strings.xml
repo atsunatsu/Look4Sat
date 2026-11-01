@@ -680,5 +680,4 @@ Upstream: https://github.com/rt-bishop/Look4Sat</string>
     <string name="lotw_upload_result_copy_details">Copy error details</string>
     <string name="lotw_upload_result_retry">Retry safely</string>
     <string name="lotw_upload_result_close">Close</string>
-    <string name="mutual_threshold_line_legend">Solid &gt; minimum elevation · Dashed ≤ minimum elevation</string>
 </resources>
