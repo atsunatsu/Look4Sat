@@ -44,6 +44,7 @@ import com.rtbishop.look4sat.core.domain.cw.CwDecoder
 import com.rtbishop.look4sat.core.domain.usecase.IAddToCalendar
 import com.rtbishop.look4sat.core.domain.usecase.ISaveImage
 import com.rtbishop.look4sat.core.domain.usecase.IShowToast
+import com.rtbishop.look4sat.core.domain.utility.round
 import com.rtbishop.look4sat.core.domain.utility.toTimerString
 import com.rtbishop.look4sat.core.presentation.formatFrequency
 import kotlinx.coroutines.Dispatchers
@@ -188,7 +189,7 @@ class RadarViewModel(
                 losTime = mutualSession.endTime,
                 losAzimuth = last?.azimuthA ?: 0.0,
                 altitude = satellite.getFullPosition(settingsRepo.stationPosition.value, midTime).altitude.toInt(),
-                maxElevation = mutualSession.samples.maxOfOrNull { it.second.first } ?: 0.0,
+                maxElevation = (mutualSession.samples.maxOfOrNull { it.second.first } ?: 0.0).round(1),
                 orbitalObject = satellite
             )
         }

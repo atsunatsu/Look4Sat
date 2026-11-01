@@ -46,6 +46,10 @@ import java.util.Locale
 import com.rtbishop.look4sat.core.domain.model.Constants
 import com.rtbishop.look4sat.core.domain.source.Sources
 
+/** Blank persisted mode lists must mean no filter, not a single empty mode. */
+internal fun parsePassModesFromPreferences(raw: String?): List<String> =
+    raw?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.distinct()?.sorted().orEmpty()
+
 class SettingsRepo(
     private val locationManager: LocationManager,
     private val preferences: SharedPreferences,
@@ -621,8 +625,7 @@ class SettingsRepo(
         val aosStartMinute = preferences.getInt(keyFilterAosStartMinute, 0).coerceIn(0, 23 * 60 + 59)
         val aosEndMinute = preferences.getInt(keyFilterAosEndMinute, 23 * 60 + 59).coerceIn(0, 23 * 60 + 59)
         val invertAosTimeWindow = preferences.getBoolean(keyFilterAosInvert, false)
-        val selectedModesString = preferences.getString(keySelectedModes, null)
-        val selectedModes = selectedModesString?.split(separatorComma)?.sorted() ?: emptyList()
+        val selectedModes = parsePassModesFromPreferences(preferences.getString(keySelectedModes, null))
         return PassesSettings(
             showDeepSpace,
             hoursAhead,
