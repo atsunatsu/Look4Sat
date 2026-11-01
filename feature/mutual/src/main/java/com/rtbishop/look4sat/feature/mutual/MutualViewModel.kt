@@ -161,7 +161,7 @@ class MutualViewModel(
         val lon = value.toDoubleOrNull()
         if (lat != null && lon != null) {
             positionToQth(lat, lon)?.let { grid ->
-                _uiState.update { it.copy(stationAGrid = grid) }
+                _uiState.update { it.copy(stationAGrid = grid, stationAGridInvalid = false) }
             }
         }
     }
@@ -197,7 +197,7 @@ class MutualViewModel(
         val lon = value.toDoubleOrNull()
         if (lat != null && lon != null) {
             positionToQth(lat, lon)?.let { grid ->
-                _uiState.update { it.copy(stationBGrid = grid) }
+                _uiState.update { it.copy(stationBGrid = grid, stationBGridInvalid = false) }
             }
         }
     }

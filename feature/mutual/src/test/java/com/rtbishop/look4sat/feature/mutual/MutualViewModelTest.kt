@@ -158,6 +158,19 @@ class MutualViewModelTest {
     }
 
     @Test
+    fun `editing longitude also clears an invalid partial grid state`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
+        val vm = createVm(position = TestOrbits.GUANGZHOU)
+        vm.onStationBGrid("OL63P")
+        assertTrue(vm.uiState.value.stationBGridInvalid)
+        vm.onStationBLat("22.5")
+        vm.onStationBGrid("OL63P")
+        assertTrue(vm.uiState.value.stationBGridInvalid)
+        vm.onStationBLon("114.01")
+        assertFalse(vm.uiState.value.stationBGridInvalid)
+        assertEquals("114.01", vm.uiState.value.stationBLon)
+    }
+
+    @Test
     fun `station B independent from station A`() = runTest(mainDispatcherRule.dispatcher.scheduler) {
         val vm = createVm()
         vm.onStationBLat("22.54")
