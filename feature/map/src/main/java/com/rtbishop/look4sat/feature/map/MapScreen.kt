@@ -454,6 +454,19 @@ private fun MapScreen(
     val elevationSettingsRepo = remember(mapView.context.applicationContext) {
         (mapView.context.applicationContext as IContainerProvider).getMainContainer().settingsRepo
     }
+    // Manual WAIPA assignments live separately from synced QSO data and survive
+    // page switches, app restarts, and subsequent LoTW/Wavelog refreshes.
+    var waipaManualOverrides by remember(elevationSettingsRepo) {
+        mutableStateOf(elevationSettingsRepo.getWaipaManualOverrides())
+    }
+    fun resolveWaipaQso(
+        qso: com.rtbishop.look4sat.core.domain.model.GridQso,
+        provinceCode: String
+    ) {
+        val updated = waipaManualOverrides + (AwardCalculator.waipaQsoKey(qso) to provinceCode)
+        elevationSettingsRepo.setWaipaManualOverrides(updated)
+        waipaManualOverrides = updated
+    }
     val elevationAngles by elevationSettingsRepo.mapElevationAngles.collectAsStateWithLifecycle()
     // Shared by the satellite map and every radar/matching pass map; survives restarts.
     val showElevationContours by elevationSettingsRepo.mapElevationContoursEnabled.collectAsStateWithLifecycle()
@@ -545,17 +558,44 @@ private fun MapScreen(
     }
     // The same cached WAIPA boundary polygons drive map fill and award
     // geolocation. Resolves saved QSOs locally, without a new LoTW/Wavelog sync.
-    val waipaGridResolver = remember(mapView.context) {
-        WaipaGridResolver(AwardBoundaryData.load(mapView.context, AwardBoundaryData.AwardAsset.WAIPA))
+    val waipaRegions = remember(mapView.context) {
+        AwardBoundaryData.load(mapView.context, AwardBoundaryData.AwardAsset.WAIPA)
     }
+    val waipaGridResolver = remember(waipaRegions) { WaipaGridResolver(waipaRegions) }
     val awardProgress: List<AwardProgress> = remember(
-        uiState.workedGridQsos, workedGrids, selectedStationIds, waipaGridResolver
+        uiState.workedGridQsos, workedGrids, selectedStationIds, waipaGridResolver, waipaManualOverrides
     ) {
-        val base = AwardCalculator.calculate(uiState.workedGridQsos, waipaGridResolver)
+        val base = AwardCalculator.calculate(
+            uiState.workedGridQsos,
+            waipaGridResolver,
+            waipaGridResolver::candidateProvinces,
+            waipaManualOverrides
+        )
         if (selectedStationIds.isEmpty()) base
         else base.map { p ->
             if (p.type == AwardType.VUCC) p.copy(workedKeys = workedGrids, count = workedGrids.size) else p
         }
+    }
+    // Ambiguous QSOs are not counted toward WAIPA until the operator assigns
+    // each one to a province. Every implicated province is yellow unless green.
+    val waipaAmbiguousQsos = remember(
+        uiState.workedGridQsos, waipaGridResolver, waipaManualOverrides
+    ) {
+        AwardCalculator.waipaAmbiguousQsos(
+            uiState.workedGridQsos,
+            waipaGridResolver,
+            waipaGridResolver::candidateProvinces,
+            waipaManualOverrides
+        )
+    }
+    val waipaPendingByProvince = remember(waipaAmbiguousQsos) {
+        waipaAmbiguousQsos.flatMap { pending ->
+            pending.candidateProvinceCodes.map { code -> code to pending }
+        }.groupBy({ it.first }, { it.second })
+    }
+    val waipaPendingCodes = remember(waipaAmbiguousQsos, awardProgress) {
+        val worked = awardProgress.firstOrNull { it.type == AwardType.WAIPA }?.workedKeys.orEmpty()
+        AwardCalculator.waipaPendingProvinceCodes(waipaAmbiguousQsos, worked)
     }
     // First callsign must be recomputed within the UNION of selected station
     // scopes, not from the globally earliest contact or one arbitrary station.
@@ -726,7 +766,8 @@ private fun MapScreen(
                         setAwardMode(
                             awardMode,
                             awardProgress.firstOrNull { it.type == awardMode }?.workedKeys.orEmpty(),
-                            view
+                            view,
+                            pendingCodes = if (awardMode == AwardType.WAIPA) waipaPendingCodes else emptySet()
                         )
                         prevGridMode = uiState.isGridMode
                     } else {
@@ -929,21 +970,33 @@ private fun MapScreen(
             onPinMark = { call -> onAction(MapAction.PinMarkedStation(grid, call)) }
         )
     }
-    // Region detail dialog for a tapped award region. Read-only: the Match
-    // button and station marks are grid-scoped and stay hidden here. The list
-    // is the GLOBAL one (all 台址) — the non-VUCC awards count and fill the
-    // map globally, so their detail lists use the same scope.
+    // Region detail dialog for a tapped award region. Match and station marks
+    // stay hidden here. WAIPA additionally lists ambiguous QSOs for manual
+    // province assignment; confirmed QSO details remain global across 台址.
     selectedRegion?.let { (type, region) ->
-        val regionQsos = remember(uiState.workedGridQsos, type, region, waipaGridResolver) {
+        val regionQsos = remember(
+            uiState.workedGridQsos, type, region, waipaGridResolver, waipaManualOverrides
+        ) {
             AwardCalculator.regionQsos(
-                uiState.workedGridQsos, type, region.code, waipaGridResolver
+                uiState.workedGridQsos,
+                type,
+                region.code,
+                waipaGridResolver,
+                waipaGridResolver::candidateProvinces,
+                waipaManualOverrides
             )
         }
+        val pendingQsos = if (type == AwardType.WAIPA) {
+            waipaPendingByProvince[region.code].orEmpty()
+        } else emptyList()
         RegionQsoDialog(
             type = type,
             region = region,
             qsos = regionQsos,
+            pendingWaipaQsos = pendingQsos,
+            waipaRegions = waipaRegions,
             isUtc = uiState.isUtc,
+            onResolveWaipaQso = ::resolveWaipaQso,
             onDismiss = { selectedRegion = null }
         )
     }
@@ -1200,17 +1253,20 @@ private fun WorkedGridQsoDialog(
 
 /**
  * Centered dialog listing the confirmed satellite QSOs counted for a tapped
- * award region (DXCC/WAPC/WAJA/WAIPA/WAZ/WAS). Read-only variant of the worked-grid
- * dialog: the header shows the region name + code, and the same expandable
- * callsign rows. Match / station marks are grid-scoped and stay hidden.
- * Dismissed by tapping outside. An unworked region opens with an empty list.
+ * award region (DXCC/WAPC/WAJA/WAIPA/WAZ/WAS). The header shows the region
+ * name + code, with the same expandable confirmed-QSO rows. WAIPA also lists
+ * unresolved contacts and offers their candidate provinces for manual assignment.
+ * Match / station marks are grid-scoped and stay hidden.
  */
 @Composable
 private fun RegionQsoDialog(
     type: AwardType,
     region: AwardRegion,
     qsos: List<com.rtbishop.look4sat.core.domain.model.GridQso>,
+    pendingWaipaQsos: List<com.rtbishop.look4sat.core.domain.model.WaipaAmbiguousQso> = emptyList(),
+    waipaRegions: List<AwardRegion> = emptyList(),
     isUtc: Boolean,
+    onResolveWaipaQso: (com.rtbishop.look4sat.core.domain.model.GridQso, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
 ) {
     // WAZ regions are named by their bare zone number in the asset, so the
@@ -1258,6 +1314,19 @@ private fun RegionQsoDialog(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (pendingWaipaQsos.isNotEmpty()) {
+                            val useEnglish = androidx.compose.ui.platform.LocalConfiguration.current
+                                .locales[0].language != "zh"
+                            Text(
+                                text = if (useEnglish) {
+                                    "${pendingWaipaQsos.size} province assignment(s) need review"
+                                } else {
+                                    "${pendingWaipaQsos.size} 条通联待确认省份"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                        }
                     }
                 }
                 androidx.compose.material3.HorizontalDivider()
@@ -1266,7 +1335,28 @@ private fun RegionQsoDialog(
                         .heightIn(max = 380.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    if (qsos.isEmpty()) {
+                    if (pendingWaipaQsos.isNotEmpty()) {
+                        val useEnglish = androidx.compose.ui.platform.LocalConfiguration.current
+                            .locales[0].language != "zh"
+                        Text(
+                            text = if (useEnglish) "Unresolved province assignments" else "待确认的通联归属",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                        )
+                        pendingWaipaQsos.forEach { pending ->
+                            WaipaPendingQsoRow(
+                                pending = pending,
+                                regions = waipaRegions,
+                                isUtc = isUtc,
+                                onSelectProvince = { province -> onResolveWaipaQso(pending.qso, province) }
+                            )
+                            androidx.compose.material3.HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
+                    if (qsos.isEmpty() && pendingWaipaQsos.isEmpty()) {
                         Text(
                             text = stringResource(R.string.region_qso_empty),
                             style = MaterialTheme.typography.bodyMedium,
@@ -1275,7 +1365,7 @@ private fun RegionQsoDialog(
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         )
-                    } else {
+                    } else if (qsos.isNotEmpty()) {
                         // Same grouping as the worked-grid dialog: by callsign
                         // preserving first-contact order (list is oldest-first).
                         val grouped = remember(qsos) {
@@ -1289,6 +1379,65 @@ private fun RegionQsoDialog(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * One ambiguous Indonesian QSO shown inside a yellow WAIPA province dialog.
+ * The operator chooses the actual operating province; the choice is saved by
+ * stable QSO identity and immediately updates award progress and map fills.
+ */
+@Composable
+private fun WaipaPendingQsoRow(
+    pending: com.rtbishop.look4sat.core.domain.model.WaipaAmbiguousQso,
+    regions: List<AwardRegion>,
+    isUtc: Boolean,
+    onSelectProvince: (String) -> Unit
+) {
+    val qso = pending.qso
+    val locator = qso.theirFineGrids.takeIf { it.isNotEmpty() }?.joinToString(", ")
+        ?: qso.theirGrids.takeIf { it.isNotEmpty() }?.joinToString(", ").orEmpty()
+    val details = listOf(formatDate(qso.epochMs, isUtc), locator, qso.satName, qso.mode)
+        .filter { it.isNotBlank() }.joinToString(" · ")
+    val useEnglish = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language != "zh"
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = qso.call,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = details,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = if (useEnglish) "Review" else "待确认",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
+        Text(
+            text = if (useEnglish) "Choose the province where this QSO took place:" else "请选择这次通联实际发生的省份：",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        pending.candidateProvinceCodes.sorted().forEach { code ->
+            val candidate = regions.firstOrNull { it.code == code }
+            TextButton(
+                onClick = { onSelectProvince(code) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(candidate?.let { "${regionDisplayName(it)} ($code)" } ?: code)
             }
         }
     }
@@ -2156,7 +2305,12 @@ private class TiandituTileSource(
  * Satellite-related layers are hidden exactly like grid mode. VUCC keeps the
  * plain Maidenhead grid overlay (the grid view IS the VUCC view).
  */
-private fun setAwardMode(award: AwardType, workedCodes: Set<String>, mapView: MapView) {
+private fun setAwardMode(
+    award: AwardType,
+    workedCodes: Set<String>,
+    mapView: MapView,
+    pendingCodes: Set<String> = emptySet()
+) {
     val asset = when (award) {
         AwardType.WAPC -> AwardBoundaryData.AwardAsset.WAPC
         AwardType.WAJA -> AwardBoundaryData.AwardAsset.WAJA
@@ -2171,11 +2325,13 @@ private fun setAwardMode(award: AwardType, workedCodes: Set<String>, mapView: Ma
         overlay.isEnabled = true
         overlay.regions = AwardBoundaryData.load(mapView.context, asset)
         overlay.workedCodes = workedCodes
+        overlay.pendingCodes = if (award == AwardType.WAIPA) pendingCodes else emptySet()
     } else {
         mapView.overlays[OVERLAY_GRID] = AwardBoundaryOverlay().apply {
             isEnabled = true
             regions = AwardBoundaryData.load(mapView.context, asset)
             this.workedCodes = workedCodes
+            this.pendingCodes = if (award == AwardType.WAIPA) pendingCodes else emptySet()
             applyTheme(mapIsLightUi == true)
         }
     }

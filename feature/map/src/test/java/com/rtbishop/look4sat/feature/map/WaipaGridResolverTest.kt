@@ -80,4 +80,40 @@ class WaipaGridResolverTest {
         assertNull(lookup("OI71ZZ"))
         assertEquals("BA", lookup("oi71oi")) // case insensitive, cached
     }
+    @Test
+    fun `returns both provinces when a six-character cell crosses their shared border`() {
+        fun rectangle(
+            code: String,
+            west: Double,
+            south: Double,
+            east: Double,
+            north: Double
+        ) = AwardRegion(
+            code = code,
+            name = code,
+            labelLon = (west + east) / 2.0,
+            labelLat = (south + north) / 2.0,
+            rings = listOf(
+                listOf(
+                    doubleArrayOf(west, south),
+                    doubleArrayOf(east, south),
+                    doubleArrayOf(east, north),
+                    doubleArrayOf(west, north)
+                )
+            )
+        )
+
+        // OJ82MA spans 117.0000..117.0833 E and 2.0000..2.0417 N.
+        // The artificial province boundary at 117.04 E crosses that cell.
+        val lookup = WaipaGridResolver(
+            listOf(
+                rectangle("KI", 116.9, 1.9, 117.04, 2.1),
+                rectangle("KU", 117.04, 1.9, 117.2, 2.1)
+            )
+        )
+        assertEquals(setOf("KI", "KU"), lookup.candidateProvinces("OJ82MA"))
+        assertNull(lookup("OJ82MA"))
+        assertEquals(setOf("KI", "KU"), lookup.candidateProvinces("OJ82"))
+    }
+
 }
