@@ -88,20 +88,22 @@ object WaipaCallsignLookup {
         Rule(fields[0], fields[1].single(), fields[2], ranges)
     }
 
-    /** Returns a province only when exactly one IIHG rule matches the whole call. */
-    fun province(call: String): String? {
+    /** All IIHG province allocations compatible with the complete callsign. */
+    fun candidates(call: String): Set<String> {
         val normalized = call.trim().uppercase(Locale.US)
         // /P, /M, /MM, /3, /QRP, foreign guest calls, etc. are location-dependent.
-        if ('/' in normalized || normalized.length !in 4..7) return null
+        if ('/' in normalized || normalized.length !in 4..7) return emptySet()
         if (normalized.length < 4 ||
             normalized[0] != 'Y' || normalized[1] !in "BCDEFG" ||
             normalized[2] !in '0'..'9' || !normalized.drop(3).all { it in 'A'..'Z' }
-        ) return null
+        ) return emptySet()
         val suffix = normalized.substring(3)
-        val candidates = rules.asSequence()
+        return rules.asSequence()
             .filter { it.matches(normalized[1], normalized[2], suffix) }
             .map { it.code }
-            .distinct().take(2).toList()
-        return candidates.singleOrNull()
+            .toSet()
     }
+
+    /** Returns a province only when exactly one IIHG rule matches the whole call. */
+    fun province(call: String): String? = candidates(call).singleOrNull()
 }

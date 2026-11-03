@@ -37,6 +37,11 @@ data class AwardProgress(
 
 enum class AwardType { DXCC, VUCC, WAPC, WAJA, WAIPA, WAZ, WAS }
 
+data class WaipaAmbiguousQso(
+    val qso: GridQso,
+    val candidateProvinceCodes: Set<String>
+)
+
 object AwardTargets {
     const val DXCC = 100
     const val VUCC = 100
@@ -69,7 +74,9 @@ object AwardCalculator {
 
     fun calculate(
         qsosByGrid: Map<String, List<GridQso>>,
-        waipaProvinceForGrid: (String) -> String? = { null }
+        waipaProvinceForGrid: (String) -> String? = { null },
+        waipaCandidatesForGrid: (String) -> Set<String> = { emptySet() },
+        waipaManualOverrides: Map<String, String> = emptyMap()
     ): List<AwardProgress> {
         val all = qsosByGrid.values.flatten()
         return listOf(
@@ -82,7 +89,7 @@ object AwardCalculator {
             calculateDxcc(all),
             calculateWapc(all),
             calculateWaja(all),
-            calculateWaipa(qsosByGrid, waipaProvinceForGrid),
+            calculateWaipa(qsosByGrid, waipaProvinceForGrid, waipaCandidatesForGrid, waipaManualOverrides),
             calculateWaz(all),
             calculateWas(all)
         )
@@ -103,7 +110,9 @@ object AwardCalculator {
         type: AwardType,
         q: GridQso,
         waipaProvinceForGrid: (String) -> String? = { null },
-        workedGrid: String? = null
+        workedGrid: String? = null,
+        waipaCandidatesForGrid: (String) -> Set<String> = { emptySet() },
+        waipaManualOverrides: Map<String, String> = emptyMap()
     ): String? = when (type) {
         AwardType.DXCC -> (q.dxcc ?: prefixEntityCode(q.call))?.toString()
         AwardType.WAPC -> wapcKey(q)
@@ -111,7 +120,10 @@ object AwardCalculator {
             q.state?.trim()?.takeIf { it.length == 2 && it.all(Char::isDigit) }
         } else null
 
-        AwardType.WAIPA -> waipaKey(q, waipaProvinceForGrid, listOfNotNull(workedGrid))
+        AwardType.WAIPA -> waipaKey(
+            q, waipaProvinceForGrid, listOfNotNull(workedGrid),
+            waipaCandidatesForGrid, waipaManualOverrides
+        )
         AwardType.WAZ -> q.cqz?.takeIf { it in 1..40 }?.toString()
         AwardType.WAS -> if (entityOf(q) == Entity.USA) {
             q.state?.trim()?.uppercase()?.takeIf { it in US_STATES }
@@ -131,10 +143,12 @@ object AwardCalculator {
         qsosByGrid: Map<String, List<GridQso>>,
         type: AwardType,
         code: String,
-        waipaProvinceForGrid: (String) -> String? = { null }
+        waipaProvinceForGrid: (String) -> String? = { null },
+        waipaCandidatesForGrid: (String) -> Set<String> = { emptySet() },
+        waipaManualOverrides: Map<String, String> = emptyMap()
     ): List<GridQso> =
         if (type == AwardType.WAIPA) {
-            resolvedWaipaQsos(qsosByGrid, waipaProvinceForGrid)
+            resolvedWaipaQsos(qsosByGrid, waipaProvinceForGrid, waipaCandidatesForGrid, waipaManualOverrides)
                 .filter { (_, province) -> province == code }
                 .map { (qso, _) -> qso }
                 .sortedBy { it.epochMs }
@@ -174,20 +188,27 @@ object AwardCalculator {
      */
     private fun resolvedWaipaQsos(
         byGrid: Map<String, List<GridQso>>,
-        provinceForGrid: (String) -> String?
+        provinceForGrid: (String) -> String?,
+        candidatesForGrid: (String) -> Set<String> = { emptySet() },
+        manualOverrides: Map<String, String> = emptyMap()
     ): List<Pair<GridQso, String?>> {
         val gridsByQso = linkedMapOf<GridQso, MutableSet<String>>()
         byGrid.forEach { (grid, qsos) ->
             qsos.forEach { q -> gridsByQso.getOrPut(q) { linkedSetOf() }.add(grid) }
         }
-        return gridsByQso.map { (q, grids) -> q to waipaKey(q, provinceForGrid, grids) }
+        return gridsByQso.map { (q, grids) ->
+            q to waipaKey(q, provinceForGrid, grids, candidatesForGrid, manualOverrides)
+        }
     }
 
     private fun calculateWaipa(
         byGrid: Map<String, List<GridQso>>,
-        provinceForGrid: (String) -> String?
+        provinceForGrid: (String) -> String?,
+        candidatesForGrid: (String) -> Set<String>,
+        manualOverrides: Map<String, String>
     ): AwardProgress {
-        val keys = resolvedWaipaQsos(byGrid, provinceForGrid).mapNotNull { it.second }.toSet()
+        val keys = resolvedWaipaQsos(byGrid, provinceForGrid, candidatesForGrid, manualOverrides)
+            .mapNotNull { it.second }.toSet()
         return AwardProgress(AwardType.WAIPA, keys, keys.size, AwardTargets.WAIPA)
     }
 
@@ -203,12 +224,17 @@ object AwardCalculator {
     private fun waipaKey(
         q: GridQso,
         provinceForGrid: (String) -> String?,
-        workedGrids: Collection<String> = emptyList()
+        workedGrids: Collection<String> = emptyList(),
+        candidatesForGrid: (String) -> Set<String> = { emptySet() },
+        manualOverrides: Map<String, String> = emptyMap()
     ): String? {
         // A different explicit DXCC must never receive Indonesian credits,
         // even when the operator has an Indonesian-looking callsign.
         if (q.dxcc != null && q.dxcc != 327) return null
         if (entityOf(q) != Entity.INDONESIA) return null
+
+        manualOverrides[waipaQsoKey(q)]?.trim()?.uppercase()
+            ?.takeIf { it in ID_PROVINCES }?.let { return it }
 
         val state = q.state?.trim()?.uppercase()?.removePrefix("ID-")
         if (state != null && state in ID_PROVINCES) return state
@@ -217,6 +243,11 @@ object AwardCalculator {
             .map { it.trim().uppercase() }
             .filter { it.length >= 6 }.distinct().toList()
         if (fineLocators.isNotEmpty()) {
+            // A fine locator can itself straddle an administrative border. Check
+            // polygon intersections as well as the single-province resolver so
+            // a boundary cell is never silently credited to one side.
+            val possible = fineLocators.flatMap(candidatesForGrid).filter { it in ID_PROVINCES }.toSet()
+            if (possible.size > 1) return null
             val provinces = fineLocators.mapNotNull(provinceForGrid).toSet()
             if (provinces.size > 1) return null
             if (provinces.size == 1) return provinces.first()
@@ -229,8 +260,11 @@ object AwardCalculator {
 
         // The map cache historically retained only 4 characters. Use those
         // only when *the whole square* resolves to a single province.
-        val coarseProvinces = (q.theirGrids + workedGrids)
-            .mapNotNull { provinceForGrid(it.trim().uppercase().take(4)) }
+        val coarseGrids = (q.theirGrids + workedGrids).map { it.trim().uppercase().take(4) }
+        val coarseCandidates = coarseGrids.flatMap(candidatesForGrid).filter { it in ID_PROVINCES }.toSet()
+        if (coarseCandidates.size > 1) return null
+        val coarseProvinces = coarseGrids
+            .mapNotNull(provinceForGrid)
             .filter { it in ID_PROVINCES }.toSet()
         if (coarseProvinces.size > 1) return null
         if (coarseProvinces.size == 1) return coarseProvinces.first()
@@ -239,6 +273,84 @@ object AwardCalculator {
         // operating position: usable only for non-portable, unambiguous calls.
         return WaipaCallsignLookup.province(q.call)
     }
+
+    /**
+     * QSO fingerprint for a user-confirmed WAIPA province. It deliberately
+     * excludes optional DXCC, station and locator metadata so a later sync
+     * that enriches a record does not orphan the user's choice. The same QSO is repeated under each
+     * worked grid in the map cache, so only stable contact identity belongs here.
+     */
+    fun waipaQsoKey(q: GridQso): String = listOf(
+        q.call.trim().uppercase(),
+        q.epochMs.toString(),
+        q.satName.trim().uppercase(),
+        q.mode.trim().uppercase(),
+        q.bandUp.trim().uppercase(),
+        q.bandDown.trim().uppercase()
+    ).joinToString("|") { "${it.length}:$it" }
+
+    /**
+     * QSOs whose province cannot be resolved automatically but have multiple
+     * plausible Indonesian provinces. These are used only for the WAIPA map's
+     * pending (yellow) province fill; they never contribute to award progress.
+     */
+    fun waipaAmbiguousQsos(
+        qsosByGrid: Map<String, List<GridQso>>,
+        waipaProvinceForGrid: (String) -> String?,
+        waipaCandidatesForGrid: (String) -> Set<String>,
+        waipaManualOverrides: Map<String, String> = emptyMap()
+    ): List<WaipaAmbiguousQso> {
+        val gridsByQso = linkedMapOf<GridQso, MutableSet<String>>()
+        qsosByGrid.forEach { (grid, qsos) ->
+            qsos.forEach { q -> gridsByQso.getOrPut(q) { linkedSetOf() }.add(grid) }
+        }
+        return gridsByQso.mapNotNull { (q, workedGrids) ->
+            if (q.dxcc != null && q.dxcc != 327) return@mapNotNull null
+            if (entityOf(q) != Entity.INDONESIA) return@mapNotNull null
+            val key = waipaQsoKey(q)
+            if (waipaManualOverrides[key]?.uppercase()?.let { it in ID_PROVINCES } == true) return@mapNotNull null
+            if (waipaKey(q, waipaProvinceForGrid, workedGrids, waipaCandidatesForGrid) != null) {
+                return@mapNotNull null
+            }
+
+            val state = q.state?.trim()?.uppercase()?.removePrefix("ID-")
+            if (state != null && state in ID_PROVINCES) return@mapNotNull null
+
+            val fineLocators = q.theirFineGrids.asSequence()
+                .map { it.trim().uppercase() }
+                .filter { it.length >= 6 }.distinct().toList()
+            val fineCandidates = fineLocators.flatMap(waipaCandidatesForGrid)
+                .filter { it in ID_PROVINCES }.toSet()
+            if (fineCandidates.size > 1) {
+                return@mapNotNull WaipaAmbiguousQso(q, fineCandidates)
+            }
+            // A single geographic candidate is not a province ambiguity; do
+            // not fall through and flag unrelated home-callsign allocations.
+            if (fineCandidates.size == 1) return@mapNotNull null
+
+            // A unique IOTA assignment is a stronger independent island hint
+            // than a coarse 4-character grid or a home callsign allocation.
+            if (WaipaIotaLookup.province(q.iota) != null) return@mapNotNull null
+
+            val coarseGrids = (q.theirGrids + workedGrids)
+                .map { it.trim().uppercase().take(4) }
+            val coarseCandidates = coarseGrids.flatMap(waipaCandidatesForGrid)
+                .filter { it in ID_PROVINCES }.toSet()
+            if (coarseCandidates.size > 1) {
+                return@mapNotNull WaipaAmbiguousQso(q, coarseCandidates)
+            }
+            if (coarseCandidates.size == 1) return@mapNotNull null
+
+            val callsignCandidates = WaipaCallsignLookup.candidates(q.call)
+            if (callsignCandidates.size > 1) WaipaAmbiguousQso(q, callsignCandidates) else null
+        }.distinctBy { waipaQsoKey(it.qso) }.sortedBy { it.qso.epochMs }
+    }
+
+    /** Pending province fills never cover a region that is already worked. */
+    fun waipaPendingProvinceCodes(
+        pending: List<WaipaAmbiguousQso>,
+        workedCodes: Set<String>
+    ): Set<String> = pending.flatMap { it.candidateProvinceCodes }.toSet() - workedCodes
 
     private fun calculateWaz(all: List<GridQso>): AwardProgress {
         val keys = all.mapNotNull { awardKey(AwardType.WAZ, it) }.toSet()

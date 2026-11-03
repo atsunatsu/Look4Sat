@@ -299,6 +299,38 @@ class SettingsRepo(
         preferences.edit { putString(keyWorkedGridQsos, root.toString()) }
     }
 
+    // User-confirmed WAIPA province choices. Stored separately from synced QSO
+    // data so a LoTW/Wavelog refresh cannot overwrite a manual correction.
+    private val keyWaipaManualOverrides = "waipaManualProvinceOverrides"
+
+    override fun getWaipaManualOverrides(): Map<String, String> {
+        val json = preferences.getString(keyWaipaManualOverrides, null).orEmpty()
+        if (json.isBlank()) return emptyMap()
+        return try {
+            val root = org.json.JSONObject(json)
+            val result = mutableMapOf<String, String>()
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val province = root.optString(key).trim().uppercase()
+                if (key.isNotBlank() && province.isNotBlank()) result[key] = province
+            }
+            result
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    override fun setWaipaManualOverrides(overrides: Map<String, String>) {
+        val root = org.json.JSONObject()
+        overrides.toSortedMap().forEach { (key, province) ->
+            if (key.isNotBlank() && province.isNotBlank()) {
+                root.put(key, province.trim().uppercase())
+            }
+        }
+        preferences.edit { putString(keyWaipaManualOverrides, root.toString()) }
+    }
+
     // Distinct 4-char gridsquares the account operated from (LoTW <MY_GRIDSQUARE>,
     // satellite QSOs only). Stored as a JSONArray like workedGrids.
     private val keyRoamedGrids = "roamedGrids"

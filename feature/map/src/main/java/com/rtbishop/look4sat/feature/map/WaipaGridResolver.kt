@@ -51,6 +51,7 @@ internal class WaipaGridResolver(regions: List<AwardRegion>) : (String) -> Strin
         )
     }
     private val cache = mutableMapOf<String, String?>()
+    private val candidateCache = mutableMapOf<String, Set<String>>()
 
     override fun invoke(grid: String): String? {
         val normalized = grid.trim().uppercase(Locale.US)
@@ -58,6 +59,30 @@ internal class WaipaGridResolver(regions: List<AwardRegion>) : (String) -> Strin
         val matched = decode(normalized)?.let(::province)
         cache[normalized] = matched
         return matched
+    }
+
+    /**
+     * Every province whose actual land polygon has a positive-area intersection
+     * with this locator cell. Unlike [invoke], this deliberately returns several
+     * candidates when a 6/8-character cell crosses a provincial border.
+     */
+    fun candidateProvinces(grid: String): Set<String> {
+        val normalized = grid.trim().uppercase(Locale.US)
+        if (candidateCache.containsKey(normalized)) return candidateCache.getValue(normalized)
+        val candidates = decode(normalized)?.let { cell ->
+            bounded.asSequence()
+                .filter {
+                    it.maxLon > cell.lon && it.minLon < cell.lon + cell.width &&
+                        it.maxLat > cell.lat && it.minLat < cell.lat + cell.height
+                }
+                .filter { boundedRegion ->
+                    boundedRegion.region.rings.any { ring -> polygonOverlapsCell(ring, cell) }
+                }
+                .map { it.region.code }
+                .toSet()
+        }.orEmpty()
+        candidateCache[normalized] = candidates
+        return candidates
     }
 
     private fun decode(grid: String): GridCell? {
