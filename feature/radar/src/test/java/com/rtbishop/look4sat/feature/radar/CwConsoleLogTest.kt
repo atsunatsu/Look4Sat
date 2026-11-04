@@ -47,7 +47,10 @@ class CwConsoleLogTest {
                 else -> error("Unexpected QSO call $name")
             }
         }
-        val wavelog = MutableStateFlow(WavelogUploadSettings(stationCallsign = "BA7OPF"))
+        val wavelog = MutableStateFlow(WavelogUploadSettings(
+            url = "https://wavelog.example", apiKey = "test-key", stationId = "1",
+            stationCallsign = "BA7OPF", stationGrid = "PM01"
+        ))
         val position = MutableStateFlow(GeoPos(0.0, 0.0))
         val settings = stub<ISettingsRepo> { name, _ ->
             when (name) {
@@ -93,6 +96,17 @@ class CwConsoleLogTest {
         assertEquals("CW", qso.mode)
         assertEquals("BA7OPF", vm.uiState.value.ownCallsign)
         assertEquals("", vm.uiState.value.callsignInput)
+    }
+
+    @Test fun wavelogOnlyConsoleRecordsUseTheSelectedStationCallsign() = withFixture { f ->
+        val vm = f.viewModel
+        assertTrue(vm.uiState.value.wavelogMode)
+        assertEquals("", vm.uiState.value.certificateCallsign)
+        assertEquals("BA7OPF", vm.uiState.value.ownCallsign)
+        vm.updateCallsign("BG5JSU")
+        vm.recordCw()
+        runCurrent()
+        assertEquals("BA7OPF", f.saved.single().myCallsign)
     }
 
     @Test fun storageFailureRetainsCallsignAndCanBeRetried() = withFixture { f ->
