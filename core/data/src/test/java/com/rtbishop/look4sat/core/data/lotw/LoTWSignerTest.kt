@@ -69,8 +69,10 @@ class LoTWSignerTest {
         )
 
         // Verify that the signature in the generated TQ8 covers the full comma-separated grid set.
-        val encodedSignature = Regex("""<SIGN_LOTW_V2\\.0:\\d+:6>([A-Za-z0-9+/=\\r\\n]+)""")
-            .find(payload)!!.groupValues[1].replace(Regex("\\s"), "")
+        val encodedSignature = payload.substringAfter("<SIGN_LOTW_V2.0:")
+            .substringAfter(">")
+            .substringBefore("<SIGNDATA:")
+            .filterNot(Char::isWhitespace)
         val signature = Base64.getDecoder().decode(encodedSignature)
         val valid = Signature.getInstance("SHA1withRSA").run {
             initVerify(key.certificate.publicKey)
