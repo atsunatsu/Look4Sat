@@ -41,6 +41,8 @@ fun GridQso.toConfirmedRecord(accountCallsign: String): QsoRecord = QsoRecord(
     vuccGrids = myGrids.toList(),
     band = bandUp,
     rxBand = bandDown,
+    txFrequencyHz = txFrequencyHz,
+    rxFrequencyHz = rxFrequencyHz,
     mode = mode,
     // On satellites, MODE=MFSK means FT4 (ADIF pairing); keep the sub-mode so
     // confirmations match local FT4 records (mode=MFSK, submode=FT4).
