@@ -97,6 +97,24 @@ class LogbookMergeTest {
     }
 
     @Test
+    fun withConfirmation_replacesStaleOwnGridWithReportedLocator() {
+        val old = local.copy(myGrid = "OL62", txFrequencyHz = 145_850_000L)
+        val fromLoTW = confirmed.copy(myGrid = "OL62TI")
+
+        val merged = old.withConfirmation(fromLoTW)
+
+        assertEquals("OL62TI", merged.myGrid)
+        assertEquals(145_850_000L, merged.txFrequencyHz)
+    }
+
+    @Test
+    fun withConfirmation_keepsOwnGridWhenReportOmitsIt() {
+        val old = local.copy(myGrid = "OL62TI")
+
+        assertEquals("OL62TI", old.withConfirmation(confirmed.copy(myGrid = "")).myGrid)
+    }
+
+    @Test
     fun toConfirmedRecord_mapsGridQso() {
         val qso = GridQso(
             call = "BH6RJD",
