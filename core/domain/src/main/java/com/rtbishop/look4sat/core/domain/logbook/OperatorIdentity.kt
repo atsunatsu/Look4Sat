@@ -23,26 +23,30 @@ import java.util.Locale
 /**
  * Own (operator) identity written into the records this app logs.
  *
- * An imported LoTW certificate is the authoritative source — it is the signing identity — so
- * wherever one exists its callsign wins. A Wavelog-only setup has no certificate at all, and
- * without the fallback every locally logged record would keep an empty own callsign: the ADIF
- * export would lose `STATION_CALLSIGN`, the posted summary its "TNX de …" line, the map's
- * [com.rtbishop.look4sat.core.domain.model.GridQso] its operator callsign, and — because the
- * dedupe key contains the own callsign — a contact pulled back from Wavelog (where the server
- * stamps the station profile's callsign) would no longer match its local row and would appear
- * twice in the logbook.
+ * When Wavelog is the active upload destination, its selected station profile must win
+ * even if an old LoTW certificate remains installed. Otherwise the CW console and new QSO
+ * records may carry the wrong station callsign and fail to match QSOs synced from Wavelog.
+ * Outside Wavelog mode, the LoTW certificate wins with Wavelog as a fallback.
  */
-fun operatorCallsign(certificateCallsign: String, wavelogCallsign: String): String =
-    certificateCallsign.ifBlank { wavelogCallsign }.trim().uppercase(Locale.US)
+fun operatorCallsign(
+    certificateCallsign: String,
+    wavelogCallsign: String,
+    wavelogMode: Boolean = false
+): String =
+    (if (wavelogMode) wavelogCallsign else certificateCallsign.ifBlank { wavelogCallsign })
+        .trim().uppercase(Locale.US)
 
 /**
- * Station grids a record would be logged under, in the same precedence order: the LoTW station
- * location first, the selected Wavelog station profile as the fallback. Either side may hold
- * several gridsquares comma-separated (a location on a line or a corner), so the result is the
- * split list — the caller picks the primary one where a single grid is needed.
+ * Station grids follow the active upload destination too: Wavelog's selected station
+ * profile when ready, otherwise the LoTW location with Wavelog as a fallback. Either side
+ * may hold several comma-separated gridsquares.
  */
-fun operatorGrids(lotwStationGrid: String, wavelogStationGrid: String): List<String> =
-    lotwStationGrid.ifBlank { wavelogStationGrid }
+fun operatorGrids(
+    lotwStationGrid: String,
+    wavelogStationGrid: String,
+    wavelogMode: Boolean = false
+): List<String> =
+    (if (wavelogMode) wavelogStationGrid else lotwStationGrid.ifBlank { wavelogStationGrid })
         .split(',')
         .map { it.trim().uppercase(Locale.US) }
         .filter(String::isNotEmpty)
