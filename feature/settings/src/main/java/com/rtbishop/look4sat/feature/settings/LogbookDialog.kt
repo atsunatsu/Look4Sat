@@ -303,7 +303,7 @@ fun LogbookDialog(
             modeFilter = modeFilter,
             confirmation = confirmationFilter,
             modes = records.map { it.displayMode }.filter(String::isNotBlank).distinct().sorted(),
-            hitCount = shownRecords.size,
+            results = shownRecords,
             onQueryChange = { queryText = it },
             onModeFilter = { modeFilter = it },
             onConfirmation = { confirmationFilter = it },
@@ -581,7 +581,7 @@ private fun LogbookQuerySheet(
     modeFilter: String,
     confirmation: LogbookFilter,
     modes: List<String>,
-    hitCount: Int,
+    results: List<QsoRecord>,
     onQueryChange: (String) -> Unit,
     onModeFilter: (String) -> Unit,
     onConfirmation: (LogbookFilter) -> Unit,
@@ -610,7 +610,7 @@ private fun LogbookQuerySheet(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(R.string.prefs_logbook_query_hits, hitCount),
+                    text = stringResource(R.string.prefs_logbook_query_hits, results.size),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -645,7 +645,74 @@ private fun LogbookQuerySheet(
                     )
                 }
             }
+            if (results.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.prefs_logbook_query_empty),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(results, key = { it.id }) { record ->
+                        LogbookQueryResultRow(record)
+                    }
+                }
+            }
         }
+    }
+}
+
+/** Read-only result row; it mirrors the logbook list so the query sheet shows the same QSO details. */
+@Composable
+private fun LogbookQueryResultRow(record: QsoRecord) {
+    val time = remember(record.startUtcMillis) {
+        SimpleDateFormat("MM-dd HH:mm'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.format(Date(record.startUtcMillis))
+    }
+    val satShort = record.satelliteName.substringBefore('(').trim()
+    val band = record.band.ifBlank { frequencyBand(record.txFrequencyHz) }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = record.theirCallsign,
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (record.lotwConfirmed) {
+                val oppositeGrids = gridsLabel(
+                    (listOf(record.theirGrid) + record.theirVuccGrids).distinct()
+                )
+                if (oppositeGrids.isNotEmpty()) {
+                    Text(text = oppositeGrids, fontSize = 13.sp, color = ConfirmedGreen, fontFamily = FontFamily.Monospace)
+                } else {
+                    Text(text = "QSL", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+                }
+            } else if (record.lotwUploaded) {
+                Text(text = "UP", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+            }
+        }
+        Text(
+            text = listOf(
+                satShort, record.displayMode, band, time,
+                gridsLabel((listOf(record.myGrid) + record.vuccGrids).distinct())
+            ).filter { it.isNotBlank() }.joinToString(" · "),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 3.dp)
+        )
     }
 }
 
