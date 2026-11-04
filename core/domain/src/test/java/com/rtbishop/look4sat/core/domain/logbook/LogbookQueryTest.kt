@@ -64,22 +64,27 @@ class LogbookQueryTest {
     }
 
     @Test
-    fun ownCallsignSelectorFiltersRecordsAndCombinesWithFreeText() {
-        val ba7 = record(callsign = "JA1ABC", myCallsign = "BA7OPF")
-        val ba8 = record(callsign = "VK3XYZ", myCallsign = "BA8OPF")
-        val list = listOf(ba7, ba8)
+    fun ownStationSelectorDistinguishesSameCallsignAtDifferentGrids() {
+        val ba7Ol62 = record(callsign = "JA1ABC", myCallsign = "BA7OPF").copy(myGrid = "OL62")
+        val ba7Ol63 = record(callsign = "VK3XYZ", myCallsign = "BA7OPF").copy(myGrid = "OL63")
+        val ba8Ol62 = record(callsign = "BD5EUA", myCallsign = "BA8OPF").copy(myGrid = "OL62")
+        val list = listOf(ba7Ol62, ba7Ol63, ba8Ol62)
 
         assertEquals(
-            listOf(ba7),
-            filterRecords(list, "", "", LogbookFilter.ALL, "ba7opf")
+            listOf(ba7Ol62),
+            filterRecords(list, "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL62"))
         )
         assertEquals(
-            listOf(ba8),
-            filterRecords(list, "vk3", "", LogbookFilter.ALL, "BA8OPF")
+            listOf(ba7Ol63),
+            filterRecords(list, "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL63"))
+        )
+        assertEquals(
+            listOf(ba7Ol63),
+            filterRecords(list, "vk3", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL63"))
         )
         assertEquals(
             emptyList<QsoRecord>(),
-            filterRecords(list, "JA1", "", LogbookFilter.ALL, "BA8OPF")
+            filterRecords(list, "JA1", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL63"))
         )
     }
 
