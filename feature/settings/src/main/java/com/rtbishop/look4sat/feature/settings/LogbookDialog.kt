@@ -461,6 +461,7 @@ private fun LogbookUploadPreviewDialog(
 
 /** Confirmed-grid colour: the map's worked-grid green, so "confirmed" reads the same everywhere. */
 private val ConfirmedGreen = Color(0xFF4CD964)
+private val IotaBlue = Color(0xFF64B5F6)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -527,20 +528,30 @@ private fun LogbookRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                // Confirmed contacts show the opposite station's grid set from the LoTW
-                // report (single or multi-grid, abbreviated) in the worked-grid green
-                // instead of the word QSL; without any grid the QSL text stays.
-                if (record.lotwConfirmed) {
-                    val oppositeGrids = gridsLabel(
-                        (listOf(record.theirGrid) + record.theirVuccGrids).distinct()
-                    )
-                    if (oppositeGrids.isNotEmpty()) {
-                        Text(text = oppositeGrids, fontSize = 13.sp, color = ConfirmedGreen, fontFamily = FontFamily.Monospace)
-                    } else {
-                        Text(text = "QSL", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+                // Keep the opposite grid/status in the existing top-right position.
+                // Show the opposite IOTA directly underneath, aligned to the same edge.
+                Column(horizontalAlignment = Alignment.End) {
+                    if (record.lotwConfirmed) {
+                        val oppositeGrids = gridsLabel(
+                            (listOf(record.theirGrid) + record.theirVuccGrids).distinct()
+                        )
+                        if (oppositeGrids.isNotEmpty()) {
+                            Text(text = oppositeGrids, fontSize = 13.sp, color = ConfirmedGreen, fontFamily = FontFamily.Monospace)
+                        } else {
+                            Text(text = "QSL", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+                        }
+                    } else if (record.lotwUploaded) {
+                        Text(text = "UP", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
                     }
-                } else if (record.lotwUploaded) {
-                    Text(text = "UP", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+                    if (record.iota.isNotBlank()) {
+                        Text(
+                            text = record.iota,
+                            fontSize = 12.sp,
+                            color = IotaBlue,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
             Text(
