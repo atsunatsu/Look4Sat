@@ -246,18 +246,18 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.10 — English
-          - Added an own-station selector to logbook search, distinguishing each callsign and transmitting-grid combination (for example, BA7OPF OL62 and BA7OPF OL63).
-          - Selecting an own station filters records by both the operator callsign and the exact transmitting grid; free-text search no longer accidentally matches the operator's own callsign.
-          - Preserved the selected own station when closing and reopening the query dialog; Clear resets it with the other filters.
-          - Updated matched QSO records' own grid from nonblank LoTW or Wavelog server data during synchronization, while retaining the local grid when the server omits it.
+          ## v18.12 — English
+          - Fixed LoTW download to retain transmitted FREQ and received FREQ_RX from ADIF in the logbook, without changing map grid or confirmation handling.
+          - Wavelog synchronization now fills missing local transmit/receive frequencies when the server supplies them, using a unique exact-QSO fallback to prevent duplicates.
+          - Existing locally recorded frequencies are preserved when a provider omits them; distinct contacts with different known frequencies remain separate.
+          - Full resynchronization can restore historical frequencies only when the provider still includes them in its ADIF export.
           - Release CI verifies unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest), signed APK certificate, version and both ARM ABIs.
 
-          ## v18.10 — 中文
-          - 日志查询增加本台呼号选择器，按「本台呼号 + 发射网格」区分不同台址，例如 BA7OPF OL62 和 BA7OPF OL63。
-          - 选择后同时按本台呼号和准确网格筛选；普通文字搜索不再误把本台呼号匹配为对方呼号。
-          - 关闭并重新打开查询弹窗时保留本台呼号选择，点击清除则与其他筛选条件一起重置。
-          - 全量同步匹配到已有通联时，使用 LoTW 或 Wavelog 返回的非空本台网格更新 myGrid；服务器未提供网格时保留本地值。
+          ## v18.12 — 中文
+          - 修复 LoTW 同步遗漏 ADIF 的 FREQ（发射）和 FREQ_RX（接收）字段的问题，保留原有网格和确认处理。
+          - Wavelog 同步可为本地缺失的收发频率补全服务器数据，仅在通联身份唯一且精确匹配时执行，避免产生重复日志。
+          - 服务器缺少频率时不清空本地原有频率；不同已知频率的独立通联不合并。
+          - 全量同步可补全服务器 ADIF 仍然提供的历史频率，服务器未保存的频率无法恢复。
           - 发布 CI 在发布前检查单元测试（排除已有超时问题的 RadioConfigurationSaveTest）、APK 签名证书、版本号及两种 ARM ABI。
           RELEASE_NOTES
           )"
