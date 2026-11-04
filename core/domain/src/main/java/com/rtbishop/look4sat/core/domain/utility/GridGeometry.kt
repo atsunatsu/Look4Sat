@@ -207,7 +207,7 @@ enum class StationGridSetIssue {
 }
 
 /**
- * Checks the grid set a TQ8 would be signed with (ADIF `GRIDSQUARE` + `MY_VUCC_GRIDS`).
+ * Checks the grid set serialized into the TQ8 station record's comma-separated `GRIDSQUARE` field.
  *
  * This is the upload-side gate only: LoTW itself validates the format of these fields (4/6-char
  * locator syntax) but never their geometry, so a single mistyped field letter reaches the server,
