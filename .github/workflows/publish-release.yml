@@ -16,7 +16,7 @@ name: Build Look4Sat APK
 on:
   # A commit prefixed with "release: v4.4.8-ba7opf." publishes that version on push.
   push:
-    branches: [main]
+    branches: [main, artifact-preview-pr55-20261104]
   workflow_dispatch:
     inputs:
       mode:
@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   build:
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.')) }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.') || startsWith(github.event.head_commit.message, 'artifact-preview:'))) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -52,7 +52,7 @@ jobs:
         working-directory: source
         env:
           BUILD_RUN_NUMBER: ${{ github.run_number }}
-          BUILD_MODE: ${{ github.event_name == 'push' && 'release' || inputs.mode }}
+          BUILD_MODE: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'artifact-preview:') && 'artifact' || (github.event_name == 'push' && 'release' || inputs.mode) }}
         run: |
           set -euo pipefail
           VERSION="$(sed -nE 's/^appVersionName *= *"([^"]+)".*/\1/p' gradle/libs.versions.toml | head -n 1)"
