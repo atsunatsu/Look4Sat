@@ -246,16 +246,18 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.9 — English
-          - Added own IOTA and opposite-station IOTA to the QSO details, shown only when the corresponding values are available.
-          - Displayed the opposite station's IOTA in blue at the right side of the logbook summary row, alongside the satellite, mode, band and time information.
-          - Kept the IOTA label compact and constrained its line height so it does not increase the height or spacing of logbook entries.
+          ## v18.10 — English
+          - Added an own-station selector to logbook search, distinguishing each callsign and transmitting-grid combination (for example, BA7OPF OL62 and BA7OPF OL63).
+          - Selecting an own station filters records by both the operator callsign and the exact transmitting grid; free-text search no longer accidentally matches the operator's own callsign.
+          - Preserved the selected own station when closing and reopening the query dialog; Clear resets it with the other filters.
+          - Updated matched QSO records' own grid from nonblank LoTW or Wavelog server data during synchronization, while retaining the local grid when the server omits it.
           - Release CI verifies unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest), signed APK certificate, version and both ARM ABIs.
 
-          ## v18.9 — 中文
-          - 在通联详情中加入本台 IOTA 和对方 IOTA，仅在对应字段有数据时显示。
-          - 日志本列表在通联摘要行右侧显示对方 IOTA，与卫星、模式、波段和时间信息保持同行。
-          - IOTA 使用蓝色小字号，并限制行高，不增加日志记录的高度和间距。
+          ## v18.10 — 中文
+          - 日志查询增加本台呼号选择器，按「本台呼号 + 发射网格」区分不同台址，例如 BA7OPF OL62 和 BA7OPF OL63。
+          - 选择后同时按本台呼号和准确网格筛选；普通文字搜索不再误把本台呼号匹配为对方呼号。
+          - 关闭并重新打开查询弹窗时保留本台呼号选择，点击清除则与其他筛选条件一起重置。
+          - 全量同步匹配到已有通联时，使用 LoTW 或 Wavelog 返回的非空本台网格更新 myGrid；服务器未提供网格时保留本地值。
           - 发布 CI 在发布前检查单元测试（排除已有超时问题的 RadioConfigurationSaveTest）、APK 签名证书、版本号及两种 ARM ABI。
           RELEASE_NOTES
           )"
