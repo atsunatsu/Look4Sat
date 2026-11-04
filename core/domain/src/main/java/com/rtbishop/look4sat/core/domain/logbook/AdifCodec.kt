@@ -197,7 +197,8 @@ object AdifCodec {
 
     private fun hzToMhz(value: Long): String = String.format(Locale.US, "%.6f", value / 1_000_000.0)
 
-    private fun mhzToHz(value: String?): Long? = value?.toDoubleOrNull()?.let { (it * 1_000_000.0).toLong() }
+    /** ADIF frequencies are in MHz; keep decoding consistent across file import and LoTW sync. */
+    fun mhzToHz(value: String?): Long? = value?.toDoubleOrNull()?.let { (it * 1_000_000.0).toLong() }
 
     private fun format(value: Long, pattern: String): String =
         SimpleDateFormat(pattern, Locale.US).apply { timeZone = utc }.format(Date(value))
