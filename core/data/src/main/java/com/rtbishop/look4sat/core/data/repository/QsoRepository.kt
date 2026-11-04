@@ -322,6 +322,9 @@ class QsoRepository(
                     syncOrigin = sharedOrigin(previous.syncOrigin, origin),
                     wavelogUploaded = true,
                     wavelogStation = remote.wavelogStation.ifBlank { previous.wavelogStation },
+                    // Use the latest matching server station locator, retaining local data
+                    // only when the Wavelog export has no MY_GRIDSQUARE.
+                    myGrid = remote.myGrid.ifBlank { previous.myGrid },
                     theirGrid = previous.theirGrid.ifBlank { remote.theirGrid },
                     theirVuccGrids = previous.theirVuccGrids.ifEmpty { remote.theirVuccGrids },
                     theirFullGrids = (previous.theirFullGrids + remote.theirFullGrids).distinct(),
