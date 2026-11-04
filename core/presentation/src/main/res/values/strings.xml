@@ -278,7 +278,7 @@
     <string name="prefs_logbook_station_all">All</string>
     <string name="prefs_logbook_query">Query</string>
     <string name="prefs_logbook_query_title">Query logbook</string>
-    <string name="prefs_logbook_query_hint">Search worked callsign, satellite, grid or comment</string>
+    <string name="prefs_logbook_query_hint">Search other callsign, satellite, grid or comment</string>
     <string name="prefs_logbook_query_callsign">Callsign</string>
     <string name="prefs_logbook_query_all_callsigns">All</string>
     <string name="prefs_logbook_query_hits">%1$d matches</string>
