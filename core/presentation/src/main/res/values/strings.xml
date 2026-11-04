@@ -513,6 +513,8 @@ Upstream: https://github.com/rt-bishop/Look4Sat</string>
     <string name="qso_edit_sent">Sent RST</string>
     <string name="qso_edit_received">Received RST</string>
     <string name="qso_edit_grid">Opposite grid</string>
+    <string name="qso_edit_their_iota">Opposite IOTA</string>
+    <string name="qso_edit_my_iota">Own IOTA</string>
     <string name="qso_edit_comment">Comment</string>
     <string name="qso_edit_save">Save</string>
     <string name="qso_edit_cancel">Cancel</string>
