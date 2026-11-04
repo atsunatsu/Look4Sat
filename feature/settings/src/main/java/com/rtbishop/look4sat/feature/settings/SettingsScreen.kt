@@ -343,8 +343,8 @@ private fun SettingsScreen(
             newRecord = {
                 // Blank draft: minute-truncated "now" (the radar Log tab's granularity), the own
                 // callsign and the station's first grid, so the record is uploadable as it stands.
-                // Certificate / LoTW station location first, the selected Wavelog station profile
-                // as the fallback — a Wavelog-only setup has neither of the LoTW pair.
+                // Use the selected Wavelog profile when it is the active upload destination;
+                // otherwise use the LoTW identity with Wavelog as a fallback.
                 val now = System.currentTimeMillis() / 60_000L * 60_000L
                 QsoRecord(
                     startUtcMillis = now,
@@ -352,11 +352,13 @@ private fun SettingsScreen(
                     theirCallsign = "",
                     myCallsign = operatorCallsign(
                         uiState.lotwCertificate?.callsign.orEmpty(),
-                        uiState.wavelogUploadSettings.stationCallsign
+                        uiState.wavelogUploadSettings.stationCallsign,
+                        uiState.wavelogUploadSettings.isReady
                     ),
                     myGrid = operatorGrids(
                         uiState.lotwStation?.grid.orEmpty(),
-                        uiState.wavelogUploadSettings.stationGrid
+                        uiState.wavelogUploadSettings.stationGrid,
+                        uiState.wavelogUploadSettings.isReady
                     ).firstOrNull().orEmpty(),
                     status = QsoStatus.COMPLETE
                 )

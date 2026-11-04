@@ -115,9 +115,8 @@ data class LogUiState(
     /** Out-of-window contact waiting for the operator's confirmation (null when closed). */
     val outOfWindowLog: OutOfWindowLog? = null
 ) {
-    /** Own callsign written into a new record: the certificate's, else the Wavelog
-     *  station profile's (a Wavelog-only setup installs no certificate). */
-    val ownCallsign: String get() = operatorCallsign(certificateCallsign, wavelogCallsign)
+    /** Own callsign follows the active upload destination (also used by CW presets). */
+    val ownCallsign: String get() = operatorCallsign(certificateCallsign, wavelogCallsign, wavelogMode)
 }
 
 class LogViewModel(
@@ -158,9 +157,7 @@ class LogViewModel(
             _uiState.update {
                 it.copy(certificateCallsign = cert?.callsign.orEmpty(), satelliteCatalog = catalog)
             }
-            // Station grids and the roaming hint come from the LoTW station location, with the
-            // selected Wavelog station profile as the fallback (a Wavelog-only setup has no
-            // station location at all).
+            // Station grids and roaming hints follow the active upload destination.
             refreshPositionHintNow()
         }
         // Upload routing follows the Wavelog configuration: once it is ready the log
@@ -558,9 +555,9 @@ class LogViewModel(
 
     private suspend fun refreshPositionHintNow() {
         val station = runCatching { lotwUploadRepository.station() }.getOrNull()
-        // The station location first; a Wavelog-only setup has none, so its records are logged —
-        // and its roaming hint measured — against the selected Wavelog station profile's grids.
-        val grids = operatorGrids(station?.grid.orEmpty(), settingsRepo.wavelogUploadSettings.value.stationGrid)
+        // Do not use a leftover LoTW station location when Wavelog handles uploads.
+        val wavelog = settingsRepo.wavelogUploadSettings.value
+        val grids = operatorGrids(station?.grid.orEmpty(), wavelog.stationGrid, wavelog.isReady)
         _uiState.update {
             it.copy(
                 stationMismatch = positionWarning(settingsRepo.getCurrentGrid(), grids),
