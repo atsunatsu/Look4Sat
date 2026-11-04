@@ -649,7 +649,24 @@ private fun LogbookQuerySheet(
                             onDismissRequest = { callsignMenuOpen = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.prefs_logbook_query_all_callsigns)) },
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.prefs_logbook_query_all_callsigns),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (ownCallsignFilter.isBlank()) {
+                                            Text(
+                                                text = "✓",
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontSize = 16.sp
+                                            )
+                                        }
+                                    }
+                                },
                                 onClick = {
                                     onOwnCallsignFilter("")
                                     callsignMenuOpen = false
@@ -657,7 +674,21 @@ private fun LogbookQuerySheet(
                             )
                             ownCallsigns.forEach { callsign ->
                                 DropdownMenuItem(
-                                    text = { Text(callsign) },
+                                    text = {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(callsign, modifier = Modifier.weight(1f))
+                                            if (ownCallsignFilter.equals(callsign, ignoreCase = true)) {
+                                                Text(
+                                                    text = "✓",
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontSize = 16.sp
+                                                )
+                                            }
+                                        }
+                                    },
                                     onClick = {
                                         onOwnCallsignFilter(callsign)
                                         callsignMenuOpen = false
