@@ -31,7 +31,7 @@ data class OwnStationFilter(val callsign: String, val grid: String)
  * here, next to the record model, as the single definition of "matches the query".
  *
  * [query] is matched case-insensitively against the opposite callsign, the satellite
- * name, both primary grids, the counterpart's VUCC grids and the comment. [ownCallsignFilter]
+ * name, both primary grids, the counterpart's VUCC grids and the comment. [ownStationFilter]
  * independently limits results to one operator callsign and transmitting grid.
  * [modeFilter] is either blank (any mode)
  * or an exact [displayMode] — the modes offered are whatever the log actually contains, so
