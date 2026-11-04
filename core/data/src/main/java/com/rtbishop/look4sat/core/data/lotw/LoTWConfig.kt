@@ -149,23 +149,20 @@ internal class LoTWConfig(input: InputStream) {
         if (grids.size !in 1..4 || grids.any { !it.matches(Regex("[A-R]{2}[0-9]{2}([A-X]{2}([0-9]{2})?)?")) }) {
             fail(LoTWProblem.STATION_GRID)
         }
-        // ADIF (VUCC_GRIDS / MY_VUCC_GRIDS) and LoTW's station-location rules allow one grid, a
-        // boundary pair, or a four-way intersection — never three, never a set that only has the
-        // right count. The format check above cannot tell a mistyped field letter (OM00AX for
-        // PM00AX) from a real location, and LoTW stores MY_VUCC_GRIDS verbatim (it validates the
-        // syntax of these fields, not their geometry), so the set is refused here, before signing,
-        // instead of being published as a station location that sits 1700 km from its own grids.
+        // LoTW station locations allow one grid, a boundary pair, or a four-way intersection —
+        // never three, and never a set that only has the right count. The format check above cannot
+        // tell a mistyped field letter (OM00AX for PM00AX) from a real location, so reject invalid
+        // geometry before signing instead of publishing a station location with distant grids.
         when (stationGridSetIssue(grids)) {
             StationGridSetIssue.COUNT -> fail(LoTWProblem.STATION_GRID_COUNT, grids.joinToString(","))
             StationGridSetIssue.NOT_ADJACENT ->
                 fail(LoTWProblem.STATION_GRID_NOT_ADJACENT, grids.joinToString(","))
             null -> Unit
         }
-        // The primary grid goes into GRIDSQUARE (the field the config's tSTATION
-        // order signs); the full multi-grid set goes into MY_VUCC_GRIDS, an extra
-        // station field that TQSL stores but does not sign (same precedent as IOTA).
-        val fields = linkedMapOf("GRIDSQUARE" to grids.first())
-        if (grids.size > 1) fields["MY_VUCC_GRIDS"] = grids.joinToString(",")
+        // TQSL stores a boundary pair or four-way intersection as one comma-separated GRIDSQUARE
+        // station field. LoTW derives MY_VUCC_GRIDS in its QSO detail reports; it is not a tSTATION
+        // field and must not be emitted as one. The complete value is also included in V2.0 signing.
+        val fields = linkedMapOf("GRIDSQUARE" to grids.joinToString(","))
         fun zone(name: String, value: String, maximum: Int) {
             if (value.isBlank()) return
             val number = value.trim().toIntOrNull()?.takeIf { it in 1..maximum } ?: fail(LoTWProblem.STATION_ZONE)
