@@ -25,8 +25,8 @@ import org.junit.Test
  * Upload-side gate for the own-station grid set serialized into the TQ8
  * station record's comma-separated GRIDSQUARE field.
  *
- * LoTW validates the syntax of those fields but never their geometry, so a mistyped field letter
- * (PM00AX -> OM00AX) is stored verbatim and only shows up as a "roamed" square 1700 km away. The
+ * LoTW validates grid syntax but not the relationship between a comma-separated set of grids,
+ * so a mistyped field letter (PM00AX -> OM00AX) can be stored as a distant "roamed" square. The
  * real-world value that triggered this is the last case.
  */
 class StationGridSetTest {
