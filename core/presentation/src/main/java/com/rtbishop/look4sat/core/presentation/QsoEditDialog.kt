@@ -234,6 +234,12 @@ fun QsoEditDialog(
                     )
                 }
                 ReadOnlyField(stringResource(R.string.qso_edit_grid), record.displayTheirGrid)
+                if (record.iota.isNotBlank()) {
+                    ReadOnlyField(stringResource(R.string.qso_edit_their_iota), record.iota)
+                }
+                if (record.myIota.isNotBlank()) {
+                    ReadOnlyField(stringResource(R.string.qso_edit_my_iota), record.myIota)
+                }
                 if (txHz == null) {
                     Text(
                         text = stringResource(R.string.qso_edit_warn_no_freq),
