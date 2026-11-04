@@ -50,6 +50,13 @@ class CwConsoleStateTest {
         assertEquals(CwConsoleDraft(), CwConsoleState().draft)
     }
 
+    @Test fun defaultCwCallsignFollowsTheActiveUploadDestination() {
+        val log = LogUiState(certificateCallsign = "BA7OPF", wavelogCallsign = "BH3HCF", wavelogMode = true)
+        assertEquals("BH3HCF", CwConsoleDraft().myCallsign ?: log.ownCallsign)
+        assertEquals("BA7OPF", CwConsoleDraft().myCallsign ?: log.copy(wavelogMode = false).ownCallsign)
+        assertEquals("BH3HCF/P", CwConsoleDraft(myCallsign = "BH3HCF/P").myCallsign ?: log.ownCallsign)
+    }
+
     @Test fun ownCallsignOverrideCanBeExplicitlyClearedWithoutChangingTheSource() {
         val source = "BA7OPF"
         assertEquals(source, CwConsoleDraft().myCallsign ?: source)
