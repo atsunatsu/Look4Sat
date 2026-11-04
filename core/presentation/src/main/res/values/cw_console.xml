@@ -4,6 +4,7 @@
     <string name="cw_console_their_call">Their callsign</string>
     <string name="cw_console_my_call">My callsign</string>
     <string name="cw_console_report">Sent RST</string>
+    <string name="cw_console_frequency_step">Frequency step</string>
     <string name="cw_console_message">CW message</string>
     <string name="cw_console_grid">Grid: %1$s</string>
     <string name="cw_console_grid_field">My grid</string>
