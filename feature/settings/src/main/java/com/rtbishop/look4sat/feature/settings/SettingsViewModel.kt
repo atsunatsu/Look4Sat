@@ -439,9 +439,13 @@ class SettingsViewModel(
                     actualMode,
                     failedStations = fetch.failedStations.toSet()
                 )
+                // Take a fresh snapshot after the Room transaction so the settings
+                // logbook card/dialog reflects the completed sync immediately.
+                val syncedRecords = qsoRepository.records.first()
                 _uiState.update {
                     it.copy(
                         wavelogSyncing = false,
+                        logbookRecords = syncedRecords,
                         workedGridsCount = settingsRepo.getWorkedGrids().size,
                         wavelogLastSyncEpochMs = settingsRepo.getLastWavelogSyncEpochMs(),
                         wavelogUploadMessage = wavelogSyncSummary(actualMode, fetch, merge, stations.size, promoted)
@@ -505,7 +509,14 @@ class SettingsViewModel(
 
     private fun refreshLogbook() {
         viewModelScope.launch {
-            _uiState.update { it.copy(logbookRecords = qsoRepository.records.first()) }
+            val records = qsoRepository.records.first()
+            _uiState.update {
+                it.copy(
+                    logbookRecords = records,
+                    workedGridsCount = settingsRepo.getWorkedGrids().size,
+                    lotwLastSyncEpochMs = lotwCursorEpochMs(settingsRepo.getLastLotwSyncDate())
+                )
+            }
         }
     }
 
