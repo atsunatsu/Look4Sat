@@ -4,6 +4,7 @@
     <string name="cw_console_their_call">對方呼號</string>
     <string name="cw_console_my_call">自己呼號</string>
     <string name="cw_console_report">傳送報告</string>
+    <string name="cw_console_frequency_step">頻率步進</string>
     <string name="cw_console_message">CW 文字</string>
     <string name="cw_console_grid">網格：%1$s</string>
     <string name="cw_console_grid_field">自己網格</string>
