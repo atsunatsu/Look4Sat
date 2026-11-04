@@ -307,13 +307,10 @@ class LoTWUploadRepository internal constructor(
                     else -> contact
                 }
             }
-            // The station-location grids this batch is signed with: the primary grid plus the
-            // MY_VUCC_GRIDS set (1 inside a grid, 2 on a line, 4 on a corner — see [LoTWConfig]).
-            val locationGrids = buildList {
-                signing.location["GRIDSQUARE"]?.takeIf(String::isNotBlank)?.let(::add)
-                signing.location["MY_VUCC_GRIDS"]?.split(',')
-                    ?.map(String::trim)?.filter(String::isNotBlank)?.let(::addAll)
-            }.distinct()
+            // GRIDSQUARE carries all the signed station grids as a comma-separated set;
+            // retain each grid separately in the preview and the uploaded-QSO stamp.
+            val locationGrids = signing.location["GRIDSQUARE"].orEmpty().split(',')
+                .map(String::trim).filter(String::isNotBlank).distinct()
             val submittedIds = contacts.map { it.record.id }
             val preview = LoTWUploadPreview(
                 UUID.randomUUID().toString(), signing.key.info.callsign, signing.key.info.dxcc, signing.location.getValue("GRIDSQUARE"),
