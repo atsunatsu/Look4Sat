@@ -53,6 +53,23 @@ class WavelogSyncRepositoryTest {
     }
 
     @Test
+    fun downloadedAdifRetainsTransmitAndReceiveFrequencies() {
+        val adif = "<ADIF_VER:5>3.1.7<EOH>" +
+            "<QSO_DATE:8>20260916<TIME_ON:4>0745<CALL:6>BG5JSB" +
+            "<FREQ:7>145.850<FREQ_RX:7>436.795" +
+            "<MODE:2>FM<PROP_MODE:3>SAT<SAT_NAME:5>SO-50<EOR>"
+        val page = repository.parsePage(JSONObject()
+            .put("status", "successful")
+            .put("lastfetchedid", 1)
+            .put("exported_qsos", 1)
+            .put("adif", adif)
+            .toString())!!
+
+        assertEquals(145_850_000L, page.records.single().txFrequencyHz)
+        assertEquals(436_795_000L, page.records.single().rxFrequencyHz)
+    }
+
+    @Test
     fun failedStatusIsRejected() {
         assertNull(repository.parsePage("""{"status":"failed","reason":"missing api key"}"""))
     }
