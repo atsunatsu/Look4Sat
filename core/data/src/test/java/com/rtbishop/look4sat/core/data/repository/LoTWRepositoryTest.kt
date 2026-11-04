@@ -131,6 +131,28 @@ class LoTWRepositoryTest {
         "<EOR>\n"
 
     @Test
+    fun parseQsosCarriesFrequenciesIntoLogbookAndDoesNotLeakAcrossRecords() {
+        // LoTW sends FREQ / FREQ_RX in MHz; the next QSO may omit either field.
+        val withFrequencies = "<CALL:5>A50QO\n<QSO_DATE:8>20260820\n<TIME_ON:4>1130\n" +
+            "<FREQ:7>145.850\n<FREQ_RX:7>436.795\n<GRIDSQUARE:4>NL47\n" +
+            "<MODE:2>CW\n<PROP_MODE:3>SAT\n<SAT_NAME:5>FO-29\n<EOR>\n"
+        val withoutFrequencies = "<CALL:6>BG7ZFK\n<QSO_DATE:8>20260821\n<TIME_ON:4>1130\n" +
+            "<GRIDSQUARE:4>OK48\n<MODE:2>CW\n<PROP_MODE:3>SAT\n" +
+            "<SAT_NAME:5>FO-29\n<EOR>\n"
+        val parsed = repo.parseConfirmedGridQsos(report(withFrequencies, withoutFrequencies))!!
+        val with = parsed.getValue("NL47").single()
+        assertEquals(145_850_000L, with.txFrequencyHz)
+        assertEquals(436_795_000L, with.rxFrequencyHz)
+        val logbook = with.toConfirmedRecord("BA7OPF")
+        assertEquals(145_850_000L, logbook.txFrequencyHz)
+        assertEquals(436_795_000L, logbook.rxFrequencyHz)
+
+        val without = parsed.getValue("OK48").single()
+        assertNull(without.txFrequencyHz)
+        assertNull(without.rxFrequencyHz)
+    }
+
+    @Test
     fun parseQsosExtractsSatelliteDetail() {
         val result = repo.parseConfirmedGridQsos(report(satQsoFull))!!
         val qsos = result["NL47"]!!
