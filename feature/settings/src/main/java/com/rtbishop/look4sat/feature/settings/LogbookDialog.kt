@@ -147,15 +147,13 @@ fun LogbookDialog(
     // Record currently open in the edit dialog — a listed row, or the blank draft the Create
     // button just made. A draft carries id = 0, so saving it inserts a new row.
     var editTarget by remember { mutableStateOf<QsoRecord?>(null) }
-    // Query sheet state. The query is a *display* filter over the listed records only: the
-    // Upload button still signs every record exactly as before. Keeping it local to this
-    // dialog also keeps the per-edition settings ViewModels free of query fields.
+    // Query sheet state is kept separate from the main logbook list. Its filters affect
+    // only the results shown inside the query sheet; closing it leaves the original list intact.
+    // Keeping the state local also keeps the settings ViewModel free of query fields.
     var querySheetOpen by remember { mutableStateOf(false) }
     var queryText by rememberSaveable { mutableStateOf("") }
     var modeFilter by rememberSaveable { mutableStateOf("") }
     var confirmationFilter by rememberSaveable { mutableStateOf(LogbookFilter.ALL) }
-    val queryActive = queryText.isNotBlank() || modeFilter.isNotEmpty() ||
-        confirmationFilter != LogbookFilter.ALL
     val clearQuery = {
         queryText = ""
         modeFilter = ""
@@ -193,13 +191,6 @@ fun LogbookDialog(
         ) {
             if (records.isEmpty()) {
                 Text(stringResource(R.string.prefs_logbook_empty), fontSize = 14.sp)
-            } else if (shownRecords.isEmpty()) {
-                // A query can legitimately empty the list while records exist — say that,
-                // instead of showing the "log your first QSO" message.
-                Text(stringResource(R.string.prefs_logbook_query_empty), fontSize = 14.sp)
-                TextButton(onClick = { clearQuery() }) {
-                    Text(stringResource(R.string.prefs_logbook_query_clear), fontSize = 12.sp)
-                }
             } else {
                 // Selection mode shows the checked count; otherwise a hint that long-press
                 // opens it (the path to resubmitting already-uploaded records).
@@ -215,18 +206,6 @@ fun LogbookDialog(
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-                if (queryActive && !selectionMode) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = stringResource(R.string.prefs_logbook_query_hits, shownRecords.size),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        TextButton(onClick = { clearQuery() }) {
-                            Text(stringResource(R.string.prefs_logbook_query_clear), fontSize = 11.sp)
-                        }
-                    }
                 }
                 if (stationOptions.isNotEmpty()) {
                     // 台址 selector: filters the list to one Wavelog station profile
@@ -277,7 +256,7 @@ fun LogbookDialog(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    items(shownRecords, key = { it.id }) { record ->
+                    items(records, key = { it.id }) { record ->
                         LogbookRow(
                             record = record,
                             selectionMode = selectionMode,
@@ -303,12 +282,25 @@ fun LogbookDialog(
             modeFilter = modeFilter,
             confirmation = confirmationFilter,
             modes = records.map { it.displayMode }.filter(String::isNotBlank).distinct().sorted(),
-            hitCount = shownRecords.size,
+            results = shownRecords,
             onQueryChange = { queryText = it },
             onModeFilter = { modeFilter = it },
             onConfirmation = { confirmationFilter = it },
+            selectionMode = selectionMode,
+            selectedIds = selectedIds,
+            swipeController = swipeController,
+            onDelete = onDelete,
+            onRecordClick = { record ->
+                if (selectionMode) onToggleSelection(record.id) else editTarget = record
+            },
+            onRecordLongClick = { record ->
+                if (selectionMode) onToggleSelection(record.id) else onStartSelection(record.id)
+            },
             onClear = { clearQuery() },
-            onDismiss = { querySheetOpen = false }
+            onDismiss = {
+                querySheetOpen = false
+                swipeController.close()
+            }
         )
     }
 
@@ -581,7 +573,13 @@ private fun LogbookQuerySheet(
     modeFilter: String,
     confirmation: LogbookFilter,
     modes: List<String>,
-    hitCount: Int,
+    results: List<QsoRecord>,
+    selectionMode: Boolean,
+    selectedIds: Set<Long>,
+    swipeController: SwipeController,
+    onDelete: (Long) -> Unit,
+    onRecordClick: (QsoRecord) -> Unit,
+    onRecordLongClick: (QsoRecord) -> Unit,
     onQueryChange: (String) -> Unit,
     onModeFilter: (String) -> Unit,
     onConfirmation: (LogbookFilter) -> Unit,
@@ -610,7 +608,7 @@ private fun LogbookQuerySheet(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(R.string.prefs_logbook_query_hits, hitCount),
+                    text = stringResource(R.string.prefs_logbook_query_hits, results.size),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -643,6 +641,31 @@ private fun LogbookQuerySheet(
                         onClick = { onModeFilter(if (modeFilter == mode) "" else mode) },
                         label = { Text(mode, fontSize = 12.sp) }
                     )
+                }
+            }
+            if (results.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.prefs_logbook_query_empty),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(results, key = { it.id }) { record ->
+                        LogbookRow(
+                            record = record,
+                            selectionMode = selectionMode,
+                            selected = record.id in selectedIds,
+                            swipeController = swipeController,
+                            onDelete = { onDelete(record.id) },
+                            onClick = { onRecordClick(record) },
+                            onLongClick = { onRecordLongClick(record) }
+                        )
+                    }
                 }
             }
         }
