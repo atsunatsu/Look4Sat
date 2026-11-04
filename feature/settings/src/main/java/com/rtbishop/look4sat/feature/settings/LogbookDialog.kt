@@ -320,7 +320,6 @@ fun LogbookDialog(
             onClear = { clearQuery() },
             onDismiss = {
                 querySheetOpen = false
-                clearQuery()
                 swipeController.close()
             }
         )
