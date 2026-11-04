@@ -11,10 +11,10 @@ name: Build Look4Sat APK
 # Test builds and official releases share the same versionCode sequence. Test APKs add ".test.<run_number>"
 # to versionName; official release tags and versionName still use the version catalog.
 # Changes to the version catalog happen only in the runner's checkout, NOT in Git.
-# Local Gradle builds keep using the catalog unchanged. Most runs are manual; only the specific release commit has a guarded push trigger.
+# Local Gradle builds keep using the catalog unchanged. Most runs are manual; release commits use a guarded push trigger.
 
 on:
-  # One-shot v18.7 release automation; only the specific release commit runs on push.
+  # A commit prefixed with "release: v4.4.8-ba7opf." publishes that version on push.
   push:
     branches: [main]
   workflow_dispatch:
@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   build:
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.18.7')) }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -229,11 +229,11 @@ jobs:
         run: |
           set -euo pipefail
           # Republishing the same version is destructive: only a deliberately
-          # labeled push release commit may replace the existing public asset.
+          # labeled push release commit for that version may replace the public asset.
           REPUBLISH=false
           if gh release view "$TAG" >/dev/null 2>&1; then
             COMMIT_SUBJECT="$(git log -1 --format=%s)"
-            if [ "$GITHUB_EVENT_NAME" != "push" ] || [ "$COMMIT_SUBJECT" != "release: v4.4.8-ba7opf.18.7 [republish]" ]; then
+            if [ "$GITHUB_EVENT_NAME" != "push" ] || [ "$COMMIT_SUBJECT" != "release: v${VERSION} [republish]" ]; then
               echo "::error::Release $TAG already exists. Explicit [republish] commit required."
               exit 1
             fi
@@ -246,21 +246,17 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.7 — English
-          - Fixed TLE update refresh so satellite selection and pass predictions re-read the latest orbit data.
-          - Corrected radio-mode filtering: if no satellite matches a selected mode, the pass list remains empty rather than showing all satellites.
-          - Fixed radar navigation from mutual-pass matches so it opens the intended pass rather than a different/filtered pass.
-          - Preserved precise user-entered coordinates in dual-station matching instead of snapping them back to Maidenhead grid centres; tightened Maidenhead field and longitude-boundary validation.
-          - Dual-station radar tracks and elevation curves now use solid lines above each station's own minimum elevation and dashed lines below or equal to it, without changing mutual-pass filtering.
+          ## v18.8 — English
+          - Added matching QSO records directly inside the logbook query dialog, so users can inspect results without leaving the dialog.
+          - Reused the logbook's interactive rows in query results: tap to edit, swipe to delete, and long-press to select records.
+          - Kept query filters and results isolated from the main logbook list; the full list remains unchanged, while query conditions persist when the query dialog is closed and reopened.
           - Release CI verifies unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest), signed APK certificate, version and both ARM ABIs.
 
-          ## v18.7 — 中文
-          - 修复 TLE 更新后卫星选择页与过境预测未及时重载最新轨道数据的问题。
-          - 修复筛选转发器模式但无匹配卫星时错误显示全部过境的问题。
-          - 修复双站匹配结果跳转雷达时可能打开其他过境的问题。
-          - 双站匹配保留用户输入的精确经纬度，不再强制退回 Maidenhead 网格中心；同时修正网格首字段及经度边界校验。
-          - 双方轨迹线及仰角曲线独立按各方最低仰角绘制：超过门限为实线，未超过为虚线。匹配筛选规则保持不变。
-          - 发布 CI 在发布前检查单元测试（排除已有超时问题的 RadioConfigurationSaveTest）、APK 签名、版本号及两种 ARM ABI。
+          ## v18.8 — 中文
+          - 日志查询弹窗内直接显示匹配的通联记录，无需离开弹窗返回日志本查看。
+          - 查询结果复用日志本的交互记录行，支持点击编辑、滑动删除和长按多选。
+          - 查询筛选条件和结果与原日志本相互独立；原日志本始终显示完整列表，关闭并重新打开查询弹窗时保留原查询条件。
+          - 发布 CI 在发布前检查单元测试（排除已有超时问题的 RadioConfigurationSaveTest）、APK 签名证书、版本号及两种 ARM ABI。
           RELEASE_NOTES
           )"
           fi
