@@ -27,8 +27,9 @@ enum class LogbookFilter { ALL, CONFIRMED, UNCONFIRMED, DRAFTS }
  * copy of this predicate, which is exactly how the two lists drift apart — so it lives
  * here, next to the record model, as the single definition of "matches the query".
  *
- * [query] is matched case-insensitively against the opposite callsign, the own callsign,
- * the satellite name, both primary grids, the counterpart's VUCC grids and the comment.
+ * [query] is matched case-insensitively against the opposite callsign, the satellite
+ * name, both primary grids, the counterpart's VUCC grids and the comment. [ownCallsignFilter]
+ * independently limits results to records logged under one operator callsign.
  * [modeFilter] is either blank (any mode)
  * or an exact [displayMode] — the modes offered are whatever the log actually contains, so
  * there is no sentinel for "worked via satellite". [confirmation] narrows to confirmed,
@@ -38,17 +39,20 @@ fun filterRecords(
     records: List<QsoRecord>,
     query: String,
     modeFilter: String,
-    confirmation: LogbookFilter
+    confirmation: LogbookFilter,
+    ownCallsignFilter: String = ""
 ): List<QsoRecord> = records.filter { record ->
     val trimmed = query.trim()
+    val selectedOwnCallsign = ownCallsignFilter.trim()
     (trimmed.isEmpty() || (listOf(
         record.theirCallsign,
-        record.myCallsign,
         record.satelliteName,
         record.theirGrid,
         record.myGrid,
         record.comment
     ) + record.theirVuccGrids).any { it.contains(trimmed, ignoreCase = true) }) &&
+        (selectedOwnCallsign.isEmpty() ||
+            record.myCallsign.trim().equals(selectedOwnCallsign, ignoreCase = true)) &&
         when (modeFilter) {
             "" -> true
             else -> record.displayMode == modeFilter
