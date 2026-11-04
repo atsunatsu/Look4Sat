@@ -191,7 +191,9 @@ fun QsoRecord.withConfirmation(confirmed: QsoRecord): QsoRecord = copy(
     myFullGrids = (myFullGrids + confirmed.myFullGrids).distinct(),
     iota = confirmed.iota.ifBlank { iota },
     myIota = confirmed.myIota.ifBlank { myIota },
-    myGrid = myGrid.ifBlank { confirmed.myGrid },
+    // A matched LoTW confirmation carries the station grid used for this QSO.
+    // Prefer it over a stale local locator; do not erase a grid when LoTW omits it.
+    myGrid = confirmed.myGrid.ifBlank { myGrid },
     sentReport = sentReport.ifBlank { confirmed.sentReport },
     receivedReport = receivedReport.ifBlank { confirmed.receivedReport },
     txFrequencyHz = txFrequencyHz ?: confirmed.txFrequencyHz,
