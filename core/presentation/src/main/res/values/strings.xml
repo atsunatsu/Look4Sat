@@ -4,6 +4,7 @@
     <string name="app_name" translatable="false">Look4Sat-BA7OPF</string>
     <string name="btn_accept">Accept</string>
     <string name="btn_cancel">Cancel</string>
+    <string name="btn_save">Save</string>
     <string name="btn_confirm">Confirm</string>
     <string name="empty_list_message">No data to show</string>
 
@@ -153,6 +154,12 @@
     <string name="map_time_reset">Reset</string>
     <string name="map_azimuth">Azimuth: %.1f°</string>
     <string name="map_elevation">Elevation: %.1f°</string>
+    <string name="map_elevation_circles">Elevation circles</string>
+    <string name="map_elevation_circles_title">Elevation circle settings</string>
+    <string name="map_elevation_circles_description">Show dashed equal-elevation lines within the satellite footprint (0°–90°).</string>
+    <string name="map_elevation_circles_angle">Elevation %1$d (°)</string>
+    <string name="map_elevation_circles_add">＋ Add elevation circle</string>
+    <string name="map_elevation_circles_invalid">Enter unique elevation angles between 0° and 90°.</string>
     <string name="map_altitude">Altitude: %.0f km</string>
     <string name="map_distance">Distance: %.0f km</string>
     <string name="map_latitude">Latitude: %.1f°</string>
