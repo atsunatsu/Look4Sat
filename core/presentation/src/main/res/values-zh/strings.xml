@@ -3,6 +3,7 @@
     <!-- Commmon -->
     <string name="btn_accept">确定</string>
     <string name="btn_cancel">取消</string>
+    <string name="btn_save">保存</string>
     <string name="btn_confirm">确认</string>
     <string name="empty_list_message">没有数据可显示</string>
 
@@ -134,6 +135,12 @@
     <string name="map_time_reset">重置</string>
     <string name="map_azimuth">方位角：%.1f°</string>
     <string name="map_elevation">仰角：%.1f°</string>
+    <string name="map_elevation_circles">仰角圆</string>
+    <string name="map_elevation_circles_title">仰角圆设置</string>
+    <string name="map_elevation_circles_description">在卫星覆盖范围内显示等仰角虚线（0°–90°）。</string>
+    <string name="map_elevation_circles_angle">仰角 %1$d (°)</string>
+    <string name="map_elevation_circles_add">＋ 添加仰角圆</string>
+    <string name="map_elevation_circles_invalid">请输入不重复的 0°–90° 仰角。</string>
     <string name="map_altitude">高度：%.0f km</string>
     <string name="map_distance">距离：%.0f km</string>
     <string name="map_latitude">纬度：%.1f°</string>

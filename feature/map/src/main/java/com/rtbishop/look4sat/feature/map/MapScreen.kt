@@ -848,7 +848,7 @@ private fun MapScreen(
                             modifier = Modifier.clickable { openElevationSettings() }
                                 .padding(start = 12.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
                         ) {
-                            Text("仰角圆", color = ComposeColor.White, fontSize = 12.sp, modifier = Modifier.padding(end = 2.dp))
+                            Text(stringResource(R.string.map_elevation_circles), color = ComposeColor.White, fontSize = 12.sp, modifier = Modifier.padding(end = 2.dp))
                             Switch(
                                 checked = showElevationContours,
                                 // The switch itself only toggles visibility. Tapping the
@@ -980,13 +980,13 @@ private fun ElevationSettingsDialog(
                         .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)
                 ) {
                     Text(
-                        "仰角圆设置",
+                        stringResource(R.string.map_elevation_circles_title),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary,
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = onDismiss) { Text("取消") }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.btn_cancel)) }
                 }
                 androidx.compose.material3.HorizontalDivider()
                 Column(
@@ -997,7 +997,7 @@ private fun ElevationSettingsDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        "在卫星覆盖范围内显示等仰角虚线（0°–90°）。",
+                        stringResource(R.string.map_elevation_circles_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1008,7 +1008,7 @@ private fun ElevationSettingsDialog(
                                 onValueChange = { newText ->
                                     onValuesChange(values.toMutableList().also { it[index] = newText })
                                 },
-                                label = { Text("仰角 ${index + 1} (°)") },
+                                label = { Text(stringResource(R.string.map_elevation_circles_angle, index + 1)) },
                                 isError = input.trim().toDoubleOrNull()?.let { !it.isFinite() || it !in 0.0..90.0 } ?: true,
                                 singleLine = true,
                                 modifier = Modifier.weight(1f)
@@ -1020,10 +1020,10 @@ private fun ElevationSettingsDialog(
                             }
                         }
                     }
-                    TextButton(onClick = { onValuesChange(values + "") }) { Text("＋ 添加仰角圆") }
+                    TextButton(onClick = { onValuesChange(values + "") }) { Text(stringResource(R.string.map_elevation_circles_add)) }
                     if (!valid) {
                         Text(
-                            "请输入不重复的 0°–90° 仰角。",
+                            stringResource(R.string.map_elevation_circles_invalid),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -1037,7 +1037,7 @@ private fun ElevationSettingsDialog(
                     TextButton(
                         enabled = valid,
                         onClick = { onApply(parsed.filterNotNull()) }
-                    ) { Text("保存") }
+                    ) { Text(stringResource(R.string.btn_save)) }
                 }
             }
         }
