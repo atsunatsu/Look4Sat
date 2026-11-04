@@ -396,6 +396,46 @@ class QsoRepositoryTest {
     }
 
     @Test
+    fun mergeLoTW_updatesExistingOwnGridOnMatchedConfirmation() = runBlocking {
+        val id = dao.save(loggedInApp("SO-50", lotwUploaded = true)
+            .copy(myGrid = "OL62").toEntity())
+
+        repository.mergeLoTW(listOf(reportConfirmation(satName = "SO-50")
+            .copy(myGrid = "OL62TI")))
+
+        val row = dao.getAll().single()
+        assertEquals(id, row.id)
+        assertEquals("OL62TI", row.myGrid)
+        assertTrue(row.lotwConfirmed)
+    }
+
+    @Test
+    fun mergeWavelog_overwritesExistingOwnGridWithRemoteValue() = runBlocking {
+        val id = dao.save(loggedInApp("SO-50", lotwUploaded = false)
+            .copy(myGrid = "OL62", comment = "local note").toEntity())
+        val remote = loggedInApp("SO-50", lotwUploaded = false)
+            .copy(myGrid = "OL62TI", comment = "server note", wavelogStation = "3")
+
+        repository.mergeWavelog(listOf(remote))
+
+        val row = dao.getAll().single()
+        assertEquals(id, row.id)
+        assertEquals("OL62TI", row.myGrid)
+        assertEquals("local note", row.comment)
+        assertEquals("3", row.wavelogStation)
+    }
+
+    @Test
+    fun mergeWavelog_keepsOwnGridWhenRemoteHasNoGrid() = runBlocking {
+        dao.save(loggedInApp("SO-50", lotwUploaded = false)
+            .copy(myGrid = "OL62TI").toEntity())
+        repository.mergeWavelog(listOf(loggedInApp("SO-50", lotwUploaded = false)
+            .copy(myGrid = "", wavelogStation = "3")))
+
+        assertEquals("OL62TI", dao.getAll().single().myGrid)
+    }
+
+    @Test
     fun mergeWavelog_isIdempotentAcrossSyncs() = runBlocking {
         val records = listOf(loggedInApp("SO-50", lotwUploaded = false).copy(wavelogStation = "1"))
 
