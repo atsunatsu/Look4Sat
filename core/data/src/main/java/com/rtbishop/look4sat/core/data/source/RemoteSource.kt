@@ -71,7 +71,7 @@ class RemoteSource(
     override suspend fun getAmSatCatalog(): String? = withContext(dispatcher) {
         try {
             val request = Request.Builder()
-                .url("https://www.amsat.org/status/api/v1/catalog.php")
+                .url("https://status.amsat.org/api/v1/catalog.php")
                 .header("User-Agent", "Look4Sat")
                 .build()
             httpClient.newCall(request).execute().use { response ->
@@ -87,7 +87,7 @@ class RemoteSource(
     override suspend fun getAmSatReports(hours: Int, limit: Int): String? = withContext(dispatcher) {
         try {
             val request = Request.Builder()
-                .url("https://www.amsat.org/status/api/v1/reports.php?hours=$hours&limit=$limit")
+                .url("https://status.amsat.org/api/v1/reports.php?hours=$hours&limit=$limit")
                 .header("User-Agent", "Look4Sat")
                 .build()
             httpClient.newCall(request).execute().use { response ->
@@ -104,7 +104,7 @@ class RemoteSource(
         try {
             val body = payloadJson.toRequestBody("application/json; charset=utf-8".toMediaType())
             val request = Request.Builder()
-                .url("https://www.amsat.org/status/api/v1/reports.php")
+                .url("https://status.amsat.org/api/v1/reports.php")
                 .header("User-Agent", "Look4Sat")
                 .post(body)
                 .build()
