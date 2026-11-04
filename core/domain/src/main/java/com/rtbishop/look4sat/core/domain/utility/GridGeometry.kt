@@ -195,9 +195,8 @@ private fun bearingDegrees(dNorth: Double, dEast: Double): Double {
 /**
  * Why an own-station grid set cannot describe a VUCC boundary / four-way intersection.
  *
- * ADIF 3.1.7 (`VUCC_GRIDS` / `MY_VUCC_GRIDS`) and LoTW's own station-location rules allow exactly
- * one grid, two grids sharing an edge, or four grids sharing a corner — never three, and never a
- * set that merely happens to have the right count.
+ * LoTW station-location rules allow exactly one grid, two grids sharing an edge, or four grids
+ * sharing a corner — never three, and never a set that merely happens to have the right count.
  */
 enum class StationGridSetIssue {
     /** Not 1, 2 or 4 grids. */
