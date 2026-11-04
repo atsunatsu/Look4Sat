@@ -528,46 +528,49 @@ private fun LogbookRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                // Keep the opposite grid/status in the existing top-right position.
-                // Show the opposite IOTA directly underneath, aligned to the same edge.
-                Column(horizontalAlignment = Alignment.End) {
-                    if (record.lotwConfirmed) {
-                        val oppositeGrids = gridsLabel(
-                            (listOf(record.theirGrid) + record.theirVuccGrids).distinct()
-                        )
-                        if (oppositeGrids.isNotEmpty()) {
-                            Text(text = oppositeGrids, fontSize = 13.sp, color = ConfirmedGreen, fontFamily = FontFamily.Monospace)
-                        } else {
-                            Text(text = "QSL", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
-                        }
-                    } else if (record.lotwUploaded) {
-                        Text(text = "UP", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+                // Keep the opposite grid / status on the callsign line.
+                if (record.lotwConfirmed) {
+                    val oppositeGrids = gridsLabel(
+                        (listOf(record.theirGrid) + record.theirVuccGrids).distinct()
+                    )
+                    if (oppositeGrids.isNotEmpty()) {
+                        Text(text = oppositeGrids, fontSize = 13.sp, color = ConfirmedGreen, fontFamily = FontFamily.Monospace)
+                    } else {
+                        Text(text = "QSL", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
                     }
-                    if (record.iota.isNotBlank()) {
-                        Text(
-                            text = record.iota,
-                            fontSize = 12.sp,
-                            color = IotaBlue,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1
-                        )
-                    }
+                } else if (record.lotwUploaded) {
+                    Text(text = "UP", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
                 }
             }
-            Text(
-                // Own station grid: the set the upload was stamped with, or — for rows from
-                // before the stamp existed — the grid the QSO was logged under, so every
-                // stored contact shows where the operator was.
-                text = listOf(
-                    satShort, record.displayMode, band, time,
-                    gridsLabel((listOf(record.myGrid) + record.vuccGrids).distinct())
-                ).filter { it.isNotBlank() }.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 3.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(top = 3.dp)
+            ) {
+                Text(
+                    // Own station grid: the set stamped at upload, or the logged grid.
+                    text = listOf(
+                        satShort, record.displayMode, band, time,
+                        gridsLabel((listOf(record.myGrid) + record.vuccGrids).distinct())
+                    ).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (record.iota.isNotBlank()) {
+                    // The existing bodySmall line is taller than 14sp: IOTA adds no row height.
+                    Text(
+                        text = record.iota,
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                        color = IotaBlue,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
         }
     }
 }
