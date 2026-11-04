@@ -14,8 +14,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Own identity precedence: the LoTW certificate first (it is the signing identity), the selected
- * Wavelog station profile as the fallback for a Wavelog-only setup, blank when neither exists.
+ * Own identity follows the active destination: selected Wavelog station when ready, otherwise
+ * the LoTW certificate with a Wavelog fallback.
  */
 class OperatorIdentityTest {
 
@@ -45,6 +45,20 @@ class OperatorIdentityTest {
         // Wavelog keeps several gridsquares comma-separated (a location on a line or a corner);
         // they come back trimmed and uppercase.
         assertEquals(listOf("OL62TI", "OL62TJ"), operatorGrids("", " ol62ti , OL62TJ "))
+    }
+
+    @Test
+    fun callsign_wavelogStationWinsWhenWavelogIsActive() {
+        assertEquals("BH3HCF", operatorCallsign("BA7OPF", " bh3hcf ", wavelogMode = true))
+        // Never silently log under an old certificate if the selected profile lacks a callsign.
+        assertEquals("", operatorCallsign("BA7OPF", "", wavelogMode = true))
+    }
+
+    @Test
+    fun grids_followTheWavelogStationWhenWavelogIsActive() {
+        assertEquals(listOf("OL62TJ", "OL62TK"),
+            operatorGrids("OL62TI", " ol62tj , ol62tk ", wavelogMode = true))
+        assertTrue(operatorGrids("OL62TI", "", wavelogMode = true).isEmpty())
     }
 
     @Test
