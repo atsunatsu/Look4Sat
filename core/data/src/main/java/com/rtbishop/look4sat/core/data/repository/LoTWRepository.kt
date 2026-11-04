@@ -17,6 +17,7 @@
  */
 package com.rtbishop.look4sat.core.data.repository
 
+import com.rtbishop.look4sat.core.domain.logbook.AdifCodec
 import com.rtbishop.look4sat.core.domain.repository.ILoTWRepository
 import com.rtbishop.look4sat.core.domain.repository.LoTWPhase
 import com.rtbishop.look4sat.core.domain.repository.LoTWProgress
@@ -259,6 +260,8 @@ class LoTWRepository : ILoTWRepository {
         var mode = ""
         var bandUp = ""
         var bandDown = ""
+        var txFrequencyHz: Long? = null
+        var rxFrequencyHz: Long? = null
         var dxcc: Int? = null
         var country: String? = null
         var cqz: Int? = null
@@ -295,6 +298,7 @@ class LoTWRepository : ILoTWRepository {
             val qso = com.rtbishop.look4sat.core.domain.model.GridQso(
                 call = call, epochMs = epochMs, satName = satName,
                 mode = mode, bandUp = bandUp, bandDown = bandDown,
+                txFrequencyHz = txFrequencyHz, rxFrequencyHz = rxFrequencyHz,
                 dxcc = dxcc, country = country, cqz = cqz, state = state,
                 iota = iota,
                 myGrid = myGrids.firstOrNull(),
@@ -315,6 +319,7 @@ class LoTWRepository : ILoTWRepository {
         fun resetRecord() {
             propMode = null; call = ""; qsoDate = ""; timeOn = ""
             satName = ""; mode = ""; bandUp = ""; bandDown = ""
+            txFrequencyHz = null; rxFrequencyHz = null
             dxcc = null; country = null; cqz = null; state = null; iota = null
             myGrids = mutableSetOf()
             myCallsign = null; myDxcc = null; myState = null
@@ -343,6 +348,10 @@ class LoTWRepository : ILoTWRepository {
                     satName = adifValue(line)
                 line.startsWith("<MODE:") ->
                     mode = adifValue(line)
+                line.startsWith("<FREQ_RX:") ->
+                    rxFrequencyHz = AdifCodec.mhzToHz(adifValue(line))
+                line.startsWith("<FREQ:") ->
+                    txFrequencyHz = AdifCodec.mhzToHz(adifValue(line))
                 line.startsWith("<BAND_RX:") ->
                     bandDown = adifValue(line).uppercase()
                 line.startsWith("<BAND:") && !line.startsWith("<BAND_RX:") ->
