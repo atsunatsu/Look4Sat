@@ -461,6 +461,7 @@ private fun LogbookUploadPreviewDialog(
 
 /** Confirmed-grid colour: the map's worked-grid green, so "confirmed" reads the same everywhere. */
 private val ConfirmedGreen = Color(0xFF4CD964)
+private val IotaBlue = Color(0xFF64B5F6)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -527,9 +528,7 @@ private fun LogbookRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                // Confirmed contacts show the opposite station's grid set from the LoTW
-                // report (single or multi-grid, abbreviated) in the worked-grid green
-                // instead of the word QSL; without any grid the QSL text stays.
+                // Keep the opposite grid / status on the callsign line.
                 if (record.lotwConfirmed) {
                     val oppositeGrids = gridsLabel(
                         (listOf(record.theirGrid) + record.theirVuccGrids).distinct()
@@ -543,20 +542,35 @@ private fun LogbookRow(
                     Text(text = "UP", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
                 }
             }
-            Text(
-                // Own station grid: the set the upload was stamped with, or — for rows from
-                // before the stamp existed — the grid the QSO was logged under, so every
-                // stored contact shows where the operator was.
-                text = listOf(
-                    satShort, record.displayMode, band, time,
-                    gridsLabel((listOf(record.myGrid) + record.vuccGrids).distinct())
-                ).filter { it.isNotBlank() }.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 3.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(top = 3.dp)
+            ) {
+                Text(
+                    // Own station grid: the set stamped at upload, or the logged grid.
+                    text = listOf(
+                        satShort, record.displayMode, band, time,
+                        gridsLabel((listOf(record.myGrid) + record.vuccGrids).distinct())
+                    ).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (record.iota.isNotBlank()) {
+                    // The existing bodySmall line is taller than 14sp: IOTA adds no row height.
+                    Text(
+                        text = record.iota,
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                        color = IotaBlue,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
         }
     }
 }
