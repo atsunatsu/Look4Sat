@@ -604,8 +604,10 @@ private fun LogbookQuerySheet(
     val filtered = query.isNotBlank() || ownCallsignFilter.isNotBlank() ||
         modeFilter.isNotEmpty() || confirmation != LogbookFilter.ALL
     var callsignMenuOpen by remember { mutableStateOf(false) }
-    val callsignSelectionLabel = ownCallsignFilter.ifBlank {
+    val callsignSelectionLabel = if (ownCallsignFilter.isBlank()) {
         stringResource(R.string.prefs_logbook_query_all_callsigns)
+    } else {
+        ownCallsignFilter
     }
     SharedDialog(
         title = stringResource(R.string.prefs_logbook_query_title),
