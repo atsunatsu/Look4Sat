@@ -304,7 +304,12 @@ class QsoRepository(
                 skipped++
                 return@forEach
             }
-            val index = indexByKey[key]
+            // Wavelog may add a frequency later to a QSO previously synced without one.
+            // Match only a unique identical contact whose transmit frequency is missing
+            // on exactly one side, so different-frequency QSOs are never collapsed.
+            val index = indexByKey[key] ?: working.indices.filter { i ->
+                sameWavelogContactWithMissingFrequency(working[i], remote)
+            }.singleOrNull()
             if (index == null) {
                 val added = remote.copy(
                     id = 0L,
@@ -322,6 +327,12 @@ class QsoRepository(
                     syncOrigin = sharedOrigin(previous.syncOrigin, origin),
                     wavelogUploaded = true,
                     wavelogStation = remote.wavelogStation.ifBlank { previous.wavelogStation },
+                    // Fill missing numeric frequencies, but never clear or overwrite
+                    // frequencies already stored locally.
+                    txFrequencyHz = previous.txFrequencyHz ?: remote.txFrequencyHz,
+                    rxFrequencyHz = previous.rxFrequencyHz ?: remote.rxFrequencyHz,
+                    band = previous.band.ifBlank { remote.band },
+                    rxBand = previous.rxBand.ifBlank { remote.rxBand },
                     // Use the latest matching server station locator, retaining local data
                     // only when the Wavelog export has no MY_GRIDSQUARE.
                     myGrid = remote.myGrid.ifBlank { previous.myGrid },
@@ -334,6 +345,7 @@ class QsoRepository(
                 )
                 if (merged != previous) {
                     working[index] = merged
+                    indexByKey.putIfAbsent(stableQsoKey(merged), index)
                     changes[index] = merged
                     updated++
                 } else {
@@ -487,6 +499,20 @@ private fun QsoRecord.toEntity() = QsoEntity(
     myIota = myIota.trim().uppercase(Locale.US),
     syncOrigin = syncOrigin
 )
+
+/**
+ * One-side-missing-frequency fallback for Wavelog ADIF downloads.
+ * Keep the exact timestamp and all other stable QSO identity fields: guessing by callsign
+ * and minute alone could fold two real contacts from the same satellite pass.
+ */
+private fun sameWavelogContactWithMissingFrequency(local: QsoRecord, remote: QsoRecord): Boolean =
+    (local.txFrequencyHz == null) != (remote.txFrequencyHz == null) &&
+        stableQsoKey(local.copy(txFrequencyHz = null)) ==
+            stableQsoKey(remote.copy(txFrequencyHz = null)) &&
+        (local.rxFrequencyHz == null || remote.rxFrequencyHz == null ||
+            local.rxFrequencyHz == remote.rxFrequencyHz) &&
+        (local.band.isBlank() || remote.band.isBlank() || local.band.equals(remote.band, true)) &&
+        (local.rxBand.isBlank() || remote.rxBand.isBlank() || local.rxBand.equals(remote.rxBand, true))
 
 internal fun stableQsoKey(record: QsoRecord): String = listOf(
     record.startUtcMillis.toString(),
