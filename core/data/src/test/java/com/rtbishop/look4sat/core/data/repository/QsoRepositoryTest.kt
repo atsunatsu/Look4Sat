@@ -366,6 +366,60 @@ class QsoRepositoryTest {
     }
 
     @Test
+    fun mergeWavelog_backfillsBothFrequenciesWithoutCreatingDuplicate() = runBlocking {
+        val localId = dao.save(loggedInApp("SO-50", lotwUploaded = false)
+            .copy(txFrequencyHz = null, rxFrequencyHz = null, comment = "local note").toEntity())
+        val remote = loggedInApp("SO-50", lotwUploaded = false).copy(wavelogStation = "3")
+
+        repository.mergeWavelog(listOf(remote))
+        repository.mergeWavelog(listOf(remote))
+
+        val row = dao.getAll().single()
+        assertEquals(localId, row.id)
+        assertEquals(145_850_000L, row.txFrequencyHz)
+        assertEquals(436_795_000L, row.rxFrequencyHz)
+        assertEquals("local note", row.comment)
+        assertEquals("3", row.wavelogStation)
+    }
+
+    @Test
+    fun mergeWavelog_keepsKnownLocalFrequenciesWhenServerOmitsThem() = runBlocking {
+        dao.save(loggedInApp("SO-50", lotwUploaded = false).toEntity())
+
+        repository.mergeWavelog(listOf(loggedInApp("SO-50", lotwUploaded = false)
+            .copy(txFrequencyHz = null, rxFrequencyHz = null)))
+
+        val row = dao.getAll().single()
+        assertEquals(145_850_000L, row.txFrequencyHz)
+        assertEquals(436_795_000L, row.rxFrequencyHz)
+    }
+
+    @Test
+    fun mergeWavelog_doesNotCollapseTwoDistinctKnownFrequencies() = runBlocking {
+        dao.save(loggedInApp("SO-50", lotwUploaded = false).toEntity())
+
+        repository.mergeWavelog(listOf(loggedInApp("SO-50", lotwUploaded = false)
+            .copy(txFrequencyHz = 145_900_000L)))
+
+        assertEquals(2, dao.getAll().size)
+    }
+
+    @Test
+    fun mergeLoTW_backfillsMissingFrequenciesFromTheConfirmation() = runBlocking {
+        val id = dao.save(loggedInApp("SO-50", lotwUploaded = true)
+            .copy(txFrequencyHz = null, rxFrequencyHz = null).toEntity())
+        val confirmation = reportConfirmation("SO-50")
+            .copy(txFrequencyHz = 145_850_000L, rxFrequencyHz = 436_795_000L)
+
+        repository.mergeLoTW(listOf(confirmation))
+
+        val row = dao.getAll().single()
+        assertEquals(id, row.id)
+        assertEquals(145_850_000L, row.txFrequencyHz)
+        assertEquals(436_795_000L, row.rxFrequencyHz)
+    }
+
+    @Test
     fun mergeWavelog_insertsNewRecordsAlreadyMarkedAndStationTagged() = runBlocking {
         val result = repository.mergeWavelog(
             listOf(loggedInApp("SO-50", lotwUploaded = false).copy(wavelogStation = "2"))
