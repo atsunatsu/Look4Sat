@@ -56,11 +56,31 @@ class LogbookQueryTest {
     }
 
     @Test
-    fun queryAlsoMatchesMyCallsignAndComment() {
+    fun freeTextQueryMatchesCounterpartCallsignAndCommentButNotOwnCallsign() {
         val commented = record(comment = "first QSO of the day")
         val list = listOf(commented, satFm)
         assertEquals(listOf(commented), filterRecords(list, "first qso", "", LogbookFilter.ALL))
-        assertEquals(listOf(commented, satFm), filterRecords(list, "BA7OPF", "", LogbookFilter.ALL))
+        assertEquals(emptyList<QsoRecord>(), filterRecords(list, "BA7OPF", "", LogbookFilter.ALL))
+    }
+
+    @Test
+    fun ownCallsignSelectorFiltersRecordsAndCombinesWithFreeText() {
+        val ba7 = record(callsign = "JA1ABC", myCallsign = "BA7OPF")
+        val ba8 = record(callsign = "VK3XYZ", myCallsign = "BA8OPF")
+        val list = listOf(ba7, ba8)
+
+        assertEquals(
+            listOf(ba7),
+            filterRecords(list, "", "", LogbookFilter.ALL, "ba7opf")
+        )
+        assertEquals(
+            listOf(ba8),
+            filterRecords(list, "vk3", "", LogbookFilter.ALL, "BA8OPF")
+        )
+        assertEquals(
+            emptyList<QsoRecord>(),
+            filterRecords(list, "JA1", "", LogbookFilter.ALL, "BA8OPF")
+        )
     }
 
     @Test
