@@ -21,6 +21,9 @@ package com.rtbishop.look4sat.core.domain.logbook
 /** Confirmation state filters offered by the logbook query. */
 enum class LogbookFilter { ALL, CONFIRMED, UNCONFIRMED, DRAFTS }
 
+/** One own-station identity in the logbook: operator callsign plus its transmitting grid. */
+data class OwnStationFilter(val callsign: String, val grid: String)
+
 /**
  * The logbook query shared by every logbook surface (the enhanced logbook page and the
  * settings logbook dialog's query sheet). Both used to / would otherwise carry their own
@@ -29,7 +32,7 @@ enum class LogbookFilter { ALL, CONFIRMED, UNCONFIRMED, DRAFTS }
  *
  * [query] is matched case-insensitively against the opposite callsign, the satellite
  * name, both primary grids, the counterpart's VUCC grids and the comment. [ownCallsignFilter]
- * independently limits results to records logged under one operator callsign.
+ * independently limits results to one operator callsign and transmitting grid.
  * [modeFilter] is either blank (any mode)
  * or an exact [displayMode] — the modes offered are whatever the log actually contains, so
  * there is no sentinel for "worked via satellite". [confirmation] narrows to confirmed,
@@ -40,10 +43,9 @@ fun filterRecords(
     query: String,
     modeFilter: String,
     confirmation: LogbookFilter,
-    ownCallsignFilter: String = ""
+    ownStationFilter: OwnStationFilter? = null
 ): List<QsoRecord> = records.filter { record ->
     val trimmed = query.trim()
-    val selectedOwnCallsign = ownCallsignFilter.trim()
     (trimmed.isEmpty() || (listOf(
         record.theirCallsign,
         record.satelliteName,
@@ -51,8 +53,9 @@ fun filterRecords(
         record.myGrid,
         record.comment
     ) + record.theirVuccGrids).any { it.contains(trimmed, ignoreCase = true) }) &&
-        (selectedOwnCallsign.isEmpty() ||
-            record.myCallsign.trim().equals(selectedOwnCallsign, ignoreCase = true)) &&
+        (ownStationFilter == null ||
+            (record.myCallsign.trim().equals(ownStationFilter.callsign.trim(), ignoreCase = true) &&
+                record.myGrid.trim().equals(ownStationFilter.grid.trim(), ignoreCase = true))) &&
         when (modeFilter) {
             "" -> true
             else -> record.displayMode == modeFilter
