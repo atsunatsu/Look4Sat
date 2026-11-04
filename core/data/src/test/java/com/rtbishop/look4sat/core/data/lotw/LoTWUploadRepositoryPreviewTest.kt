@@ -121,6 +121,27 @@ class LoTWUploadRepositoryPreviewTest {
         }
     }
 
+    @Test
+    fun `multi grid upload preview keeps the individual signed grids`() {
+        runBlocking {
+            val repo = LoTWUploadRepository(
+                MemStorage(),
+                { LoTWConfig(File("src/main/assets/lotw/config.tq6").inputStream()) },
+                now = { System.currentTimeMillis() }
+            )
+            repo.importCertificate(fixture("test_tqsl_empty.p12"), charArrayOf())
+            repo.saveStation(LoTWStation(grid = "OM60, OM61"))
+            val start = 1_787_000_000_000L
+            val preview = repo.prepare(
+                listOf(sampleRecord(start, "BH6RJD", "BA7OPF")),
+                resubmit = false
+            )
+            assertEquals(1, preview.count)
+            assertEquals("OM60,OM61", preview.grid)
+            assertEquals(listOf("OM60", "OM61"), preview.grids)
+        }
+    }
+
     /** Nothing signable at all: the preview still comes back (count 0) with the conflicts listed,
      *  so the UI can offer the rewrite / use-another-certificate actions instead of a dead end. */
     @Test
