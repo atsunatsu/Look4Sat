@@ -307,8 +307,21 @@ fun LogbookDialog(
             onQueryChange = { queryText = it },
             onModeFilter = { modeFilter = it },
             onConfirmation = { confirmationFilter = it },
+            selectionMode = selectionMode,
+            selectedIds = selectedIds,
+            swipeController = swipeController,
+            onDelete = onDelete,
+            onRecordClick = { record ->
+                if (selectionMode) onToggleSelection(record.id) else editTarget = record
+            },
+            onRecordLongClick = { record ->
+                if (selectionMode) onToggleSelection(record.id) else onStartSelection(record.id)
+            },
             onClear = { clearQuery() },
-            onDismiss = { querySheetOpen = false }
+            onDismiss = {
+                querySheetOpen = false
+                clearQuery()
+            }
         )
     }
 
@@ -582,6 +595,12 @@ private fun LogbookQuerySheet(
     confirmation: LogbookFilter,
     modes: List<String>,
     results: List<QsoRecord>,
+    selectionMode: Boolean,
+    selectedIds: Set<Long>,
+    swipeController: SwipeController,
+    onDelete: (Long) -> Unit,
+    onRecordClick: (QsoRecord) -> Unit,
+    onRecordLongClick: (QsoRecord) -> Unit,
     onQueryChange: (String) -> Unit,
     onModeFilter: (String) -> Unit,
     onConfirmation: (LogbookFilter) -> Unit,
@@ -658,61 +677,19 @@ private fun LogbookQuerySheet(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     items(results, key = { it.id }) { record ->
-                        LogbookQueryResultRow(record)
+                        LogbookRow(
+                            record = record,
+                            selectionMode = selectionMode,
+                            selected = record.id in selectedIds,
+                            swipeController = swipeController,
+                            onDelete = { onDelete(record.id) },
+                            onClick = { onRecordClick(record) },
+                            onLongClick = { onRecordLongClick(record) }
+                        )
                     }
                 }
             }
         }
-    }
-}
-
-/** Read-only result row; it mirrors the logbook list so the query sheet shows the same QSO details. */
-@Composable
-private fun LogbookQueryResultRow(record: QsoRecord) {
-    val time = remember(record.startUtcMillis) {
-        SimpleDateFormat("MM-dd HH:mm'Z'", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }.format(Date(record.startUtcMillis))
-    }
-    val satShort = record.satelliteName.substringBefore('(').trim()
-    val band = record.band.ifBlank { frequencyBand(record.txFrequencyHz) }
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = record.theirCallsign,
-                style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            if (record.lotwConfirmed) {
-                val oppositeGrids = gridsLabel(
-                    (listOf(record.theirGrid) + record.theirVuccGrids).distinct()
-                )
-                if (oppositeGrids.isNotEmpty()) {
-                    Text(text = oppositeGrids, fontSize = 13.sp, color = ConfirmedGreen, fontFamily = FontFamily.Monospace)
-                } else {
-                    Text(text = "QSL", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
-                }
-            } else if (record.lotwUploaded) {
-                Text(text = "UP", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
-            }
-        }
-        Text(
-            text = listOf(
-                satShort, record.displayMode, band, time,
-                gridsLabel((listOf(record.myGrid) + record.vuccGrids).distinct())
-            ).filter { it.isNotBlank() }.joinToString(" · "),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 3.dp)
-        )
     }
 }
 
