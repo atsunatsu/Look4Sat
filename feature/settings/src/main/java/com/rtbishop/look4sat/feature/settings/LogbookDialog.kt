@@ -634,12 +634,19 @@ private fun LogbookQuerySheet(
                 )
                 Box(modifier = Modifier.widthIn(max = 132.dp)) {
                     TextButton(onClick = { callsignMenuOpen = true }) {
-                        Text(
-                            text = "${stringResource(R.string.prefs_logbook_query_callsign)}: $callsignSelectionLabel",
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "${stringResource(R.string.prefs_logbook_query_callsign)}: $callsignSelectionLabel",
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Text("▾", fontSize = 12.sp)
+                        }
                     }
                     DropdownMenu(
                         expanded = callsignMenuOpen,
