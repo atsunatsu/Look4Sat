@@ -632,7 +632,7 @@ private fun LogbookQuerySheet(
                     modifier = Modifier.weight(1f),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters)
                 )
-                Box(modifier = Modifier.widthIn(max = 132.dp)) {
+                Box(modifier = Modifier.widthIn(max = 168.dp)) {
                     TextButton(onClick = { callsignMenuOpen = true }) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
