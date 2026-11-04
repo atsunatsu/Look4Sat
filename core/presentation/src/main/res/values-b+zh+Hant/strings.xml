@@ -495,6 +495,8 @@
     <string name="qso_edit_sent">发送报告</string>
     <string name="qso_edit_received">接收报告</string>
     <string name="qso_edit_grid">对方网格</string>
+    <string name="qso_edit_their_iota">对方 IOTA</string>
+    <string name="qso_edit_my_iota">本台 IOTA</string>
     <string name="qso_edit_comment">备注</string>
     <string name="qso_edit_save">保存</string>
     <string name="qso_edit_cancel">取消</string>
