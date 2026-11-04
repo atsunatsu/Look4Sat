@@ -89,7 +89,11 @@ data class GridQso(
      * the 4-char station selection/grid overlay used for VUCC. */
     val myFineGrids: List<String> = emptyList(),
     /** Own station's IOTA reference from MY_IOTA, independent of opponent IOTA. */
-    val myIota: String? = null
+    val myIota: String? = null,
+    /** LoTW ADIF FREQ (transmit/uplink), expressed in Hz when available. */
+    val txFrequencyHz: Long? = null,
+    /** LoTW ADIF FREQ_RX (receive/downlink), expressed in Hz when available. */
+    val rxFrequencyHz: Long? = null
 ) {
     /** Short uplink/downlink band label ("U/V", "V/A"), or "" when unknown. */
     val bandLabel: String
