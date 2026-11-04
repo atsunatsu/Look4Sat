@@ -620,57 +620,54 @@ private fun LogbookQuerySheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    placeholder = { Text(stringResource(R.string.prefs_logbook_query_hint), fontSize = 13.sp) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters)
-                )
-                Box(modifier = Modifier.widthIn(max = 168.dp)) {
-                    TextButton(onClick = { callsignMenuOpen = true }) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = "${stringResource(R.string.prefs_logbook_query_callsign)}: $callsignSelectionLabel",
-                                fontSize = 11.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            Text("▾", fontSize = 12.sp)
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = callsignMenuOpen,
-                        onDismissRequest = { callsignMenuOpen = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.prefs_logbook_query_all_callsigns)) },
-                            onClick = {
-                                onOwnCallsignFilter("")
-                                callsignMenuOpen = false
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = { Text(stringResource(R.string.prefs_logbook_query_hint), fontSize = 13.sp) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                trailingIcon = {
+                    Box(modifier = Modifier.widthIn(max = 168.dp)) {
+                        TextButton(onClick = { callsignMenuOpen = true }) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = "${stringResource(R.string.prefs_logbook_query_callsign)}: $callsignSelectionLabel",
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                Text("▾", fontSize = 12.sp)
                             }
-                        )
-                        ownCallsigns.forEach { callsign ->
+                        }
+                        DropdownMenu(
+                            expanded = callsignMenuOpen,
+                            onDismissRequest = { callsignMenuOpen = false }
+                        ) {
                             DropdownMenuItem(
-                                text = { Text(callsign) },
+                                text = { Text(stringResource(R.string.prefs_logbook_query_all_callsigns)) },
                                 onClick = {
-                                    onOwnCallsignFilter(callsign)
+                                    onOwnCallsignFilter("")
                                     callsignMenuOpen = false
                                 }
                             )
+                            ownCallsigns.forEach { callsign ->
+                                DropdownMenuItem(
+                                    text = { Text(callsign) },
+                                    onClick = {
+                                        onOwnCallsignFilter(callsign)
+                                        callsignMenuOpen = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
-            }
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.prefs_logbook_query_hits, results.size),
