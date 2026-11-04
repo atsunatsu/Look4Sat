@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rtbishop.look4sat.core.domain.logbook.LogbookFilter
 import com.rtbishop.look4sat.core.domain.logbook.QsoRecord
+import com.rtbishop.look4sat.core.domain.logbook.OwnStationFilter
 import com.rtbishop.look4sat.core.domain.repository.LoTWUploadIssueKind
 import com.rtbishop.look4sat.core.domain.model.NominalFrequencies
 import com.rtbishop.look4sat.core.domain.logbook.displayMode
@@ -152,15 +154,39 @@ fun LogbookDialog(
     // Keeping the state local also keeps the settings ViewModel free of query fields.
     var querySheetOpen by remember { mutableStateOf(false) }
     var queryText by rememberSaveable { mutableStateOf("") }
+    var ownStationFilterActive by rememberSaveable { mutableStateOf(false) }
+    var ownStationFilterCallsign by rememberSaveable { mutableStateOf("") }
+    var ownStationFilterGrid by rememberSaveable { mutableStateOf("") }
     var modeFilter by rememberSaveable { mutableStateOf("") }
     var confirmationFilter by rememberSaveable { mutableStateOf(LogbookFilter.ALL) }
+    val ownStations = remember(records) {
+        records.map {
+            OwnStationFilter(
+                callsign = it.myCallsign.trim().uppercase(Locale.US),
+                grid = it.myGrid.trim().uppercase(Locale.US)
+            )
+        }
+            .filter { it.callsign.isNotBlank() }
+            .distinctBy { it.callsign to it.grid }
+            .sortedWith(compareBy<OwnStationFilter> { it.callsign }.thenBy { it.grid })
+    }
+    val selectedOwnStation = if (ownStationFilterActive) {
+        OwnStationFilter(ownStationFilterCallsign, ownStationFilterGrid)
+    } else {
+        null
+    }
     val clearQuery = {
         queryText = ""
+        ownStationFilterActive = false
+        ownStationFilterCallsign = ""
+        ownStationFilterGrid = ""
         modeFilter = ""
         confirmationFilter = LogbookFilter.ALL
     }
-    val shownRecords = remember(records, queryText, modeFilter, confirmationFilter) {
-        filterRecords(records, queryText, modeFilter, confirmationFilter)
+    val shownRecords = remember(
+        records, queryText, selectedOwnStation, modeFilter, confirmationFilter
+    ) {
+        filterRecords(records, queryText, modeFilter, confirmationFilter, selectedOwnStation)
     }
     // Header leading button: Create while idle, Leave-selection while rows are checked.
     // Cancel is gone; its two jobs are split over those two labels.
@@ -279,11 +305,24 @@ fun LogbookDialog(
     if (querySheetOpen) {
         LogbookQuerySheet(
             query = queryText,
+            ownStationFilter = selectedOwnStation,
+            ownStations = ownStations,
             modeFilter = modeFilter,
             confirmation = confirmationFilter,
             modes = records.map { it.displayMode }.filter(String::isNotBlank).distinct().sorted(),
             results = shownRecords,
             onQueryChange = { queryText = it },
+            onOwnStationFilter = {
+                if (it == null) {
+                    ownStationFilterActive = false
+                    ownStationFilterCallsign = ""
+                    ownStationFilterGrid = ""
+                } else {
+                    ownStationFilterCallsign = it.callsign
+                    ownStationFilterGrid = it.grid
+                    ownStationFilterActive = true
+                }
+            },
             onModeFilter = { modeFilter = it },
             onConfirmation = { confirmationFilter = it },
             selectionMode = selectionMode,
@@ -584,6 +623,8 @@ private fun LogbookRow(
 @Composable
 private fun LogbookQuerySheet(
     query: String,
+    ownStationFilter: OwnStationFilter?,
+    ownStations: List<OwnStationFilter>,
     modeFilter: String,
     confirmation: LogbookFilter,
     modes: List<String>,
@@ -595,12 +636,18 @@ private fun LogbookQuerySheet(
     onRecordClick: (QsoRecord) -> Unit,
     onRecordLongClick: (QsoRecord) -> Unit,
     onQueryChange: (String) -> Unit,
+    onOwnStationFilter: (OwnStationFilter?) -> Unit,
     onModeFilter: (String) -> Unit,
     onConfirmation: (LogbookFilter) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val filtered = query.isNotBlank() || modeFilter.isNotEmpty() || confirmation != LogbookFilter.ALL
+    val filtered = query.isNotBlank() || ownStationFilter != null ||
+        modeFilter.isNotEmpty() || confirmation != LogbookFilter.ALL
+    var callsignMenuOpen by remember { mutableStateOf(false) }
+    val callsignSelectionLabel = ownStationFilter?.let {
+        listOf(it.callsign, it.grid).filter(String::isNotBlank).joinToString(" ")
+    } ?: stringResource(R.string.prefs_logbook_query_all_callsigns)
     SharedDialog(
         title = stringResource(R.string.prefs_logbook_query_title),
         onDismissRequest = onDismiss,
@@ -618,7 +665,83 @@ private fun LogbookQuerySheet(
                 placeholder = { Text(stringResource(R.string.prefs_logbook_query_hint), fontSize = 13.sp) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters)
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                trailingIcon = {
+                    Box(modifier = Modifier.widthIn(max = 168.dp)) {
+                        TextButton(onClick = { callsignMenuOpen = true }) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = "${stringResource(R.string.prefs_logbook_query_callsign)}: $callsignSelectionLabel",
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                Text("▾", fontSize = 12.sp)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = callsignMenuOpen,
+                            onDismissRequest = { callsignMenuOpen = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.prefs_logbook_query_all_callsigns),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (ownStationFilter == null) {
+                                            Text(
+                                                text = "✓",
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontSize = 16.sp
+                                            )
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    onOwnStationFilter(null)
+                                    callsignMenuOpen = false
+                                }
+                            )
+                            ownStations.forEach { station ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = listOf(station.callsign, station.grid)
+                                                    .filter(String::isNotBlank)
+                                                    .joinToString(" "),
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            if (ownStationFilter == station) {
+                                                Text(
+                                                    text = "✓",
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontSize = 16.sp
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        onOwnStationFilter(station)
+                                        callsignMenuOpen = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

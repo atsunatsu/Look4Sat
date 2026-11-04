@@ -56,11 +56,36 @@ class LogbookQueryTest {
     }
 
     @Test
-    fun queryAlsoMatchesMyCallsignAndComment() {
+    fun freeTextQueryMatchesCounterpartCallsignAndCommentButNotOwnCallsign() {
         val commented = record(comment = "first QSO of the day")
         val list = listOf(commented, satFm)
         assertEquals(listOf(commented), filterRecords(list, "first qso", "", LogbookFilter.ALL))
-        assertEquals(listOf(commented, satFm), filterRecords(list, "BA7OPF", "", LogbookFilter.ALL))
+        assertEquals(emptyList<QsoRecord>(), filterRecords(list, "BA7OPF", "", LogbookFilter.ALL))
+    }
+
+    @Test
+    fun ownStationSelectorDistinguishesSameCallsignAtDifferentGrids() {
+        val ba7Ol62 = record(callsign = "JA1ABC", myCallsign = "BA7OPF").copy(myGrid = "OL62")
+        val ba7Ol63 = record(callsign = "VK3XYZ", myCallsign = "BA7OPF").copy(myGrid = "OL63")
+        val ba8Ol62 = record(callsign = "BD5EUA", myCallsign = "BA8OPF").copy(myGrid = "OL62")
+        val list = listOf(ba7Ol62, ba7Ol63, ba8Ol62)
+
+        assertEquals(
+            listOf(ba7Ol62),
+            filterRecords(list, "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL62"))
+        )
+        assertEquals(
+            listOf(ba7Ol63),
+            filterRecords(list, "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL63"))
+        )
+        assertEquals(
+            listOf(ba7Ol63),
+            filterRecords(list, "vk3", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL63"))
+        )
+        assertEquals(
+            emptyList<QsoRecord>(),
+            filterRecords(list, "JA1", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL63"))
+        )
     }
 
     @Test
