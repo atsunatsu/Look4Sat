@@ -130,6 +130,13 @@ private fun SettingsScreen(
     onClearStationGridPrefill: () -> Unit = {}
 ) {
     val foregroundStatus by LoTWForegroundSyncStatus.state.collectAsStateWithLifecycle()
+    // The foreground service owns LoTW sync, so refresh the settings snapshot when
+    // it finishes (including when this destination was temporarily off-screen).
+    LaunchedEffect(foregroundStatus.running, foregroundStatus.message) {
+        if (!foregroundStatus.running && foregroundStatus.message != null) {
+            onAction(SettingsAction.RefreshLogbook)
+        }
+    }
     val context = LocalContext.current
     // MainApplication owns the only LoTW sync path; no ViewModel fallback.
     val syncLauncher = context.applicationContext as ILoTWForegroundSyncLauncher
