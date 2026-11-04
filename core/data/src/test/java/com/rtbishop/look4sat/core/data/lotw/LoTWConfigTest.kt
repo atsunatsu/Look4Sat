@@ -11,6 +11,7 @@ package com.rtbishop.look4sat.core.data.lotw
 
 import com.rtbishop.look4sat.core.domain.logbook.LoTWSatelliteAliases
 import com.rtbishop.look4sat.core.domain.repository.LoTWOperationException
+import com.rtbishop.look4sat.core.domain.repository.LoTWStation
 import com.rtbishop.look4sat.core.domain.repository.LoTWZonePair
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -76,6 +77,32 @@ class LoTWConfigTest {
         val meta = config.stationMeta(999999)
         assertNull(meta.regionField)
         assertTrue(meta.countryZones.isEmpty())
+    }
+
+    @Test
+    fun `boundary pair is serialized as one comma-separated GRIDSQUARE field`() {
+        val fields = config.stationFields(LoTWStation(grid = "OM60, OM61"), 318)
+
+        assertEquals("OM60,OM61", fields["GRIDSQUARE"])
+        assertTrue("MY_VUCC_GRIDS" !in fields)
+        assertTrue("GRIDSQUARE" in config.stationOrder)
+        assertTrue("MY_VUCC_GRIDS" !in config.stationOrder)
+    }
+
+    @Test
+    fun `four-way intersection is serialized in full in GRIDSQUARE`() {
+        val fields = config.stationFields(LoTWStation(grid = "OM90,OM91,PM00,PM01"), 318)
+
+        assertEquals("OM90,OM91,PM00,PM01", fields["GRIDSQUARE"])
+        assertTrue("MY_VUCC_GRIDS" !in fields)
+    }
+
+    @Test
+    fun `single grid remains a plain GRIDSQUARE value`() {
+        val fields = config.stationFields(LoTWStation(grid = "OM60"), 318)
+
+        assertEquals("OM60", fields["GRIDSQUARE"])
+        assertTrue("MY_VUCC_GRIDS" !in fields)
     }
 
     @Test
