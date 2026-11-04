@@ -189,7 +189,7 @@ jobs:
         run: npm install --prefix source/.github/actions/local-artifact --no-save --no-audit --no-fund @actions/artifact@2.3.2
 
       - name: Upload signed test APK without creating any Release
-        if: ${{ inputs.mode == 'artifact' }}
+        if: ${{ env.BUILD_MODE == 'artifact' }}
         uses: ./source/.github/actions/local-artifact
         env:
           ARTIFACT_NAME: Look4Sat-test-${{ steps.version.outputs.code }}-${{ steps.version.outputs.short_sha }}
@@ -218,7 +218,7 @@ jobs:
           echo "Published prerelease $TAG"
 
       - name: Publish the official Release
-        if: ${{ inputs.mode == 'release' || github.event_name == 'push' }}
+        if: ${{ env.BUILD_MODE == 'release' }}
         working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
