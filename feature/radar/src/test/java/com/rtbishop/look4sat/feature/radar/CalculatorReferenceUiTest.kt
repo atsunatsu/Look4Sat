@@ -1,5 +1,6 @@
 package com.rtbishop.look4sat.feature.radar
 
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.test.*
@@ -76,6 +77,39 @@ class CalculatorReferenceUiTest {
 
     @Test fun trackingCalculatorUpdatesBothReferencesWithoutAutomaticallyRetuning()=exercise(false)
     @Test fun cwCalculatorUsesTheSameReferencesAndKeepsNominalTuningAcrossDopplerChanges()=exercise(true)
+
+    @Test fun cwStepSelectorSupportsQuarterKilohertzAndSnapsTheVisibleFrequency() {
+        val step = mutableLongStateOf(1_000L)
+        val reference = CalculatorReference(145962000, 435057000)
+        compose.setContent {
+            MainTheme(isDarkTheme = true) {
+                DopplerFrequencyCalculator(
+                    radio, OrbitalPos(), initialTxBaseHz = reference.txHz,
+                    reference = reference, displayNominalFrequencies = true,
+                    frequencyStepHz = step.longValue,
+                    onFrequencyStepChange = { step.longValue = it }
+                )
+            }
+        }
+        compose.onNodeWithTag("calculatorTxFrequency").assertTextEquals("145.962")
+        compose.onNodeWithTag("cwCalculatorStepSelector").performClick()
+        compose.onNodeWithTag("cwCalculatorStepOption250").performClick()
+        compose.onNodeWithTag("calculatorTxFrequency").assertTextEquals("145.96200")
+        compose.onAllNodesWithText("+").onFirst().performClick()
+        compose.onNodeWithTag("calculatorTxFrequency").assertTextEquals("145.96225")
+        compose.onNodeWithTag("cwCalculatorStepSelector").performClick()
+        compose.onNodeWithTag("cwCalculatorStepOption5000").performClick()
+        compose.onNodeWithTag("calculatorTxFrequency").assertTextEquals("145.960")
+        compose.runOnIdle { assertEquals(5_000L, step.longValue) }
+    }
+
+    @Test fun calculatorStepRoundingSupportsEveryCwStep() {
+        for ((step, _) in CW_CALCULATOR_FREQUENCY_STEPS) {
+            val snapped = snapCalculatorFrequency(145_962_310L, step)
+            assertEquals(0L, snapped % step)
+            assertTrue(kotlin.math.abs(snapped - 145_962_310L) <= step / 2)
+        }
+    }
 
     @Test fun reopeningTrackingCalculatorAfterEditingBasesDoesNotRestoreTheOldFrequencies() {
         val visible=mutableStateOf(true)

@@ -91,6 +91,13 @@ internal fun CwConsole(
     val available = control.transmitOwner == RadioTransmitOwner.NONE && (remote?.txSource ?: 0) == 0
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
+    val stepPrefs = remember(context) {
+        context.getSharedPreferences("cw_console", android.content.Context.MODE_PRIVATE)
+    }
+    var frequencyStepHz by rememberSaveable {
+        mutableStateOf(stepPrefs.getLong("frequency_step_hz", 1_000L)
+            .takeIf { saved -> CW_CALCULATOR_FREQUENCY_STEPS.any { it.first == saved } } ?: 1_000L)
+    }
     val errorLabel: (Throwable) -> String = { failure ->
         if (failure is CwTemplateException) {
             val field = when (failure.variable) {
@@ -262,6 +269,11 @@ internal fun CwConsole(
                                 editingEnabled = !control.frequencyEditingLocked || transponder.uuid != control.selectedTransponderUuid ||
                                     (!control.txPanel.isConnected && !control.rxPanel.isConnected),
                                 displayNominalFrequencies = true,
+                                frequencyStepHz = frequencyStepHz,
+                                onFrequencyStepChange = { selectedStep ->
+                                    frequencyStepHz = selectedStep
+                                    stepPrefs.edit().putLong("frequency_step_hz", selectedStep).apply()
+                                },
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
