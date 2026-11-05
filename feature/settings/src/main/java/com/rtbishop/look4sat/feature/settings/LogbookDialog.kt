@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.rtbishop.look4sat.core.domain.logbook.LogbookFilter
 import com.rtbishop.look4sat.core.domain.logbook.QsoRecord
 import com.rtbishop.look4sat.core.domain.logbook.OwnStationFilter
+import com.rtbishop.look4sat.core.domain.logbook.ownStationOptions
 import com.rtbishop.look4sat.core.domain.repository.LoTWUploadIssueKind
 import com.rtbishop.look4sat.core.domain.model.NominalFrequencies
 import com.rtbishop.look4sat.core.domain.logbook.displayMode
@@ -159,17 +160,7 @@ fun LogbookDialog(
     var ownStationFilterGrid by rememberSaveable { mutableStateOf("") }
     var modeFilter by rememberSaveable { mutableStateOf("") }
     var confirmationFilter by rememberSaveable { mutableStateOf(LogbookFilter.ALL) }
-    val ownStations = remember(records) {
-        records.map {
-            OwnStationFilter(
-                callsign = it.myCallsign.trim().uppercase(Locale.US),
-                grid = it.myGrid.trim().uppercase(Locale.US)
-            )
-        }
-            .filter { it.callsign.isNotBlank() }
-            .distinctBy { it.callsign to it.grid }
-            .sortedWith(compareBy<OwnStationFilter> { it.callsign }.thenBy { it.grid })
-    }
+    val ownStations = remember(records) { ownStationOptions(records) }
     val selectedOwnStation = if (ownStationFilterActive) {
         OwnStationFilter(ownStationFilterCallsign, ownStationFilterGrid)
     } else {
