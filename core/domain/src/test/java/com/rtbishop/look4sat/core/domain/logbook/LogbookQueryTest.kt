@@ -89,6 +89,67 @@ class LogbookQueryTest {
     }
 
     @Test
+    fun ownStationSelectorUsesCompleteGridSetStampedAfterLoTWUpload() {
+        val single = record(callsign = "JA1ABC").copy(myGrid = "OL62TI")
+        val boundary = record(callsign = "VK3XYZ").copy(
+            myGrid = "OL62TI", vuccGrids = listOf("OL62", "OL61")
+        )
+        val reordered = record(callsign = "YB9ABC").copy(
+            myGrid = "OL61AT", vuccGrids = listOf("ol61", "OL62")
+        )
+        val corner = record(callsign = "E25CRF").copy(
+            myGrid = "OM90XX", vuccGrids = listOf("OM91", "PM01", "OM90", "PM00")
+        )
+        val list = listOf(single, boundary, reordered, corner)
+
+        assertEquals(
+            listOf(
+                OwnStationFilter("BA7OPF", "OL61,OL62"),
+                OwnStationFilter("BA7OPF", "OL62TI"),
+                OwnStationFilter("BA7OPF", "OM90,OM91,PM00,PM01")
+            ),
+            ownStationOptions(list)
+        )
+        assertEquals(
+            listOf(boundary, reordered),
+            filterRecords(list, "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL61,OL62"))
+        )
+        assertEquals(
+            listOf(single),
+            filterRecords(list, "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL62TI"))
+        )
+        assertEquals(
+            listOf(corner),
+            filterRecords(list, "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OM90,OM91,PM00,PM01"))
+        )
+    }
+
+    @Test
+    fun ownStationSelectorReadsMultiGridsFromDownloadedLoTWAndLegacyAdif() {
+        val downloaded = record(callsign = "BG7XYZ").copy(
+            myGrid = "OL62TI", myFullGrids = listOf("OL62TI", "OL61AT"),
+            vuccGrids = listOf("OL62", "OL61")
+        )
+        val withoutStamp = record(callsign = "BG7ZZZ").copy(
+            myGrid = "OL61AT", myFullGrids = listOf("OL61AT", "OL62TI")
+        )
+        val oldCommaField = record(callsign = "BG7ABC").copy(myGrid = "OL62TI,OL61AT")
+        val noCall = record(callsign = "BG7NOC").copy(
+            myCallsign = "", myGrid = "OL62TI", vuccGrids = listOf("OL62", "OL61")
+        )
+        val list = listOf(downloaded, withoutStamp, oldCommaField, noCall)
+
+        assertEquals(
+            listOf(OwnStationFilter("BA7OPF", "OL61,OL62")),
+            ownStationOptions(list)
+        )
+        assertEquals(
+            listOf(downloaded, withoutStamp, oldCommaField),
+            filterRecords(list, "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL61,OL62"))
+        )
+    }
+
+    @Test
     fun queryMatchesAdditionalCounterpartGridsInLegacyRecords() {
         val legacy = record(grid = "NM84", mode = "CW", confirmed = true)
             .copy(theirVuccGrids = listOf("NM94"))
