@@ -350,7 +350,7 @@ private fun SettingsScreen(
             satelliteCandidates = uiState.satelliteCatalog,
             newRecord = {
                 // Blank draft: minute-truncated "now" (the radar Log tab's granularity), the own
-                // callsign and the station's first grid, so the record is uploadable as it stands.
+                // callsign and the selected station's complete operated grid set.
                 // Use the selected Wavelog profile when it is the active upload destination;
                 // otherwise use the LoTW identity with Wavelog as a fallback.
                 val now = System.currentTimeMillis() / 60_000L * 60_000L
