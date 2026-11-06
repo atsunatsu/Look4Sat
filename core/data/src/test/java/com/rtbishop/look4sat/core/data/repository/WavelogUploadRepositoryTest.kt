@@ -175,6 +175,33 @@ class WavelogUploadRepositoryTest {
     }
 
     @Test
+    fun prepareRejectsAnIncompleteMultiGridSet() = runBlocking {
+        val settings = WavelogUploadSettings(
+            url = "http://example.org", apiKey = "k", stationId = "42",
+            stationGrid = "OL62TI,OL62TJ"
+        )
+        val qso = sampleRecord(start = 1_700_000_000_000L).withOperatorGridSet("OL62TI,OL63AA")
+        val preview = WavelogUploadRepository().prepare(listOf(qso), settings)
+        assertEquals(0, preview.count)
+        assertEquals(1, preview.reasons[WavelogProblem.GRID_MISMATCH])
+    }
+
+    @Test
+    fun changingUploadStationAfterPreviewExpiresTheSubmission() = runBlocking {
+        val settings = WavelogUploadSettings(
+            url = "http://example.org", apiKey = "k", stationId = "42",
+            stationGrid = "OL62TI"
+        )
+        val repo = WavelogUploadRepository()
+        val preview = repo.prepare(listOf(sampleRecord(1_700_000_000_000L)), settings)
+        assertEquals(1, preview.count)
+        assertEquals(
+            WavelogUploadOutcome.Expired,
+            repo.upload(preview, settings.copy(stationId = "43"))
+        )
+    }
+
+    @Test
     fun prepareWithoutConfigIsBlocked() = runBlocking {
         val repo = WavelogUploadRepository()
         val preview = repo.prepare(listOf(sampleRecord(start = 1_700_000_000_000L)), WavelogUploadSettings())
