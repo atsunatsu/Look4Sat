@@ -46,7 +46,10 @@ data class WavelogUploadPreview(
     val lastUtc: String,
     val contacts: List<String>,
     val submittedIds: List<Long>,
-    val blockedBy: WavelogProblem? = null
+    val blockedBy: WavelogProblem? = null,
+    val stationId: String = "",
+    val stationGrid: String = "",
+    val qsoGrids: List<String> = emptyList()
 )
 
 sealed interface WavelogUploadOutcome {
@@ -77,3 +80,12 @@ interface IWavelogUploadRepository {
     /** POSTs the prepared batch and classifies Wavelog's response. */
     suspend fun upload(preview: WavelogUploadPreview, settings: WavelogUploadSettings): WavelogUploadOutcome
 }
+
+/** Update selected station metadata by ID without changing the upload target. */
+fun WavelogUploadSettings.withStationProfile(station: WavelogStationInfo): WavelogUploadSettings =
+    copy(
+        stationId = station.id,
+        stationName = station.name,
+        stationCallsign = station.callsign,
+        stationGrid = station.grid
+    )
