@@ -279,6 +279,9 @@
     <string name="prefs_logbook_query_incomplete">草稿／中止</string>
     <string name="prefs_logbook_query_all_modes">全部模式</string>
     <string name="prefs_logbook_upload_wavelog_title">上传到 Wavelog</string>
+    <string name="wavelog_upload_preview_station">Wavelog 上传台址：%1$s</string>
+    <string name="wavelog_upload_preview_qso_grids">QSO 本台网格：%1$s</string>
+    <string name="wavelog_upload_preview_more_grids">（另有 %1$d 个）</string>
     <string name="lotw_upload_grid_title">上传前核对</string>
     <string name="lotw_upload_grid_fix">修改台址</string>
     <string name="lotw_upload_grid_ignore">忽略</string>
