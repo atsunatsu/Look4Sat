@@ -22,6 +22,7 @@ import com.rtbishop.look4sat.core.domain.logbook.needsPreviewForConflicts
 import com.rtbishop.look4sat.core.domain.logbook.officialSatelliteName
 import com.rtbishop.look4sat.core.domain.logbook.operatorCallsign
 import com.rtbishop.look4sat.core.domain.logbook.operatorGrids
+import com.rtbishop.look4sat.core.domain.logbook.withOperatorGridSet
 import com.rtbishop.look4sat.core.domain.logbook.satelliteIdentity
 import com.rtbishop.look4sat.core.domain.logbook.unavailableUploadSummary
 import com.rtbishop.look4sat.core.domain.logbook.wavelogConfirmedSegment
@@ -41,6 +42,7 @@ import com.rtbishop.look4sat.core.domain.repository.LoTWUploadResult
 import com.rtbishop.look4sat.core.domain.repository.WavelogUploadOutcome
 import com.rtbishop.look4sat.core.domain.repository.WavelogUploadPreview
 import com.rtbishop.look4sat.core.domain.repository.positionWarning
+import com.rtbishop.look4sat.core.domain.repository.refreshWavelogStationForUpload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -259,7 +261,7 @@ class LogViewModel(
             myCallsign = (overrides.myCallsign ?: _uiState.value.ownCallsign).trim().uppercase(Locale.US),
             sentReport = overrides.sentReport.trim(),
             receivedReport = overrides.receivedReport.trim(),
-            myGrid = myGrid.take(6).uppercase(Locale.US),
+            myGrid = "",
             txFrequencyHz = tx,
             rxFrequencyHz = rx,
             band = frequencyBand(tx),
@@ -272,7 +274,7 @@ class LogViewModel(
             satelliteMode = normalizedMode,
             status = QsoStatus.COMPLETE,
             propagationMode = "SAT"
-        )
+        ).withOperatorGridSet(myGrid)
         _uiState.update { it.copy(recordSaving = true, recordSaveFailed = false) }
         viewModelScope.launch {
             try {
@@ -400,8 +402,15 @@ class LogViewModel(
 
     /** Wavelog-mode branch of [prepareUpload]: prepare the batch and ask for confirmation. */
     private suspend fun prepareWavelogUpload(all: List<QsoRecord>, settings: WavelogUploadSettings) {
+        val current = refreshWavelogStationForUpload(wavelogUploadRepository, settingsRepo, settings)
+        if (current == null) {
+            _uiState.update {
+                it.copy(busy = false, message = "Cannot verify the selected Wavelog station — check the server and fetch station profiles again")
+            }
+            return
+        }
         val preview = runCatching {
-            wavelogUploadRepository.prepare(wavelogUploadCandidates(all), settings)
+            wavelogUploadRepository.prepare(wavelogUploadCandidates(all), current)
         }.getOrNull()
         if (preview == null) {
             _uiState.update { it.copy(busy = false, message = "Wavelog upload failed to prepare — check the configuration") }

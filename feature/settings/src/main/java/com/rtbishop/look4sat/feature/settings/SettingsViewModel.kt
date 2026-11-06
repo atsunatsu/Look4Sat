@@ -41,6 +41,8 @@ import com.rtbishop.look4sat.core.domain.repository.applyWavelogSyncResult
 import com.rtbishop.look4sat.core.domain.repository.resolveWavelogSyncMode
 import com.rtbishop.look4sat.core.domain.repository.shouldPromoteWavelogFullSync
 import com.rtbishop.look4sat.core.domain.repository.WavelogStationInfo
+import com.rtbishop.look4sat.core.domain.repository.withStationProfile
+import com.rtbishop.look4sat.core.domain.repository.refreshWavelogStationForUpload
 import com.rtbishop.look4sat.core.domain.repository.WavelogUploadOutcome
 import com.rtbishop.look4sat.core.domain.repository.WavelogUploadPreview
 import com.rtbishop.look4sat.core.domain.usecase.IShowToast
@@ -316,12 +318,7 @@ class SettingsViewModel(
 
     private fun applyWavelogUploadStation(station: WavelogStationInfo) {
         val current = settingsRepo.wavelogUploadSettings.value
-        val updated = current.copy(
-            stationId = station.id,
-            stationName = station.name,
-            stationCallsign = station.callsign,
-            stationGrid = station.grid
-        )
+        val updated = current.withStationProfile(station)
         if (!current.isReady && updated.isReady && currentLoTWConfigured()) {
             pendingWavelogSwitch = { settingsRepo.updateWavelogUploadSettings(updated) }
             _uiState.update { it.copy(wavelogSwitchWarning = true) }
@@ -374,9 +371,9 @@ class SettingsViewModel(
             // Single-station setups select themselves; a saved station that the server
             // still reports stays selected.
             val current = settingsRepo.wavelogUploadSettings.value
-            val savedStillPresent = current.stationId.isNotBlank() && probe.stations.any { it.id == current.stationId }
-            val auto = if (probe.stations.size == 1 && !savedStillPresent) probe.stations.single() else null
-            if (auto != null) applyWavelogUploadStation(auto)
+            val selected = probe.stations.firstOrNull { it.id == current.stationId }
+            val auto = if (selected == null && current.stationId.isBlank() && probe.stations.size == 1) probe.stations.single() else null
+            (selected ?: auto)?.let(::applyWavelogUploadStation)
         }
     }
 
@@ -607,8 +604,16 @@ class SettingsViewModel(
         all: List<com.rtbishop.look4sat.core.domain.logbook.QsoRecord>,
         settings: WavelogUploadSettings
     ) {
+        val current = refreshWavelogStationForUpload(wavelogUploadRepository, settingsRepo, settings)
+        if (current == null) {
+            _uiState.update {
+                it.copy(logbookUploadBusy = false, logbookUploadMessage = "Cannot verify the selected Wavelog station — check the server and fetch station profiles again")
+            }
+            return
+        }
+        _uiState.update { it.copy(wavelogUploadStations = settingsRepo.getWavelogStations()) }
         val preview = runCatching {
-            wavelogUploadRepository.prepare(wavelogUploadCandidates(all), settings)
+            wavelogUploadRepository.prepare(wavelogUploadCandidates(all), current)
         }.getOrNull()
         if (preview == null) {
             _uiState.update {
@@ -778,8 +783,16 @@ class SettingsViewModel(
                         _uiState.update { it.copy(logbookUploadBusy = false, logbookUploadMessage = "No complete QSOs in the selection") }
                         return@launch
                     }
+                    val current = refreshWavelogStationForUpload(wavelogUploadRepository, settingsRepo, wavelogSettings)
+                    if (current == null) {
+                        _uiState.update {
+                            it.copy(logbookUploadBusy = false, logbookUploadMessage = "Cannot verify the selected Wavelog station — check the server and fetch station profiles again")
+                        }
+                        return@launch
+                    }
+                    _uiState.update { it.copy(wavelogUploadStations = settingsRepo.getWavelogStations()) }
                     val preview = runCatching {
-                        wavelogUploadRepository.prepare(selected, wavelogSettings)
+                        wavelogUploadRepository.prepare(selected, current)
                     }.getOrNull()
                     if (preview == null) {
                         _uiState.update {

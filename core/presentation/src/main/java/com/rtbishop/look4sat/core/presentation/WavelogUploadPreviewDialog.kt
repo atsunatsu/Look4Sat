@@ -52,7 +52,19 @@ fun WavelogUploadPreviewDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (preview.stationLabel.isNotBlank()) {
-                    Text(preview.stationLabel, fontSize = 13.sp)
+                    Text(
+                        stringResource(R.string.wavelog_upload_preview_station, preview.stationLabel),
+                        fontSize = 13.sp
+                    )
+                }
+                if (preview.qsoGrids.isNotEmpty()) {
+                    val visibleGrids = preview.qsoGrids.take(4).joinToString(", ")
+                    val more = (preview.qsoGrids.size - 4).coerceAtLeast(0)
+                    Text(
+                        stringResource(R.string.wavelog_upload_preview_qso_grids, visibleGrids) +
+                            if (more > 0) stringResource(R.string.wavelog_upload_preview_more_grids, more) else "",
+                        fontSize = 12.sp
+                    )
                 }
                 Text("${preview.count} QSO(s) · ${preview.firstUtc} – ${preview.lastUtc}", fontSize = 13.sp)
                 val skip = wavelogSkipSummary(preview)

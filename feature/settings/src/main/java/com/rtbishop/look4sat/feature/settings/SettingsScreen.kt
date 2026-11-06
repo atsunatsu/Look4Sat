@@ -71,6 +71,7 @@ import com.rtbishop.look4sat.core.domain.logbook.QsoRecord
 import com.rtbishop.look4sat.core.domain.logbook.QsoStatus
 import com.rtbishop.look4sat.core.domain.logbook.operatorCallsign
 import com.rtbishop.look4sat.core.domain.logbook.operatorGrids
+import com.rtbishop.look4sat.core.domain.logbook.withOperatorGridSet
 import com.rtbishop.look4sat.core.domain.model.DataSourcesSettings
 import com.rtbishop.look4sat.core.domain.model.NominalFrequencies
 import com.rtbishop.look4sat.core.domain.model.OtherSettings
@@ -349,7 +350,7 @@ private fun SettingsScreen(
             satelliteCandidates = uiState.satelliteCatalog,
             newRecord = {
                 // Blank draft: minute-truncated "now" (the radar Log tab's granularity), the own
-                // callsign and the station's first grid, so the record is uploadable as it stands.
+                // callsign and the selected station's complete operated grid set.
                 // Use the selected Wavelog profile when it is the active upload destination;
                 // otherwise use the LoTW identity with Wavelog as a fallback.
                 val now = System.currentTimeMillis() / 60_000L * 60_000L
@@ -362,13 +363,12 @@ private fun SettingsScreen(
                         uiState.wavelogUploadSettings.stationCallsign,
                         uiState.wavelogUploadSettings.isReady
                     ),
-                    myGrid = operatorGrids(
-                        uiState.lotwStation?.grid.orEmpty(),
-                        uiState.wavelogUploadSettings.stationGrid,
-                        uiState.wavelogUploadSettings.isReady
-                    ).firstOrNull().orEmpty(),
                     status = QsoStatus.COMPLETE
-                )
+                ).withOperatorGridSet(operatorGrids(
+                    uiState.lotwStation?.grid.orEmpty(),
+                    uiState.wavelogUploadSettings.stationGrid,
+                    uiState.wavelogUploadSettings.isReady
+                ).joinToString(","))
             },
             nominalFrequencies = nominalFrequencies,
             uploadBusy = uiState.logbookUploadBusy,

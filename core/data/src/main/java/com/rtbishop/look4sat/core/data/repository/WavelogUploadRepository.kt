@@ -110,7 +110,10 @@ class WavelogUploadRepository internal constructor(
                             false
                         }
 
-                        !gridCompatible(record.myGrid, settings.stationGrid) -> {
+                        !gridCompatible(
+                            record.myFullGrids.takeIf { it.size > 1 }?.joinToString(",") ?: record.myGrid,
+                            settings.stationGrid
+                        ) -> {
                             skipped++
                             reasons[WavelogProblem.GRID_MISMATCH] = (reasons[WavelogProblem.GRID_MISMATCH] ?: 0) + 1
                             false
@@ -129,6 +132,11 @@ class WavelogUploadRepository internal constructor(
                     skipped = skipped,
                     reasons = reasons,
                     stationLabel = stationLabel(settings),
+                    stationId = settings.stationId,
+                    stationGrid = settings.stationGrid,
+                    qsoGrids = submitted.flatMap { record ->
+                        record.myFullGrids.ifEmpty { listOf(record.myGrid) + record.vuccGrids }
+                    }.map(String::trim).filter(String::isNotBlank).distinct(),
                     firstUtc = submitted.firstOrNull()?.let { utcText(it.startUtcMillis) }.orEmpty(),
                     lastUtc = submitted.lastOrNull()?.let { utcText(it.startUtcMillis) }.orEmpty(),
                     contacts = submitted.map { record ->
@@ -155,7 +163,10 @@ class WavelogUploadRepository internal constructor(
                 val payload = pending
                 pending = null // a preview is a one-shot authorization, including across failures
                 val now = System.currentTimeMillis()
-                if (payload == null || payload.submittedIds != preview.submittedIds || now - payload.created !in 0..900_000) {
+                if (payload == null || payload.submittedIds != preview.submittedIds ||
+                    settings.stationId != preview.stationId || settings.stationGrid != preview.stationGrid ||
+                    now - payload.created !in 0..900_000
+                ) {
                     return@withLock WavelogUploadOutcome.Expired
                 }
                 try {
@@ -192,6 +203,8 @@ class WavelogUploadRepository internal constructor(
         skipped = 0,
         reasons = emptyMap(),
         stationLabel = stationLabel(settings),
+        stationId = settings.stationId,
+        stationGrid = settings.stationGrid,
         firstUtc = "",
         lastUtc = "",
         contacts = emptyList(),

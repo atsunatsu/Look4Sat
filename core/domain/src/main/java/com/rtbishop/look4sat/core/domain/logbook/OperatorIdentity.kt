@@ -50,3 +50,13 @@ fun operatorGrids(
         .split(',')
         .map { it.trim().uppercase(Locale.US) }
         .filter(String::isNotEmpty)
+
+/** Keep the primary own grid and the complete operated multi-grid set separately. */
+fun QsoRecord.withOperatorGridSet(rawGrids: String): QsoRecord {
+    val grids = operatorGrids("", rawGrids, wavelogMode = true).distinct()
+    return copy(
+        myGrid = grids.firstOrNull().orEmpty(),
+        myFullGrids = if (grids.size > 1) grids else emptyList(),
+        vuccGrids = if (grids.size > 1) grids.map { it.take(4) }.distinct() else emptyList()
+    )
+}
