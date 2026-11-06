@@ -71,6 +71,7 @@ import com.rtbishop.look4sat.core.domain.logbook.QsoRecord
 import com.rtbishop.look4sat.core.domain.logbook.QsoStatus
 import com.rtbishop.look4sat.core.domain.logbook.operatorCallsign
 import com.rtbishop.look4sat.core.domain.logbook.operatorGrids
+import com.rtbishop.look4sat.core.domain.logbook.withOperatorGridSet
 import com.rtbishop.look4sat.core.domain.model.DataSourcesSettings
 import com.rtbishop.look4sat.core.domain.model.NominalFrequencies
 import com.rtbishop.look4sat.core.domain.model.OtherSettings
@@ -362,13 +363,12 @@ private fun SettingsScreen(
                         uiState.wavelogUploadSettings.stationCallsign,
                         uiState.wavelogUploadSettings.isReady
                     ),
-                    myGrid = operatorGrids(
-                        uiState.lotwStation?.grid.orEmpty(),
-                        uiState.wavelogUploadSettings.stationGrid,
-                        uiState.wavelogUploadSettings.isReady
-                    ).firstOrNull().orEmpty(),
                     status = QsoStatus.COMPLETE
-                )
+                ).withOperatorGridSet(operatorGrids(
+                    uiState.lotwStation?.grid.orEmpty(),
+                    uiState.wavelogUploadSettings.stationGrid,
+                    uiState.wavelogUploadSettings.isReady
+                ).joinToString(","))
             },
             nominalFrequencies = nominalFrequencies,
             uploadBusy = uiState.logbookUploadBusy,
