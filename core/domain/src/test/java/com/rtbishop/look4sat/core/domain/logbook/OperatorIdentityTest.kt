@@ -65,4 +65,27 @@ class OperatorIdentityTest {
     fun grids_areEmptyWhenNeitherSourceKnowsOne() {
         assertTrue(operatorGrids("", "").isEmpty())
     }
+
+    @Test
+    fun qso_preservesMultiGridLocatorsWithoutTruncatingThem() {
+        val qso = QsoRecord(
+            startUtcMillis = 1L, theirCallsign = "BH6RJD", myCallsign = "BA7OPF"
+        ).withOperatorGridSet(" ol62ti99 , OL62TJ, OL63AA ")
+        assertEquals("OL62TI99", qso.myGrid)
+        assertEquals(listOf("OL62TI99", "OL62TJ", "OL63AA"), qso.myFullGrids)
+        assertEquals(listOf("OL62", "OL63"), qso.vuccGrids)
+        val adif = AdifCodec.encode(listOf(qso))
+        assertTrue(adif.contains("<MY_GRIDSQUARE:8>OL62TI99"))
+        assertTrue(adif.contains("<MY_VUCC_GRIDS:22>OL62TI99,OL62TJ,OL63AA"))
+    }
+
+    @Test
+    fun qso_singleGridHasNoRedundantVuccField() {
+        val qso = QsoRecord(
+            startUtcMillis = 1L, theirCallsign = "BH6RJD", myCallsign = "BA7OPF"
+        ).withOperatorGridSet("OL62TI")
+        assertEquals("OL62TI", qso.myGrid)
+        assertTrue(qso.myFullGrids.isEmpty())
+        assertTrue(qso.vuccGrids.isEmpty())
+    }
 }
