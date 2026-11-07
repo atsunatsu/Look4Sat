@@ -53,11 +53,14 @@ internal class RecordingService(
 
     override fun sources(): List<RecordingSource> {
         val config=settings.radioControlSettings.value
-        if(config.enabled && config.radioModel==RadioControlSettings.MODEL_VERO_N76)
-            return listOf(RecordingSource("n76","N76",RecordingSourceKind.N76))
-        return externalInputs().map {it.source} + local.inputDevices.value.filter {(it.external && it.type!=AudioDeviceInfo.TYPE_BLUETOOTH_SCO) || it.type==AudioDeviceInfo.TYPE_BUILTIN_MIC}
-            .distinctBy { if(it.type==AudioDeviceInfo.TYPE_BUILTIN_MIC) "phone-microphone" else it.key }
-            .map {RecordingSource(it.key,it.name,if(it.external) RecordingSourceKind.DEVICE else RecordingSourceKind.MICROPHONE)}
+        val n76 = if(config.enabled && config.radioModel==RadioControlSettings.MODEL_VERO_N76)
+            listOf(RecordingSource("n76","N76",RecordingSourceKind.N76)) else emptyList()
+        // Keep local inputs available even when N76 is configured but not connected.
+        // The UI marks disconnected N76 unavailable and picks an alternative.
+        return n76 + externalInputs().filter { it.available() }.map {it.source} +
+            local.inputDevices.value.filter {(it.external && it.type!=AudioDeviceInfo.TYPE_BLUETOOTH_SCO) || it.type==AudioDeviceInfo.TYPE_BUILTIN_MIC}
+                .distinctBy { if(it.type==AudioDeviceInfo.TYPE_BUILTIN_MIC) "phone-microphone" else it.key }
+                .map {RecordingSource(it.key,it.name,if(it.external) RecordingSourceKind.DEVICE else RecordingSourceKind.MICROPHONE)}
     }
     @Synchronized override fun start(request: RecordingRequest) {
         if(state.value.active) return
