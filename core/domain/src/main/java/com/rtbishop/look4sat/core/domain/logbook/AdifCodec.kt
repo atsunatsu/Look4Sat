@@ -56,8 +56,15 @@ object AdifCodec {
             // to the opposite station and drives Wavelog's grid/distance/QRB display.
             appendOptional("MY_VUCC_GRIDS",
                 record.myFullGrids.ifEmpty { record.vuccGrids }.joinToString(","))
-            appendOptional("RST_SENT", record.sentReport)
-            appendOptional("RST_RCVD", record.receivedReport)
+            // Wavelog expects RST values in uploaded ADIF. Keep operator-entered reports,
+            // and supply conventional defaults only for otherwise empty analog-mode reports.
+            val defaultReport = when (record.mode.trim().uppercase(Locale.US)) {
+                "CW" -> "599"
+                "FM", "SSB", "USB", "LSB" -> "59"
+                else -> ""
+            }
+            appendOptional("RST_SENT", record.sentReport.ifBlank { defaultReport })
+            appendOptional("RST_RCVD", record.receivedReport.ifBlank { defaultReport })
             record.txFrequencyHz?.let { append(field("FREQ", hzToMhz(it))) }
             record.rxFrequencyHz?.let { append(field("FREQ_RX", hzToMhz(it))) }
             appendOptional("BAND", record.band)
