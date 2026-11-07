@@ -218,7 +218,9 @@ class AwardCalculatorTest {
         ))
         assertEquals("JK", AwardCalculator.awardKey(AwardType.WAIPA, coarse))
         assertEquals(null, WaipaCallsignLookup.province("YB7UAA")) // KI/KU overlap
+        assertEquals(setOf("KI", "KU"), WaipaCallsignLookup.candidates("YB7UAA"))
         assertEquals(null, WaipaCallsignLookup.province("YB9UAA")) // four Papua regions
+        assertEquals(setOf("PA", "PP", "PS", "PT"), WaipaCallsignLookup.candidates("YB9UAA"))
         assertEquals(null, WaipaCallsignLookup.province("YB0ABC/P"))
         assertEquals(null, WaipaCallsignLookup.province("7A7ABC"))
     }
@@ -345,4 +347,77 @@ class AwardCalculatorTest {
         assertEquals(listOf(older, newer), result)
         assertEquals(emptyList<GridQso>(), AwardCalculator.regionQsos(store, AwardType.DXCC, "292"))
     }
+    @Test
+    fun `waipa exposes boundary QSOs for manual assignment and persists the chosen province`() {
+        val boundary = qso(
+            "YB7UCC", dxcc = 327, fineGrids = listOf("OJ82MA")
+        )
+        val store = mapOf("OJ82" to listOf(boundary))
+        val provinceForGrid: (String) -> String? = { null }
+        val candidatesForGrid: (String) -> Set<String> = {
+            if (it == "OJ82MA" || it == "OJ82") setOf("KI", "KU") else emptySet()
+        }
+
+        val pending = AwardCalculator.waipaAmbiguousQsos(
+            store, provinceForGrid, candidatesForGrid
+        )
+        assertEquals(1, pending.size)
+        assertEquals(setOf("KI", "KU"), pending.single().candidateProvinceCodes)
+        assertEquals(
+            null,
+            AwardCalculator.awardKey(
+                AwardType.WAIPA,
+                boundary,
+                provinceForGrid,
+                workedGrid = "OJ82",
+                waipaCandidatesForGrid = candidatesForGrid
+            )
+        )
+        assertEquals(
+            setOf("KU"),
+            AwardCalculator.waipaPendingProvinceCodes(pending, setOf("KI"))
+        )
+        assertEquals(
+            setOf("KI", "KU"),
+            AwardCalculator.waipaPendingProvinceCodes(pending, emptySet())
+        )
+        assertEquals(
+            emptySet<String>(),
+            AwardCalculator.waipaPendingProvinceCodes(pending, setOf("KI", "KU"))
+        )
+        assertEquals(
+            AwardCalculator.waipaQsoKey(boundary),
+            AwardCalculator.waipaQsoKey(
+                boundary.copy(dxcc = null, myCallsign = "YB0AAA", stationKey = "new-station")
+            )
+        )
+        assertEquals(
+            emptySet<String>(),
+            AwardCalculator.calculate(store, provinceForGrid, candidatesForGrid)
+                .first { it.type == AwardType.WAIPA }.workedKeys
+        )
+
+        val overrides = mapOf(AwardCalculator.waipaQsoKey(boundary) to "KU")
+        val progress = AwardCalculator.calculate(
+            store, provinceForGrid, candidatesForGrid, overrides
+        ).first { it.type == AwardType.WAIPA }
+        assertEquals(setOf("KU"), progress.workedKeys)
+        assertTrue(
+            AwardCalculator.waipaAmbiguousQsos(
+                store, provinceForGrid, candidatesForGrid, overrides
+            ).isEmpty()
+        )
+        assertEquals(
+            listOf(boundary),
+            AwardCalculator.regionQsos(
+                store, AwardType.WAIPA, "KU", provinceForGrid, candidatesForGrid, overrides
+            )
+        )
+        assertTrue(
+            AwardCalculator.regionQsos(
+                store, AwardType.WAIPA, "KI", provinceForGrid, candidatesForGrid, overrides
+            ).isEmpty()
+        )
+    }
+
 }
