@@ -246,16 +246,16 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.18 — English
-          - Fixed the local radar trajectory being cut off after matching another station. The local radar now displays the entire above-horizon pass, including the portions before and after the mutual visibility window.
-          - Kept the mutual visibility timing, opposite-station overlay, and standard radar behavior unchanged.
-          - Added regression tests covering full local horizon recovery and safe fallback for invalid windows.
+          ## v18.19 — English
+          - Fixed missing signal reports in outgoing Wavelog QSO uploads and ADIF exports: FM/SSB (including USB/LSB) now default to 59, while CW defaults to 599 for both sent and received reports.
+          - Kept explicitly entered reports unchanged, including when only one of the two reports is supplied. Other modes and imported records are unaffected.
+          - Added regression tests for the default reports, individual overrides and digital-mode behavior.
           - Verification: release CI runs unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest) and checks APK signing certificate, version and both ARM ABIs.
 
-          ## v18.18 — 中文
-          - 修复匹配友台后本台雷达轨迹被截断的问题；本台雷达现在显示完整的地平线以上过境轨迹，包括双方共同可见窗口之前和之后的部分。
-          - 保持双方共同可见时间、友台轨迹叠加和普通雷达行为不变。
-          - 新增回归测试，覆盖本台完整地平线窗口恢复及异常窗口的安全回退。
+          ## v18.19 — 中文
+          - 修复 Wavelog 通联上传及 ADIF 导出缺少信号报告的问题：FM/SSB（含 USB/LSB）默认发送及接收报告均为 59，CW 均为 599。
+          - 保留手动填写的报告，包括仅填写其中一方报告的情况；不影响其他模式及导入记录。
+          - 新增回归测试，覆盖默认信号报告、单项覆盖及数字模式行为。
           - 验证：发布 CI 运行单元测试（排除已有超时问题的 RadioConfigurationSaveTest），并校验 APK 签名证书、版本号及两种 ARM ABI。
 
           RELEASE_NOTES
