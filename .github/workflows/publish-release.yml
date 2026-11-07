@@ -246,18 +246,14 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.15 — English
-          - Refreshed the currently selected Wavelog station profile by ID when fetching the station list and before preparing uploads, including manual resubmissions; station name, callsign and locator now follow server changes.
-          - Distinguished the target Wavelog station location from the actual own-grid set in upload confirmation dialogs, with support for multiple locators.
-          - Preserved complete 4-, 6- or 8-character own locators and multi-grid locations when creating QSOs in the radar log and settings logbook, including their ADIF MY_GRIDSQUARE / MY_VUCC_GRIDS fields.
-          - Validated full multi-grid compatibility before uploads and rejected prepared uploads after the selected station ID or locator changed.
+          ## v18.16 — English
+          - Fixed SatNOGS three-line element (3LE) names beginning with the `0 ` line marker being displayed with the marker; the parser now strips the marker while preserving the satellite name.
+          - Added a regression test for TLE name parsing with the SatNOGS `0 ` prefix.
           - Verification: release CI runs unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest) and checks APK signing certificate, version and both ARM ABIs.
 
-          ## v18.15 — 中文
-          - 获取 Wavelog 台址列表及准备上传（包括手动重传）时，按台址 ID 刷新当前选中台址；名称、呼号和网格现在可跟随服务器更改。
-          - 上传确认弹窗区分 Wavelog 上传目标台址和通联记录实际使用的本台网格集合，并支持显示多个网格。
-          - 雷达日志及设置页日志本新建通联时保留完整的 4、6、8 位本台网格和多网格位置，正确写入 ADIF 的 MY_GRIDSQUARE / MY_VUCC_GRIDS 字段。
-          - 上传前校验完整多网格匹配关系；上传弹窗打开后若选中台址 ID 或网格变化，则拒绝使用旧预览上传。
+          ## v18.16 — 中文
+          - 修复 SatNOGS 三行轨道根数（3LE）中的卫星名称被错误显示为以 `0 ` 开头的问题；解析时去除行标识，保留真实卫星名称。
+          - 新增对应单元测试，防止该问题回归。
           - 验证：发布 CI 运行单元测试（排除已有超时问题的 RadioConfigurationSaveTest），并校验 APK 签名证书、版本号及两种 ARM ABI。
 
           RELEASE_NOTES
