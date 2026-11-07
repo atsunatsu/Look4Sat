@@ -246,14 +246,16 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.16 — English
-          - Fixed SatNOGS three-line element (3LE) names beginning with the `0 ` line marker being displayed with the marker; the parser now strips the marker while preserving the satellite name.
-          - Added a regression test for TLE name parsing with the SatNOGS `0 ` prefix.
+          ## v18.17 — English
+          - Fixed existing cached satellite names imported from SatNOGS that still began with the `0 ` TLE line marker after upgrading; the database migration now removes the marker automatically.
+          - Added a non-destructive Room database migration (v3 → v4) that updates only affected satellite names, preserving orbital elements, NORAD IDs and saved selections.
+          - No manual cache clearing or satellite-data redownload is required.
           - Verification: release CI runs unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest) and checks APK signing certificate, version and both ARM ABIs.
 
-          ## v18.16 — 中文
-          - 修复 SatNOGS 三行轨道根数（3LE）中的卫星名称被错误显示为以 `0 ` 开头的问题；解析时去除行标识，保留真实卫星名称。
-          - 新增对应单元测试，防止该问题回归。
+          ## v18.17 — 中文
+          - 修复升级后数据库中仍残留 SatNOGS 卫星名称前缀 `0 ` 的问题；现在会在数据库升级时自动清理。
+          - 新增非破坏性 Room 数据库迁移（v3 → v4），只修改受影响的卫星名称，保留轨道根数、NORAD 编号和已保存的卫星勾选状态。
+          - 用户无需手动清空缓存，也无需重新下载卫星数据。
           - 验证：发布 CI 运行单元测试（排除已有超时问题的 RadioConfigurationSaveTest），并校验 APK 签名证书、版本号及两种 ARM ABI。
 
           RELEASE_NOTES
