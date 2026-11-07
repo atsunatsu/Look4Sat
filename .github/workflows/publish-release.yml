@@ -246,18 +246,13 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.19 — English
-          - Fixed missing signal reports in outgoing Wavelog QSO uploads and ADIF exports: FM/SSB (including USB/LSB) now default to 59, while CW defaults to 599 for both sent and received reports.
-          - Kept explicitly entered reports unchanged, including when only one of the two reports is supplied. Other modes and imported records are unaffected.
-          - Added regression tests for the default reports, individual overrides and digital-mode behavior.
-          - Verification: release CI runs unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest) and checks APK signing certificate, version and both ARM ABIs.
-
-          ## v18.19 — 中文
-          - 修复 Wavelog 通联上传及 ADIF 导出缺少信号报告的问题：FM/SSB（含 USB/LSB）默认发送及接收报告均为 59，CW 均为 599。
-          - 保留手动填写的报告，包括仅填写其中一方报告的情况；不影响其他模式及导入记录。
-          - 新增回归测试，覆盖默认信号报告、单项覆盖及数字模式行为。
-          - 验证：发布 CI 运行单元测试（排除已有超时问题的 RadioConfigurationSaveTest），并校验 APK 签名证书、版本号及两种 ARM ABI。
-
+          ## v18.20 — GPS diagnostic release / GPS 定位诊断版本
+          - Adds a copyable GPS diagnostic panel after tapping Settings → GPS Location, including permission callback results, actual permission state, location service and provider availability, passive location-cache age, and SettingsRepo GPS request/callback trace.
+          - Does not include coordinates, grids, IMEI or station details. Normal GPS positioning behavior remains unchanged to reproduce the reported failure.
+          - 这是针对 vivo Y51s / Android 10 的 GPS 权限误报问题的诊断版本。点击“设置 → GPS 定位”后，在弹出的“GPS 定位诊断”面板复制报告并发送给开发者。
+          - 报告记录系统授权状态、定位总开关、各定位提供者状态、回调结果及实际发起 GPS 请求的路径，不收集坐标或台址。
+          - 版本可覆盖安装旧版本，保留应用数据。
+          
           RELEASE_NOTES
           )"
           fi
