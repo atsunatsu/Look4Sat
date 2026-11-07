@@ -246,16 +246,16 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.17 — English
-          - Fixed existing cached satellite names imported from SatNOGS that still began with the `0 ` TLE line marker after upgrading; the database migration now removes the marker automatically.
-          - Added a non-destructive Room database migration (v3 → v4) that updates only affected satellite names, preserving orbital elements, NORAD IDs and saved selections.
-          - No manual cache clearing or satellite-data redownload is required.
+          ## v18.18 — English
+          - Fixed the local radar trajectory being cut off after matching another station. The local radar now displays the entire above-horizon pass, including the portions before and after the mutual visibility window.
+          - Kept the mutual visibility timing, opposite-station overlay, and standard radar behavior unchanged.
+          - Added regression tests covering full local horizon recovery and safe fallback for invalid windows.
           - Verification: release CI runs unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest) and checks APK signing certificate, version and both ARM ABIs.
 
-          ## v18.17 — 中文
-          - 修复升级后数据库中仍残留 SatNOGS 卫星名称前缀 `0 ` 的问题；现在会在数据库升级时自动清理。
-          - 新增非破坏性 Room 数据库迁移（v3 → v4），只修改受影响的卫星名称，保留轨道根数、NORAD 编号和已保存的卫星勾选状态。
-          - 用户无需手动清空缓存，也无需重新下载卫星数据。
+          ## v18.18 — 中文
+          - 修复匹配友台后本台雷达轨迹被截断的问题；本台雷达现在显示完整的地平线以上过境轨迹，包括双方共同可见窗口之前和之后的部分。
+          - 保持双方共同可见时间、友台轨迹叠加和普通雷达行为不变。
+          - 新增回归测试，覆盖本台完整地平线窗口恢复及异常窗口的安全回退。
           - 验证：发布 CI 运行单元测试（排除已有超时问题的 RadioConfigurationSaveTest），并校验 APK 签名证书、版本号及两种 ARM ABI。
 
           RELEASE_NOTES
