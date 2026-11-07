@@ -245,7 +245,23 @@ class RadarViewModel(
             trackingService.setTransponder(initialTransponder)
         }
         if (!pass.isDeepSpace) {
-            val track = satelliteRepo.getTrack(pass.orbitalObject, stationPos, pass.aosTime, pass.losTime)
+            // A matched pass's AOS/LOS is the *common* visibility window, which
+            // can be shorter than this station's pass. Keep the mutual timer
+            // unchanged, but draw the complete local track up to its own 0° edges.
+            val (trackStart, trackEnd) = if (
+                mutualSession.trackSamples.isNotEmpty() &&
+                mutualSession.startTime == pass.aosTime &&
+                mutualSession.endTime == pass.losTime
+            ) {
+                withContext(Dispatchers.Default) {
+                    expandMatchedRadarLocalVisibilityWindow(pass.aosTime, pass.losTime) { time ->
+                        pass.orbitalObject.getElevation(stationPos, time) > 0.0
+                    }
+                }
+            } else {
+                pass.aosTime to pass.losTime
+            }
+            val track = satelliteRepo.getTrack(pass.orbitalObject, stationPos, trackStart, trackEnd)
             _uiState.update { it.copy(satTrack = track) }
         }
         return allRadios
