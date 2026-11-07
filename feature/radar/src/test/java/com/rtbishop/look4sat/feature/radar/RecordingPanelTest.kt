@@ -36,7 +36,7 @@ class RecordingPanelTest {
         var starts=0;var stops=0
         var lastRequest:RecordingRequest?=null
         override fun sources()=choices
-        override fun start(request:RecordingRequest) {starts++;lastRequest=request;state.value=RecordingState(phase=RecordingPhase.RECORDING,source=sources().single())}
+        override fun start(request:RecordingRequest) {starts++;lastRequest=request;state.value=RecordingState(phase=RecordingPhase.RECORDING,source=sources().first { it.id == request.sourceId })}
         override fun failStart(reason:String)=Unit
         override suspend fun runRecording(request:RecordingRequest)=Unit
         override suspend fun stop() {stops++;state.value=RecordingState()}
