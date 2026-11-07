@@ -100,8 +100,16 @@ class MainContainer(private val context: Context) : IMainContainer {
     override val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + mainHandler)
     override val settingsRepo = provideSettingsRepo()
     override val controlDiagnostics = com.rtbishop.look4sat.core.domain.control.ControlDiagnosticsBuffer()
-    override val audioHub: com.rtbishop.look4sat.core.domain.audio.IAudioHub by lazy {
+    private val localAudioHub: com.rtbishop.look4sat.core.domain.audio.IAudioHub by lazy {
         com.rtbishop.look4sat.core.data.usecase.SharedAudioHub(context, appScope)
+    }
+    private val n76ReceivePcm by lazy { com.rtbishop.look4sat.core.data.audio.N76ReceivePcmBus() }
+    override val audioHub: com.rtbishop.look4sat.core.domain.audio.IAudioHub by lazy {
+        com.rtbishop.look4sat.core.data.audio.RecordingAudioHub(localAudioHub) { recordingService.state.value.active }
+    }
+    override val recordingService: com.rtbishop.look4sat.core.domain.audio.IRecordingService by lazy {
+        com.rtbishop.look4sat.core.data.audio.RecordingService(context, appScope, settingsRepo, localAudioHub,
+            n76ReceivePcm, { radioTrackingService }, diagnostics = controlDiagnostics)
     }
     override val selectionRepo = provideSelectionRepo()
     override val satelliteRepo = provideSatelliteRepo()
@@ -129,7 +137,7 @@ class MainContainer(private val context: Context) : IMainContainer {
                 com.rtbishop.look4sat.core.data.framework.BluetoothSppRadioTransport(manager,address,controlDiagnostics,
                     java.util.UUID.fromString(com.rtbishop.look4sat.core.data.framework.N76AudioProtocol.SERVICE_UUID)),
                 com.rtbishop.look4sat.core.data.framework.AndroidN76AudioIo(context,audioHub) {settingsRepo.radioControlSettings.value.n76Options},
-                appScope,controlDiagnostics)
+                appScope,controlDiagnostics, receivePcm = n76ReceivePcm::offer)
             },
             n76RecordingFactory = { com.rtbishop.look4sat.core.data.framework.AndroidN76Recording(context,
                 appScope, controlDiagnostics) { settingsRepo.radioControlSettings.value.n76Options } }

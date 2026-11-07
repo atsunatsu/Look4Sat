@@ -347,6 +347,15 @@ private fun RadarScreen(
     val context = LocalContext.current
     var showMatchDialog by rememberSaveable { mutableStateOf(false) }
     var showToolsMenu by remember { mutableStateOf(false) }
+    var showRecording by rememberSaveable { mutableStateOf(false) }
+    val recordingService = (context.applicationContext as IContainerProvider).getMainContainer().recordingService
+    val recordingStatus by recordingService.state.collectAsStateWithLifecycle()
+    if (showRecording) RecordingPanel(
+        satellite = uiState.currentPass?.name.orEmpty(),
+        passAos = uiState.currentPass?.aosTime,
+        maxElevation = uiState.currentPass?.maxElevation,
+        onDismiss = { showRecording = false }
+    )
     val closeToolsMenuThen: (() -> Unit) -> Unit = { action ->
         showToolsMenu = false
         action()
@@ -377,7 +386,9 @@ private fun RadarScreen(
                     matchError = null
                 }
             },
-            onMap = { closeToolsMenuThen(openPassMap) }
+            onMap = { closeToolsMenuThen(openPassMap) },
+            recordingActive = recordingStatus.active,
+            onRecording = { closeToolsMenuThen { showRecording = true } }
         )
     }
     BoxWithConstraints(
@@ -573,7 +584,9 @@ private fun RadarActionsMenu(
     hasPass: Boolean,
     onAddToCalendar: () -> Unit,
     onMatch: () -> Unit,
-    onMap: () -> Unit
+    onMap: () -> Unit,
+    recordingActive: Boolean,
+    onRecording: () -> Unit
 ) {
     val context = LocalContext.current
     Box(modifier = Modifier.size(48.dp)) {
@@ -622,6 +635,11 @@ private fun RadarActionsMenu(
                 label = stringResource(R.string.nav_map),
                 enabled = hasPass,
                 onClick = onMap
+            )
+            RadarToolMenuItem(
+                iconRes = R.drawable.ic_recording,
+                label = stringResource(if (recordingActive) R.string.recording_active else R.string.recording_title),
+                onClick = onRecording
             )
         }
     }
