@@ -1,6 +1,7 @@
 package com.rtbishop.look4sat.core.data.audio
 
 import android.app.Application
+import android.media.AudioDeviceInfo
 import com.rtbishop.look4sat.core.domain.audio.*
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 import com.rtbishop.look4sat.core.domain.repository.*
@@ -84,6 +85,24 @@ class RecordingServiceTest {
         assertFalse(service.state.value.active);assertEquals("Permission denied",service.state.value.error)
         assertEquals(0,hub.subscribers)
     }
+    @Test fun n76ConfigurationDoesNotHideLocalAudioInputFallbacks()=runTest {
+        val hub=Hub()
+        hub.inputDevices.value=listOf(AudioInputDevice(
+            "${AudioDeviceInfo.TYPE_BUILTIN_MIC}:Phone", "Phone",
+            AudioDeviceInfo.TYPE_BUILTIN_MIC, false
+        ))
+        val config=MutableStateFlow(RadioControlSettings(true,RadioControlSettings.MODEL_VERO_N76,"","","","",19200))
+        val settings=stub<ISettingsRepo> {if(it=="getRadioControlSettings") config else null}
+        val radio=stub<IRadioTrackingService> {if(it=="getState") MutableStateFlow(RadioTrackingState()) else null}
+        val dispatcher=StandardTestDispatcher(testScheduler)
+        val service=RecordingService(RuntimeEnvironment.getApplication(),backgroundScope,settings,hub,
+            N76ReceivePcmBus(),{radio},dispatcher,dispatcher,temp.root)
+        assertEquals(
+            listOf("n76", "${AudioDeviceInfo.TYPE_BUILTIN_MIC}:Phone"),
+            service.sources().map {it.id}
+        )
+    }
+
     @Test fun n76RequiresExplicitAudioOptInEvenIfAnOldConnectionIsStillReported()=runTest {
         val hub=Hub();val dispatcher=StandardTestDispatcher(testScheduler)
         val config=MutableStateFlow(RadioControlSettings(true,RadioControlSettings.MODEL_VERO_N76,"","","","",19200))
