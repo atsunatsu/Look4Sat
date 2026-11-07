@@ -18,6 +18,42 @@ import org.junit.Test
 class AdifCodecTest {
 
     @Test
+    fun outgoingAdifDefaultsMissingSignalReportsByMode() {
+        fun encode(mode: String, sent: String = "", received: String = "") = AdifCodec.encode(
+            listOf(QsoRecord(
+                startUtcMillis = 1_700_000_000_000L,
+                theirCallsign = "BG5JVM",
+                myCallsign = "BA7OPF",
+                mode = mode,
+                sentReport = sent,
+                receivedReport = received
+            ))
+        )
+
+        listOf("FM", "SSB", "USB", "LSB").forEach { mode ->
+            val adif = encode(mode)
+            assertTrue(adif.contains("<RST_SENT:2>59"))
+            assertTrue(adif.contains("<RST_RCVD:2>59"))
+        }
+        val cw = encode("CW")
+        assertTrue(cw.contains("<RST_SENT:3>599"))
+        assertTrue(cw.contains("<RST_RCVD:3>599"))
+
+        val explicit = encode("CW", sent = "579", received = "559")
+        assertTrue(explicit.contains("<RST_SENT:3>579"))
+        assertTrue(explicit.contains("<RST_RCVD:3>559"))
+
+        val partial = encode("CW", sent = "579")
+        assertTrue(partial.contains("<RST_SENT:3>579"))
+        assertTrue(partial.contains("<RST_RCVD:3>599"))
+
+        // Digital modes without a requested default must remain unmodified.
+        val digital = encode("MFSK")
+        assertFalse(digital.contains("<RST_SENT:"))
+        assertFalse(digital.contains("<RST_RCVD:"))
+    }
+
+    @Test
     fun encodeDecode_roundTrip() {
         val record = QsoRecord(
             startUtcMillis = 1_700_000_000_000L,
