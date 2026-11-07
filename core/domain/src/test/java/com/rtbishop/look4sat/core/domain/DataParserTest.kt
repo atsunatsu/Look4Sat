@@ -139,6 +139,17 @@ class DataParserTest {
     }
 
     @Test
+    fun `Given SatNOGS TLE name prefix removes leading zero marker`() = runTest(testDispatcher) {
+        val tleStream = """
+            0 ISS (ZARYA)
+            1 25544U 98067A   21320.51955234  .00001288  00000+0  31985-4 0  9990
+            2 25544  51.6447 309.4881 0004694 203.6966 299.8876 15.48582035312205
+        """.trimIndent().byteInputStream()
+        val sat = dataParser.parseTLEStream(tleStream)[0]
+        assert(sat.name == "ISS (ZARYA)")
+    }
+
+    @Test
     fun `Given valid TLE stream ndot is parsed for decay detection`() = runTest(testDispatcher) {
         val tleStream = """
             ISS (ZARYA)
