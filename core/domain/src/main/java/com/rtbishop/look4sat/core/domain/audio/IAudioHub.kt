@@ -16,7 +16,8 @@ enum class AudioConsumer {
     SSTV,
     CW,
     MORSE_EXPERT,
-    N76_VOICE
+    N76_VOICE,
+    RECORDING
 }
 
 enum class AudioDelivery {
@@ -37,7 +38,8 @@ data class TimestampedAudioChunk(
     val sampleRate: Int,
     val framePosition: Long,
     val elapsedRealtimeNanos: Long,
-    val format: AudioSampleFormat
+    val format: AudioSampleFormat,
+    val discontinuity: Boolean = false
 )
 
 data class AudioInputDevice(

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="recording_title">Recording</string>
+    <string name="recording_start">Start recording</string>
+    <string name="recording_stop">Stop recording</string>
+    <string name="recording_active">Recording…</string>
+    <string name="recording_source">Receive source</string>
+    <string name="recording_microphone">Microphone</string>
+    <string name="recording_microphone_required">Allow microphone access to record this input</string>
+    <string name="recording_no_source">No receive audio source available</string>
+    <string name="recording_mono">Mono</string>
+    <string name="recording_files">Recordings</string>
+    <string name="recording_play">Play</string>
+    <string name="recording_export">Export</string>
+    <string name="recording_delete">Delete</string>
+    <string name="recording_delete_confirm">Delete this recording permanently?</string>
+</resources>

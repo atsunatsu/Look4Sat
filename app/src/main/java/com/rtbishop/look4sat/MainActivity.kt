@@ -58,6 +58,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        val container = (applicationContext as IContainerProvider).getMainContainer()
+        container.recordingService.setApplicationForeground(true)
+        lifecycleScope.launch { container.radioTrackingService.setAudioForeground(true) }
+    }
+
+    override fun onStop() {
+        val container = (applicationContext as IContainerProvider).getMainContainer()
+        container.recordingService.setApplicationForeground(false)
+        lifecycleScope.launch {
+            container.recordingService.stopPlayback()
+        }
+        super.onStop()
+    }
+
     private fun observeNightFilterState() {
         val mainContainer = (applicationContext as IContainerProvider).getMainContainer()
         lifecycleScope.launch {

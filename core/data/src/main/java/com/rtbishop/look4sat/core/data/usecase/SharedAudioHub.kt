@@ -123,6 +123,7 @@ class SharedAudioHub(
 
     override suspend fun selectInputDevice(deviceKey: String?) {
         lifecycleMutex.withLock {
+            if (preferredDeviceKey == deviceKey && (captureJob == null || captureJob?.isActive == true)) return@withLock
             preferredDeviceKey = deviceKey
             val job = captureJob
             captureJob = null
@@ -211,6 +212,9 @@ class SharedAudioHub(
             }
             check(count >= 0) { "AudioRecord.read 失败: $count" }
             if (count == 0) continue
+            preferredDeviceKey?.let { expected ->
+                check(recorder.routedDevice?.let(::deviceKey) == expected) { "Selected audio input route changed" }
+            }
             updateSystemSilenced(recorder)
 
             val samples = if (candidate.format == AudioSampleFormat.PCM_FLOAT) {
@@ -355,13 +359,19 @@ class SharedAudioHub(
     }
 
     private fun updateSystemSilenced(recorder: AudioRecord) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-        val silenced = runCatching {
-            recorder.activeRecordingConfiguration?.isClientSilenced == true
-        }.getOrDefault(false)
+        val silenced = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            runCatching { recorder.activeRecordingConfiguration?.isClientSilenced == true }.getOrDefault(false)
+        } else false
+        val routed = recorder.routedDevice
         val current = _state.value
-        if (current is AudioHubState.Capturing && current.systemSilenced != silenced) {
-            _state.value = current.copy(systemSilenced = silenced)
+        if (current is AudioHubState.Capturing) {
+            val updated = current.copy(
+                systemSilenced = silenced,
+                deviceId = routed?.id,
+                deviceType = routed?.type,
+                deviceName = routed?.productName?.toString().orEmpty()
+            )
+            if (updated != current) _state.value = updated
         }
     }
 

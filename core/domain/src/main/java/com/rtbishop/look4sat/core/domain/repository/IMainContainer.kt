@@ -41,6 +41,7 @@ interface IMainContainer {
     val radioTrackingService: IRadioTrackingService
     val controlDiagnostics: com.rtbishop.look4sat.core.domain.control.IControlDiagnostics
     val audioHub: com.rtbishop.look4sat.core.domain.audio.IAudioHub
+    val recordingService: com.rtbishop.look4sat.core.domain.audio.IRecordingService
     val locationRepo: ILocationRepo
     val mutualPassData: StateFlow<MutualPassData>
     /** Grid Finder → LoTW station page prefill, consumed once by that page. */

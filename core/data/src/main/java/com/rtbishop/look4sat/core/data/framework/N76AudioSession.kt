@@ -52,7 +52,8 @@ internal class N76AudioSession(
     private val transport: RadioTransport,
     private val io: N76AudioIo,
     private val scope: CoroutineScope,
-    private val diagnostics: IControlDiagnostics = NoOpControlDiagnostics
+    private val diagnostics: IControlDiagnostics = NoOpControlDiagnostics,
+    private val receivePcm: (ShortArray) -> Unit = {}
 ) : N76Audio {
     private val mutableState = MutableStateFlow(N76AudioState())
     override val state: StateFlow<N76AudioState> = mutableState
@@ -99,6 +100,7 @@ internal class N76AudioSession(
                             while (offset < frame.size) {
                                 val length = codec.frameLength(frame, offset) ?: break
                                 val pcm = codec.decode(frame, offset) ?: break
+                                receivePcm(pcm)
                                 radioPcmSink?.invoke(pcm)
                                 queue.trySend(pcm)
                                 offset += length
