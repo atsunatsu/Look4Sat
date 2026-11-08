@@ -166,4 +166,6 @@
     <string name="prefs_outro_title">Я хотел бы сказать спасибо:</string>
     <string name="prefs_outro_license">Это ПО поставляется без гарантий.</string>
 
+    <string name="cw_console_increase_offset">Увеличить смещение</string>
+    <string name="cw_console_decrease_offset">Уменьшить смещение</string>
 </resources>

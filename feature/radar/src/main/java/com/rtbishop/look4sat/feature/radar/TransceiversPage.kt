@@ -95,6 +95,7 @@ import com.rtbishop.look4sat.core.domain.utility.CalculatorReference
 import com.rtbishop.look4sat.core.domain.utility.withCalculatorReference
 import com.rtbishop.look4sat.core.presentation.R
 import com.rtbishop.look4sat.core.presentation.infiniteMarquee
+import java.math.BigDecimal
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.math.roundToLong
@@ -508,6 +509,14 @@ private fun isValidCalculatorOffset(value: String): Boolean {
     return parsed.isFinite() && kotlin.math.abs(parsed) <= MAX_CALCULATOR_OFFSET_KHZ
 }
 
+internal fun adjustCalculatorOffset(offsetKHz: String, increase: Boolean): String {
+    val current = offsetKHz.toBigDecimalOrNull() ?: BigDecimal.ZERO
+    val delta = if (increase) BigDecimal("0.1") else BigDecimal("-0.1")
+    val limit = BigDecimal("10000")
+    return current.add(delta).coerceIn(limit.negate(), limit)
+        .stripTrailingZeros().toPlainString()
+}
+
 @Composable
 internal fun DopplerFrequencyCalculator(
     transponder: SatRadio,
@@ -694,11 +703,19 @@ private fun CalculatorContent(
     val edgeFrequencyFormat = if (displayNominalFrequencies) "%.3f" else "%.4f"
     val showStepSelector = displayNominalFrequencies && onFrequencyStepChange != null
     val stepHz = if (showStepSelector) frequencyStepHz else CALCULATOR_FREQUENCY_STEP_HZ
-    val readoutFrequencyFormat = if (!displayNominalFrequencies) "%.6f" else when (stepHz) {
-        250L -> "%.5f"
-        100L, 500L -> "%.4f"
-        else -> "%.3f"
+    val stepPrecision = when (stepHz) {
+        250L -> 5
+        100L, 500L -> 4
+        else -> 3
     }
+    val offsetPrecision = when {
+        offsetHz % 1_000L == 0L -> 3
+        offsetHz % 100L == 0L -> 4
+        offsetHz % 10L == 0L -> 5
+        else -> 6
+    }
+    val readoutFrequencyFormat = if (!displayNominalFrequencies) "%.6f" else
+        "%.${maxOf(stepPrecision, offsetPrecision)}f"
 
     fun publishTuning() {
         if(!editingEnabled)return
@@ -868,31 +885,84 @@ private fun CalculatorContent(
                         .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.small),
                     contentAlignment = Alignment.Center
                 ) {
-                    BasicTextField(
-                        value = offsetKHz,
-                        enabled=editingEnabled,
-                        onValueChange = { value ->
-                            if (isValidCalculatorOffset(value)) onOffsetChange(value)
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                        textStyle = TextStyle(
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp),
-                        decorationBox = { innerTextField ->
-                            if (offsetKHz.isEmpty()) {
-                                Text(
-                                    text = "Offset (kHz)",
-                                    fontSize = 16.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        BasicTextField(
+                            value = offsetKHz,
+                            enabled = editingEnabled,
+                            onValueChange = { value ->
+                                if (isValidCalculatorOffset(value)) onOffsetChange(value)
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                            textStyle = TextStyle(
+                                fontSize = 16.sp,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                                .testTag("cwCalculatorOffsetInput"),
+                            decorationBox = { innerTextField ->
+                                if (offsetKHz.isEmpty()) {
+                                    Text(
+                                        text = "Offset (kHz)",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                                innerTextField()
                             }
-                            innerTextField()
+                        )
+                        if (showStepSelector) {
+                            val increaseDescription = stringResource(R.string.cw_console_increase_offset)
+                            val decreaseDescription = stringResource(R.string.cw_console_decrease_offset)
+                            Column(
+                                modifier = Modifier.width(20.dp).fillMaxHeight(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier.weight(1f).fillMaxWidth()
+                                        .clickable(enabled = editingEnabled, role = Role.Button) {
+                                            val next = adjustCalculatorOffset(offsetKHz, increase = true)
+                                            if (next != offsetKHz) onOffsetChange(next)
+                                        }
+                                        .semantics { contentDescription = increaseDescription }
+                                        .testTag("cwCalculatorOffsetIncrease"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "▲",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                            alpha = if (editingEnabled) 1f else 0.38f
+                                        )
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier.weight(1f).fillMaxWidth()
+                                        .clickable(enabled = editingEnabled, role = Role.Button) {
+                                            val next = adjustCalculatorOffset(offsetKHz, increase = false)
+                                            if (next != offsetKHz) onOffsetChange(next)
+                                        }
+                                        .semantics { contentDescription = decreaseDescription }
+                                        .testTag("cwCalculatorOffsetDecrease"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "▼",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                            alpha = if (editingEnabled) 1f else 0.38f
+                                        )
+                                    )
+                                }
+                            }
                         }
-                    )
+                    }
                 }
                 if (showStepSelector) {
                     var stepMenuExpanded by remember { mutableStateOf(false) }
