@@ -317,7 +317,10 @@ class LoTWRepository : ILoTWRepository {
                 theirGrids = gridsInRecord.distinct().toList(),
                 theirFineGrids = fineGridsInRecord.distinct().toList()
             )
-            for (grid in gridsInRecord.ifEmpty { listOf(GRIDLESS_QSO_BUCKET) }) {
+            val bucketKeys: List<String> = if (gridsInRecord.isEmpty()) {
+                listOf(GRIDLESS_QSO_BUCKET)
+            } else gridsInRecord
+            for (grid in bucketKeys) {
                 result.getOrPut(grid) { mutableListOf() }.add(qso)
             }
         }
