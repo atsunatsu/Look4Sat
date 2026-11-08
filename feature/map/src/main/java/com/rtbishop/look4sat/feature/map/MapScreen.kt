@@ -104,6 +104,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rtbishop.look4sat.core.domain.model.AwardCalculator
+import com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
 import com.rtbishop.look4sat.core.domain.model.AwardProgress
 import com.rtbishop.look4sat.core.domain.model.AwardType
 import com.rtbishop.look4sat.core.domain.model.firstCallsByGrid
@@ -535,7 +536,7 @@ private fun MapScreen(
         gridSets.map { (key, grids) ->
             val worked = uiState.workedGridQsos.filterValues { qsos ->
                 qsos.scopedToStation(key).isNotEmpty()
-            }.keys
+            }.keys - GRIDLESS_QSO_BUCKET
             StationGroup(id = key, grids = grids, worked = worked)
         }.sortedByDescending { it.workedCount }
     }
