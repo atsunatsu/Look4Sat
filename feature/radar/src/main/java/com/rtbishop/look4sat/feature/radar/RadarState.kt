@@ -104,6 +104,8 @@ data class RadarState(
     val isUtc: Boolean = false,
     val orientationValues: Pair<Float, Float> = 0f to 0f,
     val orbitalPos: OrbitalPos? = null,
+    /** Live opposite-station position for the selected matched pass; null after its LOS. */
+    val oppositeStationPos: OrbitalPos? = null,
     val satTrack: List<OrbitalPos> = emptyList(),
     val shouldShowSweep: Boolean = false,
     val shouldUseCompass: Boolean = false,

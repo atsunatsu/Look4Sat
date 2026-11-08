@@ -333,17 +333,29 @@ private fun RadarScreen(
                 )
             }
     }
-    val timeNow = System.currentTimeMillis()
-    val trackBPosition = mutualData.trackSamples
-        .filter { it.time <= timeNow }
-        .lastOrNull()
-        ?.let {
-            OrbitalPos(
-                azimuth = it.azimuthB * PI / 180.0,
-                elevation = it.elevationB * PI / 180.0,
-                time = it.time
-            )
-        }
+    // Prefer the actual, per-second position at station B. Sample-only legacy
+    // sessions lack coordinates: do not hold their last above-horizon sample
+    // forever once the mutual pass has ended.
+    val trackBPosition = if (
+        mutualData.stationBLatitude != null && mutualData.stationBLongitude != null
+    ) {
+        uiState.oppositeStationPos
+    } else {
+        val timeNow = uiState.orbitalPos?.time ?: System.currentTimeMillis()
+        mutualData.trackSamples
+            .takeIf {
+                isWithinMatchedRadarWindow(timeNow, mutualData.startTime to mutualData.endTime)
+            }
+            ?.lastOrNull { it.time <= timeNow }
+            ?.takeIf { it.elevationB > 0.0 }
+            ?.let {
+                OrbitalPos(
+                    azimuth = it.azimuthB * PI / 180.0,
+                    elevation = it.elevationB * PI / 180.0,
+                    time = it.time
+                )
+            }
+    }
     val context = LocalContext.current
     var showMatchDialog by rememberSaveable { mutableStateOf(false) }
     var showToolsMenu by remember { mutableStateOf(false) }

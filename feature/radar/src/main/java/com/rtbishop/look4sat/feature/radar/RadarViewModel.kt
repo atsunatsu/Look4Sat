@@ -28,6 +28,7 @@ import com.rtbishop.look4sat.core.domain.audio.AudioConsumer
 import com.rtbishop.look4sat.core.domain.audio.IAudioHub
 import com.rtbishop.look4sat.core.domain.predict.CelestialComputer
 import com.rtbishop.look4sat.core.domain.predict.OrbitalObject
+import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
@@ -82,6 +83,8 @@ class RadarViewModel(
     private var transponders: List<SatRadio> = emptyList()
     /** Raw per-second Doppler rows, before applying the selected radio's saved references. */
     private var latestUnadjustedRadios: List<SatRadio> = emptyList()
+    private var oppositeStation: GeoPos? = null
+    private var oppositeStationWindow: Pair<Long, Long>? = null
     private var calculatorCatnum: Int? = null
     private var sstvDecoder: SstvDecoder? = null
     private var sstvSampleRate: Int? = null
@@ -244,15 +247,29 @@ class RadarViewModel(
             }
             trackingService.setTransponder(initialTransponder)
         }
+        val matchedPass = !pass.isDeepSpace &&
+            mutualSession.trackSamples.isNotEmpty() &&
+            mutualSession.startTime == pass.aosTime &&
+            mutualSession.endTime == pass.losTime
+        val latB = mutualSession.stationBLatitude
+        val lonB = mutualSession.stationBLongitude
+        oppositeStation = if (matchedPass && latB != null && lonB != null &&
+            latB in -90.0..90.0 && lonB in -180.0..180.0
+        ) GeoPos(latB, lonB) else null
+
+        // A matched pass is only the two-station overlap. Locate both stations'
+        // actual horizon windows so neither moving dot freezes at the last
+        // mutual sample. The opposite dot stays visible until *its own* LOS.
+        oppositeStationWindow = oppositeStation?.let { remote ->
+            withContext(Dispatchers.Default) {
+                expandMatchedRadarLocalVisibilityWindow(pass.aosTime, pass.losTime) { time ->
+                    pass.orbitalObject.getElevation(remote, time) > 0.0
+                }
+            }
+        }
+
         if (!pass.isDeepSpace) {
-            // A matched pass's AOS/LOS is the *common* visibility window, which
-            // can be shorter than this station's pass. Keep the mutual timer
-            // unchanged, but draw the complete local track up to its own 0° edges.
-            val (trackStart, trackEnd) = if (
-                mutualSession.trackSamples.isNotEmpty() &&
-                mutualSession.startTime == pass.aosTime &&
-                mutualSession.endTime == pass.losTime
-            ) {
+            val (trackStart, trackEnd) = if (matchedPass) {
                 withContext(Dispatchers.Default) {
                     expandMatchedRadarLocalVisibilityWindow(pass.aosTime, pass.losTime) { time ->
                         pass.orbitalObject.getElevation(stationPos, time) > 0.0
@@ -272,6 +289,12 @@ class RadarViewModel(
     private suspend fun tickPass(pass: OrbitalPass, allRadios: List<SatRadio>) {
         val timeNow = System.currentTimeMillis()
         val pos = satelliteRepo.getPosition(pass.orbitalObject, stationPos, timeNow)
+        val oppositePos = oppositeStation?.takeIf {
+            isWithinMatchedRadarWindow(timeNow, oppositeStationWindow)
+        }?.let { remote ->
+            satelliteRepo.getPosition(pass.orbitalObject, remote, timeNow)
+                .takeIf { it.elevation > 0.0 }
+        }
 
         // Recompute celestial positions at most once per minute (they move very slowly)
         if (timeNow - lastCelestialUpdateMs >= 60_000L) {
@@ -284,7 +307,8 @@ class RadarViewModel(
         _uiState.update {
             it.copy(
                 currentTime = time, isTimeAos = isAos,
-                orbitalPos = pos, sunPosition = cachedSunPos, moonPosition = cachedMoonPos
+                orbitalPos = pos, oppositeStationPos = oppositePos,
+                sunPosition = cachedSunPos, moonPosition = cachedMoonPos
             )
         }
         processRadios(allRadios, pass.orbitalObject, timeNow)

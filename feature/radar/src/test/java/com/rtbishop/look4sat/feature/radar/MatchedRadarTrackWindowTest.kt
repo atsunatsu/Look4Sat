@@ -47,4 +47,26 @@ class MatchedRadarTrackWindowTest {
             expandMatchedRadarLocalVisibilityWindow(240_000L, 120_000L) { true }
         )
     }
+
+    @Test
+    fun oppositeStationDotDisappearsAtItsOwnLosNotAtMutualEnd() {
+        // The local station sets earlier, so mutual visibility ends at 480s,
+        // but the opposite station can still see the satellite until 660s.
+        val (remoteAos, remoteLos) = expandMatchedRadarLocalVisibilityWindow(
+            mutualStart = 240_000L,
+            mutualEnd = 480_000L
+        ) { it in 120_000L until 660_000L }
+
+        val remoteWindow = remoteAos to remoteLos
+        assertTrue(isWithinMatchedRadarWindow(480_000L, remoteWindow))
+        assertTrue(isWithinMatchedRadarWindow(600_000L, remoteWindow))
+        assertTrue(!isWithinMatchedRadarWindow(660_000L, remoteWindow))
+        assertTrue(!isWithinMatchedRadarWindow(720_000L, remoteWindow))
+    }
+
+    @Test
+    fun oppositeMarkerNeverUsesUnknownOrStaleWindow() {
+        assertTrue(!isWithinMatchedRadarWindow(480_000L, null))
+        assertTrue(!isWithinMatchedRadarWindow(119_000L, 120_000L to 660_000L))
+    }
 }

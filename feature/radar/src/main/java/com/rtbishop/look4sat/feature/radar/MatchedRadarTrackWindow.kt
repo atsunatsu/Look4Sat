@@ -63,3 +63,7 @@ internal fun expandMatchedRadarLocalVisibilityWindow(
 
     return findEdge(mutualStart, -1L) to findEdge(mutualEnd, 1L)
 }
+
+/** Only the position inside this station's own above-horizon interval is live. */
+internal fun isWithinMatchedRadarWindow(time: Long, window: Pair<Long, Long>?): Boolean =
+    window != null && time >= window.first && time < window.second
