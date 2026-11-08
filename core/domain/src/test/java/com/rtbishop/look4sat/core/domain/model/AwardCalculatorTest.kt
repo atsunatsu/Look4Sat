@@ -53,6 +53,26 @@ class AwardCalculatorTest {
         assertTrue(progress.workedKeys.containsAll(setOf("OL62", "PM95")))
     }
 
+
+    @Test
+    fun `gridless confirmed QSOs count for entity awards but not VUCC`() {
+        val china = qso("BA7ABC", dxcc = 318, state = "GD", cqz = 24)
+        val japan = qso("JA1ABC", dxcc = 339, state = "13", cqz = 25)
+        val indonesia = qso("YB0ABC", dxcc = 327, state = "JK", cqz = 28)
+        val store = mapOf(GRIDLESS_QSO_BUCKET to listOf(china, japan, indonesia))
+
+        val progress = AwardCalculator.calculate(store).associateBy { it.type }
+        assertEquals(emptySet<String>(), progress.getValue(AwardType.VUCC).workedKeys)
+        assertEquals(0, progress.getValue(AwardType.VUCC).count)
+        assertEquals(setOf("318", "339", "327"), progress.getValue(AwardType.DXCC).workedKeys)
+        assertEquals(setOf("GD"), progress.getValue(AwardType.WAPC).workedKeys)
+        assertEquals(setOf("13"), progress.getValue(AwardType.WAJA).workedKeys)
+        assertEquals(setOf("JK"), progress.getValue(AwardType.WAIPA).workedKeys)
+        assertEquals(setOf("24", "25", "28"), progress.getValue(AwardType.WAZ).workedKeys)
+        assertEquals(listOf(china), AwardCalculator.regionQsos(store, AwardType.WAPC, "GD"))
+        assertEquals(listOf(indonesia), AwardCalculator.regionQsos(store, AwardType.WAIPA, "JK"))
+    }
+
     @Test
     fun `dxcc counts distinct entities from dxcc field`() {
         val all = listOf(
