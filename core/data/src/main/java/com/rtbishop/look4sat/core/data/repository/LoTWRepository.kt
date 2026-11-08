@@ -18,6 +18,7 @@
 package com.rtbishop.look4sat.core.data.repository
 
 import com.rtbishop.look4sat.core.domain.logbook.AdifCodec
+import com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
 import com.rtbishop.look4sat.core.domain.repository.ILoTWRepository
 import com.rtbishop.look4sat.core.domain.repository.LoTWPhase
 import com.rtbishop.look4sat.core.domain.repository.LoTWProgress
@@ -250,7 +251,8 @@ class LoTWRepository : ILoTWRepository {
         if (!body.contains("<eoh>", ignoreCase = true)) return null
         // One ADIF record = fields up to <EOR>. We buffer the fields we care
         // about, then emit a GridQso on <EOR> when the record is a satellite
-        // QSO (PROP_MODE=SAT) carrying a grid.
+        // QSO (PROP_MODE=SAT). Unlocated contacts retain their DXCC/STATE
+        // information in a non-geographic bucket for award calculations.
         val result = mutableMapOf<String, MutableList<com.rtbishop.look4sat.core.domain.model.GridQso>>()
         var propMode: String? = null
         var call = ""
@@ -284,7 +286,11 @@ class LoTWRepository : ILoTWRepository {
         val fineMyGridsInRecord = mutableListOf<String>()
 
         fun emitRecord() {
-            if (propMode != "SAT" || gridsInRecord.isEmpty()) return
+            if (propMode != "SAT") return
+            // A gridless record must have a real QSO identity. In particular,
+            // never create an artificial 1970 contact from a malformed report.
+            if (gridsInRecord.isEmpty() &&
+                (call.isBlank() || qsoDate.length != 8 || timeOn.length !in setOf(4, 6))) return
             val epochMs = adifTimestampToEpoch(qsoDate, timeOn)
             val stationKey = buildString {
                 append(myCallsign ?: "")
@@ -311,7 +317,10 @@ class LoTWRepository : ILoTWRepository {
                 theirGrids = gridsInRecord.distinct().toList(),
                 theirFineGrids = fineGridsInRecord.distinct().toList()
             )
-            for (grid in gridsInRecord) {
+            val bucketKeys: List<String> = if (gridsInRecord.isEmpty()) {
+                listOf(GRIDLESS_QSO_BUCKET)
+            } else gridsInRecord
+            for (grid in bucketKeys) {
                 result.getOrPut(grid) { mutableListOf() }.add(qso)
             }
         }

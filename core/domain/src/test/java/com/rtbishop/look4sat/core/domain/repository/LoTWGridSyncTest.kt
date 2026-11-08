@@ -19,6 +19,7 @@ package com.rtbishop.look4sat.core.domain.repository
 
 import com.rtbishop.look4sat.core.domain.model.DatabaseState
 import com.rtbishop.look4sat.core.domain.model.DataSourcesSettings
+import com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
 import com.rtbishop.look4sat.core.domain.model.GridQso
 import com.rtbishop.look4sat.core.domain.model.LoTWSettings
 import com.rtbishop.look4sat.core.domain.model.MarkedStation
@@ -240,6 +241,27 @@ class LoTWGridSyncTest {
         assertEquals(setOf("OL63", "OL64"), repo.getRoamedGrids())
         assertEquals("2026-10-20 10:00:00", lotwIncrementalSince(repo))
         assertEquals(lotwSyncCursor(now), repo.getLastLotwSyncDate())
+    }
+
+
+    @Test
+    fun gridlessCorrectionRemovesWorkedGridButPreservesConfirmedQso() = runBlocking {
+        val existing = qso("YB0ABC", 1000L).copy(dxcc = 327, state = "JK",
+            theirGrids = listOf("OI33"))
+        val corrected = existing.copy(theirGrids = emptyList())
+        val repo = FakeSettingsRepo().apply {
+            setWorkedGrids(setOf("OI33"))
+            setWorkedGridQsos(mapOf("OI33" to listOf(existing)))
+        }
+        val count = applyLoTWGridResult(
+            repo,
+            LoTWResult.Success(emptySet(), mapOf(GRIDLESS_QSO_BUCKET to listOf(corrected))),
+            LoTWSyncMode.Incremental, "BA7OPF", now
+        )
+        assertEquals(0, count)
+        assertEquals(emptySet<String>(), repo.getWorkedGrids())
+        assertEquals(setOf(GRIDLESS_QSO_BUCKET), repo.getWorkedGridQsos().keys)
+        assertEquals(listOf(corrected), repo.getWorkedGridQsos().getValue(GRIDLESS_QSO_BUCKET))
     }
 
     @Test

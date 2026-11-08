@@ -104,6 +104,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rtbishop.look4sat.core.domain.model.AwardCalculator
+import com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
 import com.rtbishop.look4sat.core.domain.model.AwardProgress
 import com.rtbishop.look4sat.core.domain.model.AwardType
 import com.rtbishop.look4sat.core.domain.model.firstCallsByGrid
@@ -532,11 +533,12 @@ private fun MapScreen(
                 gridSets.getOrPut(key) { q.myStationGrids() }
             }
         }
-        gridSets.map { (key, grids) ->
+        gridSets.mapNotNull { (key, grids) ->
             val worked = uiState.workedGridQsos.filterValues { qsos ->
                 qsos.scopedToStation(key).isNotEmpty()
-            }.keys
-            StationGroup(id = key, grids = grids, worked = worked)
+            }.keys - GRIDLESS_QSO_BUCKET
+            // No-grid-only station locations cannot contribute VUCC cells.
+            if (worked.isEmpty()) null else StationGroup(id = key, grids = grids, worked = worked)
         }.sortedByDescending { it.workedCount }
     }
     // Restore valid saved station IDs when data arrives or is refreshed.

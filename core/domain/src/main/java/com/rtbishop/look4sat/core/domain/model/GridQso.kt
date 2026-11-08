@@ -18,6 +18,13 @@
 package com.rtbishop.look4sat.core.domain.model
 
 /**
+ * Internal, non-geographic bucket for confirmed satellite QSOs without an
+ * opposite-station GRIDSQUARE/VUCC_GRIDS. Kept in the QSO store so DXCC and
+ * STATE-based awards can use these contacts, but NEVER counted as a VUCC grid.
+ */
+const val GRIDLESS_QSO_BUCKET = "@GRIDLESS@"
+
+/**
  * One confirmed satellite QSO as reported by LoTW, kept per worked gridsquare
  * so the map can show, for any worked grid, which callsigns were worked there
  * and when.
@@ -175,7 +182,8 @@ fun List<GridQso>.scopedToStations(stationIds: Set<String>): List<GridQso> {
 /** Earliest QSO per grid within a multi-station selection (empty means All). */
 fun Map<String, List<GridQso>>.firstCallsByGrid(stationIds: Set<String>): Map<String, String> =
     mapNotNull { (grid, qsos) ->
-        qsos.scopedToStations(stationIds).minByOrNull { it.epochMs }?.let { grid to it.call }
+        if (grid == GRIDLESS_QSO_BUCKET) null
+        else qsos.scopedToStations(stationIds).minByOrNull { it.epochMs }?.let { grid to it.call }
     }.toMap()
 
 /**
@@ -185,5 +193,6 @@ fun Map<String, List<GridQso>>.firstCallsByGrid(stationIds: Set<String>): Map<St
  */
 fun Map<String, List<GridQso>>.firstCallsByGrid(stationId: String?): Map<String, String> =
     mapNotNull { (grid, qsos) ->
-        qsos.scopedToStation(stationId).minByOrNull { it.epochMs }?.let { grid to it.call }
+        if (grid == GRIDLESS_QSO_BUCKET) null
+        else qsos.scopedToStation(stationId).minByOrNull { it.epochMs }?.let { grid to it.call }
     }.toMap()
