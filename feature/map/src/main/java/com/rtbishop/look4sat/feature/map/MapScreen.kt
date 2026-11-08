@@ -533,11 +533,12 @@ private fun MapScreen(
                 gridSets.getOrPut(key) { q.myStationGrids() }
             }
         }
-        gridSets.map { (key, grids) ->
+        gridSets.mapNotNull { (key, grids) ->
             val worked = uiState.workedGridQsos.filterValues { qsos ->
                 qsos.scopedToStation(key).isNotEmpty()
             }.keys - GRIDLESS_QSO_BUCKET
-            StationGroup(id = key, grids = grids, worked = worked)
+            // No-grid-only station locations cannot contribute VUCC cells.
+            if (worked.isEmpty()) null else StationGroup(id = key, grids = grids, worked = worked)
         }.sortedByDescending { it.workedCount }
     }
     // Restore valid saved station IDs when data arrives or is refreshed.
