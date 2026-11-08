@@ -18,15 +18,10 @@
 package com.rtbishop.look4sat.feature.settings
 
 import android.Manifest
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,7 +29,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -86,7 +80,6 @@ import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.repository.CompassAccuracy
 import com.rtbishop.look4sat.core.domain.repository.IContainerProvider
-import com.rtbishop.look4sat.core.domain.repository.GpsDiagnosticTrace
 import com.rtbishop.look4sat.core.domain.repository.LoTWSyncMode
 import com.rtbishop.look4sat.core.domain.repository.ILoTWForegroundSyncLauncher
 import com.rtbishop.look4sat.core.domain.repository.LoTWForegroundSyncStatus
@@ -199,11 +192,8 @@ private fun SettingsScreen(
     }
     val pendingCustomSourcesGrant = remember { mutableStateOf<(() -> Unit)?>(null) }
     val pendingCustomSourcesDeny = remember { mutableStateOf<(() -> Unit)?>(null) }
-    var gpsDiagnosticBase by remember { mutableStateOf<String?>(null) }
-    val gpsEvents by GpsDiagnosticTrace.events.collectAsStateWithLifecycle()
     val permissions = rememberSettingsPermissions(
         sendAction = onAction,
-        onLocationDiagnostic = { gpsDiagnosticBase = it },
         onBluetoothGranted = { dialogs.bluetooth = true },
         onNetworkGranted = { dialogs.network = true },
         onCustomSourcesPermissionGranted = {
@@ -218,43 +208,6 @@ private fun SettingsScreen(
         }
     )
 
-    if (gpsDiagnosticBase != null) {
-        val report = buildString {
-            appendLine("Look4Sat GPS diagnostic: ${uiState.appVersionName}")
-            appendLine(gpsDiagnosticBase.orEmpty())
-            appendLine()
-            appendLine("SETTINGS GPS TRACE:")
-            gpsEvents.forEach { appendLine(it) }
-            appendLine()
-            appendLine("CURRENT STATE:")
-            append(gpsDeviceSnapshot(context))
-        }
-        SharedDialog(
-            title = stringResource(R.string.prefs_gps_diag_title),
-            onDismissRequest = { gpsDiagnosticBase = null },
-            onCancel = { gpsDiagnosticBase = null },
-            cancelText = stringResource(R.string.prefs_gps_diag_close),
-            onAccept = {
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Look4Sat GPS diagnostic", report))
-                gpsDiagnosticBase = null
-                onAction(SettingsAction.ShowToast(context.getString(R.string.prefs_gps_diag_copied)))
-            },
-            acceptText = stringResource(R.string.prefs_gps_diag_copy)
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = padding),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(stringResource(R.string.prefs_gps_diag_help), style = MaterialTheme.typography.bodySmall)
-                Text(report, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
     if (showMapSettings) {
         MapSettingsDialog(
             settings = uiState.otherSettings,
@@ -1339,31 +1292,19 @@ private class SettingsPermissions(
 @Composable
 private fun rememberSettingsPermissions(
     sendAction: (SettingsAction) -> Unit,
-    onLocationDiagnostic: (String) -> Unit,
     onBluetoothGranted: () -> Unit,
     onNetworkGranted: () -> Unit,
     onCustomSourcesPermissionGranted: () -> Unit,
     onCustomSourcesPermissionDenied: () -> Unit
 ): SettingsPermissions {
-    val context = LocalContext.current
-    var beforeLocationRequest by remember { mutableStateOf("") }
     val locationError = stringResource(R.string.prefs_loc_gps_error)
     val locationRequest = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
         val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        GpsDiagnosticTrace.record("Permission callback: fine=$fine; coarse=$coarse")
         if (fine || coarse) sendAction(SettingsAction.SetGpsPosition)
-        else {
-            GpsDiagnosticTrace.record("GPS action blocked by permission callback")
-            sendAction(SettingsAction.ShowToast(locationError))
-        }
-        onLocationDiagnostic(
-            "BEFORE PERMISSION REQUEST:\n$beforeLocationRequest\n\n" +
-                "Callback: fine=$fine; coarse=$coarse\n\n" +
-                "AFTER PERMISSION CALLBACK:\n${gpsDeviceSnapshot(context)}"
-        )
+        else sendAction(SettingsAction.ShowToast(locationError))
     }
 
     val satellitesImportError = stringResource(R.string.prefs_data_import_satellites_error)
@@ -1403,9 +1344,6 @@ private fun rememberSettingsPermissions(
     return remember {
         SettingsPermissions(
             launchLocation = {
-                GpsDiagnosticTrace.reset()
-                beforeLocationRequest = gpsDeviceSnapshot(context)
-                GpsDiagnosticTrace.record("Settings GPS button tapped; requesting fine+coarse")
                 locationRequest.launch(
                     arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
                 )

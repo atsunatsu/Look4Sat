@@ -19,7 +19,6 @@ package com.rtbishop.look4sat.core.data.repository
 
 import android.content.SharedPreferences
 import android.location.Location
-import com.rtbishop.look4sat.core.domain.repository.GpsDiagnosticTrace
 import android.location.LocationManager
 import androidx.core.content.edit
 import androidx.core.location.LocationListenerCompat
@@ -680,9 +679,7 @@ class SettingsRepo(
     override val stationPosition: StateFlow<GeoPos> = _stationPosition
 
     override fun onLocationChanged(location: Location) {
-        val saved = setStationPosition(location.latitude, location.longitude, location.altitude)
-        // Never record coordinates; only report whether the async callback updated the station.
-        GpsDiagnosticTrace.record("onLocationChanged: saved=$saved; hasAccuracy=${location.hasAccuracy()}")
+        setStationPosition(location.latitude, location.longitude, location.altitude)
     }
 
     override fun setStationPosition(latitude: Double, longitude: Double, altitude: Double): Boolean {
@@ -693,34 +690,19 @@ class SettingsRepo(
     }
 
     override fun setStationPosition(): Boolean {
-        val enabled = LocationManagerCompat.isLocationEnabled(locationManager)
-        GpsDiagnosticTrace.record("SettingsRepo: system location enabled=$enabled")
-        if (!enabled) {
-            GpsDiagnosticTrace.record("SettingsRepo: returning false (system location disabled)")
-            return false
-        }
+        if (!LocationManagerCompat.isLocationEnabled(locationManager)) return false
         try {
             val hasGps = LocationManagerCompat.hasProvider(locationManager, providerGps)
             val hasNet = LocationManagerCompat.hasProvider(locationManager, providerNet)
             val provider = if (hasGps) providerGps else if (hasNet) providerNet else providerDef
-            GpsDiagnosticTrace.record(
-                "SettingsRepo: hasGps=$hasGps; hasNetwork=$hasNet; chosen=$provider; " +
-                    "chosenEnabled=${locationManager.isProviderEnabled(provider)}"
-            )
             val location = locationManager.getLastKnownLocation(providerDef)
-            val ageMs = location?.let { System.currentTimeMillis() - it.time }
-            GpsDiagnosticTrace.record("SettingsRepo: passive lastKnown ageMs=${ageMs ?: "null"}")
             if (location == null || System.currentTimeMillis() - location.time > 600_000L) {
                 println("Requesting location for $provider provider")
-                GpsDiagnosticTrace.record("SettingsRepo: requestLocationUpdates($provider)")
                 locationManager.requestLocationUpdates(provider, 0L, 0f, this)
-                GpsDiagnosticTrace.record("SettingsRepo: request registered; awaiting callback")
             } else {
-                val saved = setStationPosition(location.latitude, location.longitude, location.altitude)
-                GpsDiagnosticTrace.record("SettingsRepo: fresh passive cache applied=$saved")
+                setStationPosition(location.latitude, location.longitude, location.altitude)
             }
         } catch (exception: SecurityException) {
-            GpsDiagnosticTrace.record("SettingsRepo: SecurityException; legacy return value=true")
             println("No permissions were given - $exception")
         }
         return true
