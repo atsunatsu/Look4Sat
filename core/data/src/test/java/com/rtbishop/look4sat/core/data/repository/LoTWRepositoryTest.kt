@@ -19,6 +19,9 @@
 package com.rtbishop.look4sat.core.data.repository
 
 import com.rtbishop.look4sat.core.domain.logbook.toConfirmedRecord
+import com.rtbishop.look4sat.core.domain.model.AwardCalculator
+import com.rtbishop.look4sat.core.domain.model.AwardType
+import com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
 
 import com.rtbishop.look4sat.core.domain.repository.LoTWResult
 import org.junit.Assert.assertEquals
@@ -118,6 +121,37 @@ class LoTWRepositoryTest {
     }
 
     // region parseConfirmedGridQsos
+
+    @Test
+    fun parseGridlessSatelliteQsoPreservesEntityAndStateForAwards() {
+        val confirmed = "<CALL:6>YB0ABC\n" +
+            "<QSO_DATE:8>20261020\n<TIME_ON:6>113045\n" +
+            "<DXCC:3>327\n<STATE:2>JK\n<PROP_MODE:3>SAT\n" +
+            "<EOR>\n"
+        val ground = "<CALL:6>BA7OPF\n<QSO_DATE:8>20261020\n<TIME_ON:6>123045\n" +
+            "<DXCC:3>318\n<STATE:2>GD\n<EOR>\n"
+        val qsos = repo.parseConfirmedGridQsos(report(confirmed, ground))!!
+        assertEquals(setOf(GRIDLESS_QSO_BUCKET), qsos.keys)
+        assertEquals(emptySet<String>(), repo.parseConfirmedGrids(report(confirmed, ground)))
+        val qso = qsos.getValue(GRIDLESS_QSO_BUCKET).single()
+        assertEquals("YB0ABC", qso.call)
+        assertEquals(327, qso.dxcc)
+        assertEquals("JK", qso.state)
+        assertTrue(qso.theirGrids.isEmpty())
+        val progress = AwardCalculator.calculate(qsos)
+        assertEquals(0, progress.first { it.type == AwardType.VUCC }.count)
+        assertEquals(setOf("327"), progress.first { it.type == AwardType.DXCC }.workedKeys)
+        assertEquals(setOf("JK"), progress.first { it.type == AwardType.WAIPA }.workedKeys)
+        assertEquals(listOf(qso), AwardCalculator.regionQsos(qsos, AwardType.WAIPA, "JK"))
+    }
+
+    @Test
+    fun parseGridlessQsoRejectsMissingContactIdentity() {
+        val malformed = "<DXCC:3>327\n<STATE:2>JK\n<PROP_MODE:3>SAT\n<EOR>\n"
+        assertEquals(emptyMap<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>>(),
+            repo.parseConfirmedGridQsos(report(malformed)))
+    }
+
 
     private val satQsoFull = "<CALL:5>A50QO\n" +
         "<QSO_DATE:8>20260820\n" +
