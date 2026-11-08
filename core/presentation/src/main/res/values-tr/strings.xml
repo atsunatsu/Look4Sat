@@ -217,4 +217,6 @@
         \n• BH2VSQ BG5JSU (TianDiTu rendering support)</string>
     <string name="prefs_outro_license">Bu uygulama herhangi bir garanti sunmaz</string>
 
+    <string name="cw_console_increase_offset">Ofseti artır</string>
+    <string name="cw_console_decrease_offset">Ofseti azalt</string>
 </resources>

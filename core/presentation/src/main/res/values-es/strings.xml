@@ -167,4 +167,6 @@
     <string name="prefs_outro_title">Me gustaría dar las gracias a:</string>
     <string name="prefs_outro_license">La app viene sin garantías de ningún tipo.</string>
 
+    <string name="cw_console_increase_offset">Aumentar el desplazamiento</string>
+    <string name="cw_console_decrease_offset">Reducir el desplazamiento</string>
 </resources>

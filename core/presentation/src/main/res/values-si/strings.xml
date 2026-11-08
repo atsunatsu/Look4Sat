@@ -167,4 +167,6 @@
     <string name="prefs_outro_title">මම ස්තුති කිරීමට කැමති:</string>
     <string name="prefs_outro_license">මෘදුකාංගය වගකීමක් සමග නොලැබේ</string>
 
+    <string name="cw_console_increase_offset">ඕෆ්සෙට් වැඩි කරන්න</string>
+    <string name="cw_console_decrease_offset">ඕෆ්සෙට් අඩු කරන්න</string>
 </resources>

@@ -4,6 +4,8 @@
     <string name="cw_console_their_call">对方呼号</string>
     <string name="cw_console_my_call">自己呼号</string>
     <string name="cw_console_report">发送报告</string>
+    <string name="cw_console_increase_offset">增加偏移量</string>
+    <string name="cw_console_decrease_offset">减少偏移量</string>
     <string name="cw_console_frequency_step">频率步进</string>
     <string name="cw_console_message">CW 文本</string>
     <string name="cw_console_grid">网格：%1$s</string>

@@ -167,4 +167,6 @@
     <string name="prefs_outro_title">Я хотів би подякувати:</string>
     <string name="prefs_outro_license">Ця програма поставляється без жодних гарантій</string>
 
+    <string name="cw_console_increase_offset">Збільшити зсув</string>
+    <string name="cw_console_decrease_offset">Зменшити зсув</string>
 </resources>
