@@ -17,6 +17,7 @@
  */
 package com.rtbishop.look4sat.core.domain.repository
 
+import com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
 import com.rtbishop.look4sat.core.domain.model.GridQso
 import com.rtbishop.look4sat.core.domain.model.myStationGrids
 import kotlinx.coroutines.Dispatchers
@@ -148,9 +149,12 @@ suspend fun applyLoTWGridResult(
     // Old/new set union is not valid for QSL corrections: obsolete QSO grids must
     // disappear unless another surviving QSO still covers them. Keep standalone
     // legacy grids without QSO detail, since their origin cannot be reconstructed.
+    // Gridless QSOs are retained for entity/province awards but must not
+    // become a worked VUCC square. An incremental grid correction can also
+    // move a record between a real grid and this internal bucket.
     val mergedGrids = if (mode == LoTWSyncMode.Incremental) {
-        (existingGrids - existingQsos.keys) + mergedQsos.keys + result.grids
-    } else result.grids
+        ((existingGrids - existingQsos.keys) + mergedQsos.keys + result.grids) - GRIDLESS_QSO_BUCKET
+    } else result.grids - GRIDLESS_QSO_BUCKET
     val mergedRoamed = if (mode == LoTWSyncMode.Incremental) {
         val previouslyDetailed = existingQsos.values.asSequence().flatten()
             .flatMap { it.myStationGrids().asSequence() }.toSet()
