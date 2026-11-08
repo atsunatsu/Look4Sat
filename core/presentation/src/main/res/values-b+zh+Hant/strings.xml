@@ -185,11 +185,6 @@
 
     <string name="prefs_loc_title">站点位置</string>
     <string name="prefs_loc_gps_title">GPS 定位</string>
-    <string name="prefs_gps_diag_title">GPS 定位诊断</string>
-    <string name="prefs_gps_diag_help">这是定位诊断包。点击“复制报告”后发给开发者；报告不包含坐标或台址。可稍等片刻，观察 GPS 是否返回定位结果。</string>
-    <string name="prefs_gps_diag_copy">复制报告</string>
-    <string name="prefs_gps_diag_close">关闭</string>
-    <string name="prefs_gps_diag_copied">GPS 诊断报告已复制</string>
     <string name="prefs_loc_gps_error">检查您的位置权限</string>
     <string name="prefs_loc_input_title">输入位置</string>
     <string name="prefs_loc_input_error">输入的位置无效</string>

@@ -204,11 +204,6 @@
 
     <string name="prefs_loc_title">Station position</string>
     <string name="prefs_loc_gps_title">GPS</string>
-    <string name="prefs_gps_diag_title">GPS diagnostics</string>
-    <string name="prefs_gps_diag_help">Diagnostic build: copy this report and send it to the developer. No coordinates or station details are collected. Keep this panel open briefly to see whether GPS delivers a fix.</string>
-    <string name="prefs_gps_diag_copy">Copy report</string>
-    <string name="prefs_gps_diag_close">Close</string>
-    <string name="prefs_gps_diag_copied">GPS report copied</string>
     <string name="prefs_loc_gps_error">Check your location permissions</string>
     <string name="prefs_loc_input_title">Input</string>
     <string name="prefs_loc_input_error">Invalid location entered</string>
