@@ -246,12 +246,13 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v18.20 — GPS diagnostic release / GPS 定位诊断版本
-          - Adds a copyable GPS diagnostic panel after tapping Settings → GPS Location, including permission callback results, actual permission state, location service and provider availability, passive location-cache age, and SettingsRepo GPS request/callback trace.
-          - Does not include coordinates, grids, IMEI or station details. Normal GPS positioning behavior remains unchanged to reproduce the reported failure.
-          - 这是针对 vivo Y51s / Android 10 的 GPS 权限误报问题的诊断版本。点击“设置 → GPS 定位”后，在弹出的“GPS 定位诊断”面板复制报告并发送给开发者。
-          - 报告记录系统授权状态、定位总开关、各定位提供者状态、回调结果及实际发起 GPS 请求的路径，不收集坐标或台址。
-          - 版本可覆盖安装旧版本，保留应用数据。
+          ## v19 — No-grid LoTW QSO award recognition / 无格子通联奖项识别
+          - 修复 LoTW 已确认卫星通联缺少对方 GRIDSQUARE/VUCC_GRIDS 时，尽管包含 DXCC、STATE 或 CQZ，仍被整条丢弃的问题。
+          - 无格子通联可正常计入 DXCC、WAPC、WAJA、WAIPA、WAS、WAZ 等适用奖项，并在对应区域详情中显示；VUCC 仍须有有效网格。
+          - 保留增量同步中的格子变更处理；无格子记录不会误创建 VUCC 网格或台址。
+          - 安装后请执行一次 LoTW 全量同步，以补回之前被忽略的历史记录。
+          - 同时保留之前合并的其他修复，并移除了 v18.20 的临时 GPS 诊断界面。
+          - Signed release APK, same package ID and signing certificate; can be installed over v18.x without losing application data.
           
           RELEASE_NOTES
           )"
