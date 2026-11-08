@@ -246,14 +246,17 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v19 — No-grid LoTW QSO award recognition / 无格子通联奖项识别
-          - 修复 LoTW 已确认卫星通联缺少对方 GRIDSQUARE/VUCC_GRIDS 时，尽管包含 DXCC、STATE 或 CQZ，仍被整条丢弃的问题。
-          - 无格子通联可正常计入 DXCC、WAPC、WAJA、WAIPA、WAS、WAZ 等适用奖项，并在对应区域详情中显示；VUCC 仍须有有效网格。
-          - 保留增量同步中的格子变更处理；无格子记录不会误创建 VUCC 网格或台址。
-          - 安装后请执行一次 LoTW 全量同步，以补回之前被忽略的历史记录。
-          - 同时保留之前合并的其他修复，并移除了 v18.20 的临时 GPS 诊断界面。
-          - Signed release APK, same package ID and signing certificate; can be installed over v18.x without losing application data.
-          
+          ## v20 — CW calculator offset controls
+          - Added up/down controls beside the CW calculator Offset field. Each tap changes the offset by exactly 0.1 kHz; manual input remains available.
+          - Offset adjustments immediately recalculate the displayed and transmitted calculator frequencies, with additional readout precision so 100 Hz changes remain visible.
+          - Added boundary handling, accessibility labels, and regression coverage for offset stepping and frequency recalculation.
+          - Verification: release CI runs unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest) and checks the APK signing certificate, version code, and both ARM ABIs.
+
+          ## v20 — CW 计算器 Offset 调节
+          - 在 CW 计算器 Offset 输入框旁增加上下调节按钮，每次点击精确增减 0.1 kHz，同时保留手动输入。
+          - 调节 Offset 后立即重新计算并更新计算器显示频率及发射频率，并增加显示精度以体现 100 Hz 的变化。
+          - 增加边界处理、无障碍描述，以及 Offset 步进和频率重新计算的回归测试。
+          - 验证：发布 CI 运行单元测试（排除已有超时问题的 RadioConfigurationSaveTest），并校验 APK 签名证书、版本号及两种 ARM ABI。
           RELEASE_NOTES
           )"
           fi
