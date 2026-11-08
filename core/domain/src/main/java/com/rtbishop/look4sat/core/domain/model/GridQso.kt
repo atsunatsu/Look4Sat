@@ -18,6 +18,13 @@
 package com.rtbishop.look4sat.core.domain.model
 
 /**
+ * Internal, non-geographic bucket for confirmed satellite QSOs without an
+ * opposite-station GRIDSQUARE/VUCC_GRIDS. Kept in the QSO store so DXCC and
+ * STATE-based awards can use these contacts, but NEVER counted as a VUCC grid.
+ */
+const val GRIDLESS_QSO_BUCKET = "@GRIDLESS@"
+
+/**
  * One confirmed satellite QSO as reported by LoTW, kept per worked gridsquare
  * so the map can show, for any worked grid, which callsigns were worked there
  * and when.
@@ -41,13 +48,6 @@ package com.rtbishop.look4sat.core.domain.model
  *                  China -> province code ("GD"), Japan -> prefecture number
  *                  ("34"), USA -> state abbreviation ("CA"). Null when absent.
  */
-/**
- * Internal, non-geographic bucket for confirmed satellite QSOs without an
- * opposite-station GRIDSQUARE/VUCC_GRIDS. Kept in the QSO store so DXCC and
- * STATE-based awards can use these contacts, but NEVER counted as a VUCC grid.
- */
-const val GRIDLESS_QSO_BUCKET = "@GRIDLESS@"
-
 data class GridQso(
     val call: String,
     val epochMs: Long,
