@@ -103,10 +103,9 @@ class CalculatorReferenceUiTest {
         compose.runOnIdle { assertEquals(5_000L, step.longValue) }
     }
 
-
     @Test fun cwOffsetStepperChangesOffsetAndRecalculatesTheDownlink() {
         val offset = mutableStateOf("2.5")
-        var pair = 0L to 0L
+        val pair = mutableStateOf(0L to 0L)
         compose.setContent {
             MainTheme(isDarkTheme = true) {
                 DopplerFrequencyCalculator(
@@ -116,7 +115,7 @@ class CalculatorReferenceUiTest {
                     initialTxBaseHz = 145962000,
                     reference = CalculatorReference(145962000, 435057000, 2500),
                     displayNominalFrequencies = true,
-                    onFrequencyChange = { tx, rx -> pair = tx to rx },
+                    onFrequencyChange = { tx, rx -> pair.value = tx to rx },
                     onFrequencyStepChange = {}
                 )
             }
@@ -125,13 +124,13 @@ class CalculatorReferenceUiTest {
         compose.onNodeWithTag("cwCalculatorOffsetIncrease").performClick()
         compose.onNodeWithTag("cwCalculatorOffsetInput").assertTextEquals("2.6")
         compose.onNodeWithTag("calculatorRxFrequency").assertTextEquals("435.0571")
-        compose.waitUntil(timeoutMillis = 3_000) { pair.second == 435057100L }
-        compose.runOnIdle { assertEquals(435057100L, pair.second) }
+        compose.waitUntil(timeoutMillis = 3_000) { pair.value.second == 435057100L }
+        compose.runOnIdle { assertEquals(435057100L, pair.value.second) }
 
         compose.onNodeWithTag("cwCalculatorOffsetDecrease").performClick()
         compose.onNodeWithTag("cwCalculatorOffsetInput").assertTextEquals("2.5")
         compose.onNodeWithTag("calculatorRxFrequency").assertTextEquals("435.0570")
-        compose.waitUntil(timeoutMillis = 3_000) { pair.second == 435057000L }
+        compose.waitUntil(timeoutMillis = 3_000) { pair.value.second == 435057000L }
     }
 
     @Test fun offsetStepperUsesExactTenthKilohertzStepsAndClampsAtTheLimits() {

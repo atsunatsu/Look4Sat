@@ -936,7 +936,7 @@ private fun CalculatorContent(
                                 ) {
                                     Text(
                                         "▲",
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
                                             alpha = if (editingEnabled) 1f else 0.38f
                                         )
@@ -954,7 +954,7 @@ private fun CalculatorContent(
                                 ) {
                                     Text(
                                         "▼",
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
                                             alpha = if (editingEnabled) 1f else 0.38f
                                         )
