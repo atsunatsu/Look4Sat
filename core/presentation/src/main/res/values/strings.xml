@@ -457,9 +457,9 @@ Upstream: https://github.com/rt-bishop/Look4Sat</string>
     <!-- Mutual match page -->
     <string name="mutual_title">Pass Match</string>
     <string name="mutual_station_you">Your Station</string>
-    <string name="mutual_station_opposite">Other station</string>
+    <string name="mutual_station_opposite">Opposite Station</string>
     <string name="mutual_label_you">You</string>
-    <string name="mutual_label_opposite">Other</string>
+    <string name="mutual_label_opposite">Opposite</string>
     <string name="mutual_status_calculating">Calculating mutual visibility windows…</string>
     <string name="mutual_status_error">Fix the reported issues and retry</string>
     <string name="mutual_status_matches">%d matches found · tap a card to expand</string>
@@ -517,8 +517,8 @@ Upstream: https://github.com/rt-bishop/Look4Sat</string>
     <string name="qso_edit_hint_satellite">LoTW requires the official satellite name</string>
     <string name="qso_edit_sent">Sent RST</string>
     <string name="qso_edit_received">Received RST</string>
-    <string name="qso_edit_grid">Other station grid</string>
-    <string name="qso_edit_their_iota">Other station IOTA</string>
+    <string name="qso_edit_grid">Opposite grid</string>
+    <string name="qso_edit_their_iota">Opposite IOTA</string>
     <string name="qso_edit_my_iota">My IOTA</string>
     <string name="qso_edit_comment">Comment</string>
     <string name="qso_edit_save">Save</string>
