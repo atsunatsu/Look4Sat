@@ -82,8 +82,8 @@ object AwardCalculator {
         return listOf(
             AwardProgress(
                 AwardType.VUCC,
-                workedKeys = qsosByGrid.keys,
-                count = qsosByGrid.size,
+                workedKeys = qsosByGrid.keys - GRIDLESS_QSO_BUCKET,
+                count = (qsosByGrid.keys - GRIDLESS_QSO_BUCKET).size,
                 target = AwardTargets.VUCC
             ),
             calculateDxcc(all),
@@ -194,7 +194,10 @@ object AwardCalculator {
     ): List<Pair<GridQso, String?>> {
         val gridsByQso = linkedMapOf<GridQso, MutableSet<String>>()
         byGrid.forEach { (grid, qsos) ->
-            qsos.forEach { q -> gridsByQso.getOrPut(q) { linkedSetOf() }.add(grid) }
+            qsos.forEach { q ->
+                val grids = gridsByQso.getOrPut(q) { linkedSetOf() }
+                if (grid != GRIDLESS_QSO_BUCKET) grids.add(grid)
+            }
         }
         return gridsByQso.map { (q, grids) ->
             q to waipaKey(q, provinceForGrid, grids, candidatesForGrid, manualOverrides)
@@ -302,7 +305,10 @@ object AwardCalculator {
     ): List<WaipaAmbiguousQso> {
         val gridsByQso = linkedMapOf<GridQso, MutableSet<String>>()
         qsosByGrid.forEach { (grid, qsos) ->
-            qsos.forEach { q -> gridsByQso.getOrPut(q) { linkedSetOf() }.add(grid) }
+            qsos.forEach { q ->
+                val grids = gridsByQso.getOrPut(q) { linkedSetOf() }
+                if (grid != GRIDLESS_QSO_BUCKET) grids.add(grid)
+            }
         }
         return gridsByQso.mapNotNull { (q, workedGrids) ->
             if (q.dxcc != null && q.dxcc != 327) return@mapNotNull null
