@@ -246,17 +246,17 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v20 — CW calculator offset controls
-          - Added up/down controls beside the CW calculator Offset field. Each tap changes the offset by exactly 0.1 kHz; manual input remains available.
-          - Offset adjustments immediately recalculate the displayed and transmitted calculator frequencies, with additional readout precision so 100 Hz changes remain visible.
-          - Added boundary handling, accessibility labels, and regression coverage for offset stepping and frequency recalculation.
-          - Verification: release CI runs unit tests (excluding the pre-existing timed-out RadioConfigurationSaveTest) and checks the APK signing certificate, version code, and both ARM ABIs.
+          ## v20.1 — English UI copy improvements
+          - Renamed the logbook Query action to Search, with clearer Search QSOs title, search hint, reset action, and empty state.
+          - Improved English wording in satellite search, pass filters, Wavelog, match search, QSO editing, data sources, permissions, and radio controls.
+          - Kept the existing Opposite Station, Opposite grid, Opposite IOTA, and Opposite labels unchanged.
+          - No changes to logbook filtering, confirmed-grid display, or other application behavior.
 
-          ## v20 — CW 计算器 Offset 调节
-          - 在 CW 计算器 Offset 输入框旁增加上下调节按钮，每次点击精确增减 0.1 kHz，同时保留手动输入。
-          - 调节 Offset 后立即重新计算并更新计算器显示频率及发射频率，并增加显示精度以体现 100 Hz 的变化。
-          - 增加边界处理、无障碍描述，以及 Offset 步进和频率重新计算的回归测试。
-          - 验证：发布 CI 运行单元测试（排除已有超时问题的 RadioConfigurationSaveTest），并校验 APK 签名证书、版本号及两种 ARM ABI。
+          ## v20.1 — 英文界面文案优化
+          - 将日志本 Query 按钮改为 Search，并完善搜索标题、提示、清除操作和空结果提示。
+          - 优化卫星搜索、过境筛选、Wavelog、匹配页、QSO 编辑、数据源、权限及电台控制中的英文表达。
+          - 按要求保留 Opposite Station、Opposite grid、Opposite IOTA 和 Opposite 等原有表达。
+          - 不改变日志筛选、绿色确认网格显示及其他功能逻辑。
           RELEASE_NOTES
           )"
           fi
