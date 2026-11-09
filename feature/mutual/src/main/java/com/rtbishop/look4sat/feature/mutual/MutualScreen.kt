@@ -435,7 +435,9 @@ private fun MutualContent(
                 labelB = stringResource(R.string.mutual_label_opposite),
                 stationBGrid = state.stationBGrid.trim().uppercase(),
                 stationBLatitude = state.stationBLat.toDoubleOrNull(),
-                stationBLongitude = state.stationBLon.toDoubleOrNull()
+                stationBLongitude = state.stationBLon.toDoubleOrNull(),
+                stationALatitude = state.stationALat.toDoubleOrNull(),
+                stationALongitude = state.stationALon.toDoubleOrNull()
             )
             SwipeableItem(
                 onSwipeRight = { onFocusCatNum(pass.catNum) },
