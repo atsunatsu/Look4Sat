@@ -1514,7 +1514,7 @@ private fun WaipaUnassignedDialog(
 }
 
 /**
- * One ambiguous Indonesian QSO shown inside a yellow WAIPA province dialog.
+ * One unassigned Indonesian QSO shown in a WAIPA review list.
  * The operator chooses the actual operating province; the choice is saved by
  * stable QSO identity and immediately updates award progress and map fills.
  */
@@ -1531,11 +1531,13 @@ private fun WaipaPendingQsoRow(
         ?: qso.theirGrids.takeIf { it.isNotEmpty() }?.joinToString(", ").orEmpty()
     val details = listOf(
         formatDate(qso.epochMs, isUtc),
+        formatTime(qso.epochMs, isUtc),
         locator,
         qso.state?.takeIf { it.isNotBlank() }?.let { "STATE $it" }.orEmpty(),
         qso.iota.orEmpty(),
         qso.satName,
-        qso.mode
+        qso.mode,
+        qso.bandLabel
     ).filter { it.isNotBlank() }.joinToString(" · ")
     val useEnglish = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language != "zh"
     Column(
