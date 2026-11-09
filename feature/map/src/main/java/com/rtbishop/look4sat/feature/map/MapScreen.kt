@@ -510,6 +510,7 @@ private fun MapScreen(
     // paired with the award type it was tapped under. Local UI state like the
     // grid selection above: the map is the only consumer.
     var selectedRegion by remember { mutableStateOf<Pair<AwardType, AwardRegion>?>(null) }
+    var showWaipaUnassignedDialog by remember { mutableStateOf(false) }
     // Selected award filter. Lives in an Activity-scoped ViewModel so it
     // survives page switches; defaults to VUCC only once per process (cold start).
     var selectedAward by mapFilterViewModel.selectedAward
@@ -590,6 +591,18 @@ private fun MapScreen(
         uiState.workedGridQsos, waipaGridResolver, waipaManualOverrides
     ) {
         AwardCalculator.waipaAmbiguousQsos(
+            uiState.workedGridQsos,
+            waipaGridResolver,
+            waipaGridResolver::candidateProvinces,
+            waipaManualOverrides
+        )
+    }
+    // Global review list includes every Indonesian QSO that still has no
+    // province, even when the available record contains no candidate at all.
+    val waipaUnassignedQsos = remember(
+        uiState.workedGridQsos, waipaGridResolver, waipaManualOverrides
+    ) {
+        AwardCalculator.waipaUnassignedQsos(
             uiState.workedGridQsos,
             waipaGridResolver,
             waipaGridResolver::candidateProvinces,
@@ -727,7 +740,9 @@ private fun MapScreen(
             AwardChipsRow(
                 progress = awardProgress,
                 selected = selectedAward,
-                onSelect = { selectedAward = it }
+                onSelect = { selectedAward = it },
+                unassignedWaipaCount = waipaUnassignedQsos.size,
+                onShowWaipaUnassigned = { showWaipaUnassignedDialog = true }
             )
         } else if (isVertical) {
             TopBar {
@@ -1010,6 +1025,15 @@ private fun MapScreen(
             isUtc = uiState.isUtc,
             onResolveWaipaQso = ::resolveWaipaQso,
             onDismiss = { selectedRegion = null }
+        )
+    }
+    if (showWaipaUnassignedDialog) {
+        WaipaUnassignedDialog(
+            qsos = waipaUnassignedQsos,
+            regions = waipaRegions,
+            isUtc = uiState.isUtc,
+            onResolveWaipaQso = ::resolveWaipaQso,
+            onDismiss = { showWaipaUnassignedDialog = false }
         )
     }
 }
@@ -1396,8 +1420,103 @@ private fun RegionQsoDialog(
     }
 }
 
+
 /**
- * One ambiguous Indonesian QSO shown inside a yellow WAIPA province dialog.
+ * Global WAIPA review list. It includes ambiguous contacts and contacts whose
+ * stored data is too incomplete to suggest any province.
+ */
+@Composable
+private fun WaipaUnassignedDialog(
+    qsos: List<com.rtbishop.look4sat.core.domain.model.WaipaAmbiguousQso>,
+    regions: List<AwardRegion>,
+    isUtc: Boolean,
+    onResolveWaipaQso: (com.rtbishop.look4sat.core.domain.model.GridQso, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val useEnglish = androidx.compose.ui.platform.LocalConfiguration.current
+        .locales[0].language != "zh"
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            modifier = Modifier.fillMaxWidth(0.92f)
+        ) {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = if (useEnglish) "WAIPA unassigned QSOs" else "WAIPA 待归属通联",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = if (useEnglish) {
+                                if (qsos.size == 1) "1 QSO needs province review"
+                                else "${qsos.size} QSOs need province review"
+                            } else "${qsos.size} 条通联尚未确定省份",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(onClick = onDismiss) {
+                        Text(if (useEnglish) "Close" else "关闭")
+                    }
+                }
+                androidx.compose.material3.HorizontalDivider()
+                Column(
+                    Modifier
+                        .heightIn(max = 500.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (qsos.isEmpty()) {
+                        Text(
+                            text = if (useEnglish) {
+                                "No Indonesian QSOs currently need manual province review."
+                            } else {
+                                "当前没有需要人工确认省份的印尼通联。"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(16.dp)
+                        )
+                    } else {
+                        Text(
+                            text = if (useEnglish) {
+                                "Review the actual operating location. Suggested provinces are shown when available; otherwise choose from all 38 provinces."
+                            } else {
+                                "请根据实际通联发生地点确认省份。有候选省份时会优先显示；没有可靠候选时，可从全部 38 个省份中选择。"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                        )
+                        qsos.forEach { pending ->
+                            WaipaPendingQsoRow(
+                                pending = pending,
+                                regions = regions,
+                                isUtc = isUtc,
+                                allowAnyProvince = true,
+                                onSelectProvince = { province ->
+                                    onResolveWaipaQso(pending.qso, province)
+                                }
+                            )
+                            androidx.compose.material3.HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One unassigned Indonesian QSO shown in a WAIPA review list.
  * The operator chooses the actual operating province; the choice is saved by
  * stable QSO identity and immediately updates award progress and map fills.
  */
@@ -1406,13 +1525,22 @@ private fun WaipaPendingQsoRow(
     pending: com.rtbishop.look4sat.core.domain.model.WaipaAmbiguousQso,
     regions: List<AwardRegion>,
     isUtc: Boolean,
+    allowAnyProvince: Boolean = false,
     onSelectProvince: (String) -> Unit
 ) {
     val qso = pending.qso
     val locator = qso.theirFineGrids.takeIf { it.isNotEmpty() }?.joinToString(", ")
         ?: qso.theirGrids.takeIf { it.isNotEmpty() }?.joinToString(", ").orEmpty()
-    val details = listOf(formatDate(qso.epochMs, isUtc), locator, qso.satName, qso.mode)
-        .filter { it.isNotBlank() }.joinToString(" · ")
+    val details = listOf(
+        formatDate(qso.epochMs, isUtc),
+        formatTime(qso.epochMs, isUtc),
+        locator,
+        qso.state?.takeIf { it.isNotBlank() }?.let { "STATE $it" }.orEmpty(),
+        qso.iota.orEmpty(),
+        qso.satName,
+        qso.mode,
+        qso.bandLabel
+    ).filter { it.isNotBlank() }.joinToString(" · ")
     val useEnglish = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language != "zh"
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -1443,13 +1571,62 @@ private fun WaipaPendingQsoRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        pending.candidateProvinceCodes.sorted().forEach { code ->
-            val candidate = regions.firstOrNull { it.code == code }
-            TextButton(
-                onClick = { onSelectProvince(code) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(candidate?.let { "${regionDisplayName(it)} ($code)" } ?: code)
+        if (pending.candidateProvinceCodes.isEmpty()) {
+            Text(
+                text = if (useEnglish) {
+                    "No reliable province candidate can be inferred from this QSO."
+                } else {
+                    "这条通联没有可可靠推断的候选省份。"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            pending.candidateProvinceCodes.sorted().forEach { code ->
+                val candidate = regions.firstOrNull { it.code == code }
+                TextButton(
+                    onClick = { onSelectProvince(code) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(candidate?.let { "${regionDisplayName(it)} ($code)" } ?: code)
+                }
+            }
+        }
+        if (allowAnyProvince) {
+            val otherProvinces = remember(regions, pending.candidateProvinceCodes) {
+                regions.filterNot { it.code in pending.candidateProvinceCodes }.sortedBy { it.code }
+            }
+            var provinceMenuExpanded by remember(qso) { mutableStateOf(false) }
+            Box {
+                TextButton(
+                    onClick = { provinceMenuExpanded = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (useEnglish) {
+                            if (pending.candidateProvinceCodes.isEmpty()) "Choose province"
+                            else "Choose another province"
+                        } else {
+                            if (pending.candidateProvinceCodes.isEmpty()) "选择省份"
+                            else "选择其他省份"
+                        }
+                    )
+                }
+                DropdownMenu(
+                    expanded = provinceMenuExpanded,
+                    onDismissRequest = { provinceMenuExpanded = false },
+                    modifier = Modifier.heightIn(max = 420.dp)
+                ) {
+                    otherProvinces.forEach { candidate ->
+                        DropdownMenuItem(
+                            text = { Text("${regionDisplayName(candidate)} (${candidate.code})") },
+                            onClick = {
+                                provinceMenuExpanded = false
+                                onSelectProvince(candidate.code)
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -1972,7 +2149,9 @@ private fun TimeScrubBar(
 private fun AwardChipsRow(
     progress: List<AwardProgress>,
     selected: AwardType?,
-    onSelect: (AwardType?) -> Unit
+    onSelect: (AwardType?) -> Unit,
+    unassignedWaipaCount: Int = 0,
+    onShowWaipaUnassigned: () -> Unit = {}
 ) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1992,6 +2171,24 @@ private fun AwardChipsRow(
                 },
                 colors = FilterChipDefaults.filterChipColors()
             )
+        }
+        if (selected == AwardType.WAIPA && unassignedWaipaCount > 0) {
+            item {
+                val useEnglish = androidx.compose.ui.platform.LocalConfiguration.current
+                    .locales[0].language != "zh"
+                FilterChip(
+                    selected = false,
+                    onClick = onShowWaipaUnassigned,
+                    label = {
+                        Text(
+                            text = if (useEnglish) "Unassigned $unassignedWaipaCount"
+                            else "待归属 $unassignedWaipaCount",
+                            fontSize = 12.sp
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors()
+                )
+            }
         }
     }
 }

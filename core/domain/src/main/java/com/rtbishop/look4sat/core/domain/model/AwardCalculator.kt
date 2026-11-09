@@ -352,6 +352,55 @@ object AwardCalculator {
         }.distinctBy { waipaQsoKey(it.qso) }.sortedBy { it.qso.epochMs }
     }
 
+
+    /**
+     * Every confirmed Indonesian QSO that still has no province after all
+     * automatic WAIPA rules. Unlike [waipaAmbiguousQsos], this also includes
+     * records with no reliable candidate at all, so the operator can inspect
+     * them and choose from the complete province list.
+     *
+     * Candidate provinces are suggestions only; an empty set means the stored
+     * QSO data does not provide enough information to suggest a location.
+     */
+    fun waipaUnassignedQsos(
+        qsosByGrid: Map<String, List<GridQso>>,
+        waipaProvinceForGrid: (String) -> String?,
+        waipaCandidatesForGrid: (String) -> Set<String>,
+        waipaManualOverrides: Map<String, String> = emptyMap()
+    ): List<WaipaAmbiguousQso> {
+        val gridsByQso = linkedMapOf<GridQso, MutableSet<String>>()
+        qsosByGrid.forEach { (grid, qsos) ->
+            qsos.forEach { q ->
+                val grids = gridsByQso.getOrPut(q) { linkedSetOf() }
+                if (grid != GRIDLESS_QSO_BUCKET) grids.add(grid)
+            }
+        }
+        return gridsByQso.mapNotNull { (q, workedGrids) ->
+            if (q.dxcc != null && q.dxcc != 327) return@mapNotNull null
+            if (entityOf(q) != Entity.INDONESIA) return@mapNotNull null
+            if (waipaKey(q, waipaProvinceForGrid, workedGrids, waipaCandidatesForGrid, waipaManualOverrides) != null) {
+                return@mapNotNull null
+            }
+
+            val fineLocators = q.theirFineGrids.asSequence()
+                .map { it.trim().uppercase() }
+                .filter { it.length >= 6 }.distinct().toList()
+            val fineCandidates = fineLocators.flatMap(waipaCandidatesForGrid)
+                .filter { it in ID_PROVINCES }.toSet()
+            val coarseGrids = (q.theirGrids + workedGrids)
+                .map { it.trim().uppercase().take(4) }
+            val coarseCandidates = coarseGrids.flatMap(waipaCandidatesForGrid)
+                .filter { it in ID_PROVINCES }.toSet()
+            val callsignCandidates = WaipaCallsignLookup.candidates(q.call)
+            val suggestions = when {
+                fineCandidates.isNotEmpty() -> fineCandidates
+                coarseCandidates.isNotEmpty() -> coarseCandidates
+                else -> callsignCandidates
+            }
+            WaipaAmbiguousQso(q, suggestions)
+        }.distinctBy { waipaQsoKey(it.qso) }.sortedBy { it.qso.epochMs }
+    }
+
     /** Pending province fills never cover a region that is already worked. */
     fun waipaPendingProvinceCodes(
         pending: List<WaipaAmbiguousQso>,
