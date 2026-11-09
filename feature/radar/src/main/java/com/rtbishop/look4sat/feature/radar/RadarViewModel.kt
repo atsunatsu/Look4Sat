@@ -46,7 +46,6 @@ import com.rtbishop.look4sat.core.domain.usecase.IAddToCalendar
 import com.rtbishop.look4sat.core.domain.usecase.ISaveImage
 import com.rtbishop.look4sat.core.domain.usecase.IShowToast
 import com.rtbishop.look4sat.core.domain.utility.round
-import com.rtbishop.look4sat.core.domain.utility.toTimerString
 import com.rtbishop.look4sat.core.presentation.formatFrequency
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -78,7 +77,7 @@ class RadarViewModel(
     private val mutualSession: MutualPassData = MutualPassData()
 ) : ViewModel() {
 
-    private val stationPos = settingsRepo.stationPosition.value
+    private val stationPos = matchedRadarObserverPosition(mutualSession, settingsRepo.stationPosition.value)
     private val magDeclination = sensorsRepo.getMagDeclination(stationPos)
     private var transponders: List<SatRadio> = emptyList()
     /** Raw per-second Doppler rows, before applying the selected radio's saved references. */
