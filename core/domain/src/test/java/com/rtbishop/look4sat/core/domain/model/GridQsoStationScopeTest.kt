@@ -115,6 +115,20 @@ class GridQsoStationScopeTest {
         assertEquals(emptyList<GridQso>(), list.scopedToStation("PM01"))
     }
 
+    @Test
+    fun `worked grids are derived only from selected station QSOs`() {
+        val ol62 = qso("A", myGrid = "OL62")
+        val ol63 = qso("B", myGrid = "OL63")
+        val store = mapOf(
+            "FN31" to listOf(ol62),
+            "FN32" to listOf(ol63),
+            GRIDLESS_QSO_BUCKET to listOf(ol62)
+        )
+
+        assertEquals(setOf("FN31"), store.workedGridsForStations(setOf("OL62")))
+        assertEquals(setOf("FN32"), store.workedGridsForStations(setOf("OL63")))
+    }
+
     // --- firstCallsByGrid ---
 
     @Test

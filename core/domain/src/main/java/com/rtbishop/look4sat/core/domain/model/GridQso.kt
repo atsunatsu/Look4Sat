@@ -179,6 +179,15 @@ fun List<GridQso>.scopedToStations(stationIds: Set<String>): List<GridQso> {
     }
 }
 
+/** 4-char grids worked within the selected operated-station scope (empty keys excluded). */
+fun Map<String, List<GridQso>>.workedGridsForStations(stationIds: Set<String>): Set<String> =
+    entries.asSequence()
+        .filter { (grid, qsos) ->
+            grid != GRIDLESS_QSO_BUCKET && qsos.scopedToStations(stationIds).isNotEmpty()
+        }
+        .map { it.key }
+        .toSet()
+
 /** Earliest QSO per grid within a multi-station selection (empty means All). */
 fun Map<String, List<GridQso>>.firstCallsByGrid(stationIds: Set<String>): Map<String, String> =
     mapNotNull { (grid, qsos) ->
