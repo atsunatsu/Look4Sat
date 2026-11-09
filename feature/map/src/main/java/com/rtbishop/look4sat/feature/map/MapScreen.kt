@@ -1454,8 +1454,10 @@ private fun WaipaUnassignedDialog(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = if (useEnglish) "${qsos.size} QSO(s) need province review"
-                            else "${qsos.size} 条通联尚未确定省份",
+                            text = if (useEnglish) {
+                                if (qsos.size == 1) "1 QSO needs province review"
+                                else "${qsos.size} QSOs need province review"
+                            } else "${qsos.size} 条通联尚未确定省份",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
