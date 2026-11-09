@@ -1473,9 +1473,9 @@ private fun WaipaUnassignedDialog(
                     if (qsos.isEmpty()) {
                         Text(
                             text = if (useEnglish) {
-                                "All confirmed Indonesian QSOs have an automatic or manual province assignment."
+                                "No Indonesian QSOs currently need manual province review."
                             } else {
-                                "所有已确认的印尼通联都已有自动或人工省份归属。"
+                                "当前没有需要人工确认省份的印尼通联。"
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
