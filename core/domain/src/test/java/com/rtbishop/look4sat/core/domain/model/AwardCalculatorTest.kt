@@ -443,7 +443,7 @@ class AwardCalculatorTest {
     }
 
     @Test
-    fun \`waipa unassigned list includes QSOs with no candidate provinces\`() {
+    fun `waipa unassigned list includes QSOs with no candidate provinces`() {
         val ambiguous = qso("YB7UCC", dxcc = 327, fineGrids = listOf("OJ82MA"))
         val insufficient = qso("YB0ABC/P", dxcc = 327)
         val assigned = qso("YB0ABC", dxcc = 327, state = "JK")
