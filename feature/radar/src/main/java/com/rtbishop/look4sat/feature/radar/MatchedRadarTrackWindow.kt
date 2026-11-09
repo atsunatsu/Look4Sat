@@ -17,6 +17,9 @@
  */
 package com.rtbishop.look4sat.feature.radar
 
+import com.rtbishop.look4sat.core.domain.predict.GeoPos
+import com.rtbishop.look4sat.core.domain.repository.MutualPassData
+
 /**
  * A mutual pass covers only the time when both stations see the satellite.
  * The local radar still needs the entire local above-horizon track, including
@@ -67,3 +70,13 @@ internal fun expandMatchedRadarLocalVisibilityWindow(
 /** Only the position inside this station's own above-horizon interval is live. */
 internal fun isWithinMatchedRadarWindow(time: Long, window: Pair<Long, Long>?): Boolean =
     window != null && time >= window.first && time < window.second
+
+/** Use the station A coordinates that generated this match, if supplied. */
+internal fun matchedRadarObserverPosition(session: MutualPassData, fallback: GeoPos): GeoPos {
+    val lat = session.stationALatitude ?: return fallback
+    val lon = session.stationALongitude ?: return fallback
+    if (!lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) {
+        return fallback
+    }
+    return GeoPos(lat, lon)
+}
