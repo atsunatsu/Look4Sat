@@ -1589,6 +1589,9 @@ private fun WaipaPendingQsoRow(
             }
         }
         if (allowAnyProvince) {
+            val otherProvinces = remember(regions, pending.candidateProvinceCodes) {
+                regions.filterNot { it.code in pending.candidateProvinceCodes }.sortedBy { it.code }
+            }
             var provinceMenuExpanded by remember(qso) { mutableStateOf(false) }
             Box {
                 TextButton(
@@ -1610,7 +1613,7 @@ private fun WaipaPendingQsoRow(
                     onDismissRequest = { provinceMenuExpanded = false },
                     modifier = Modifier.heightIn(max = 420.dp)
                 ) {
-                    regions.sortedBy { it.code }.forEach { candidate ->
+                    otherProvinces.forEach { candidate ->
                         DropdownMenuItem(
                             text = { Text("${regionDisplayName(candidate)} (${candidate.code})") },
                             onClick = {
