@@ -259,7 +259,14 @@ class MutualViewModel(
         }
         _uiState.update { state ->
             val enableBothFilters = !state.filterFM && !state.filterLinear
+            // A match launched from a physical radar must use that radar's
+            // actual station A, not a stale custom position from the Match tab.
+            val local = settingsRepo.stationPosition.value
             state.copy(
+                stationALat = "%.6f".format(Locale.US, local.latitude),
+                stationALon = "%.6f".format(Locale.US, local.longitude),
+                stationAGrid = positionToQth(local.latitude, local.longitude) ?: state.stationAGrid,
+                stationAGridInvalid = false,
                 stationBGrid = normalized,
                 stationBGridInvalid = false,
                 stationBLat = "%.4f".format(Locale.US, target.latitude),
@@ -296,7 +303,9 @@ class MutualViewModel(
                         labelB = "友台",
                         stationBGrid = normalized,
                         stationBLatitude = target.latitude,
-                        stationBLongitude = target.longitude
+                        stationBLongitude = target.longitude,
+                        stationALatitude = settingsRepo.stationPosition.value.latitude,
+                        stationALongitude = settingsRepo.stationPosition.value.longitude
                     )
                 )
             }
