@@ -246,17 +246,17 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v20.1 — English UI copy improvements
-          - Renamed the logbook Query action to Search, with clearer Search QSOs title, search hint, reset action, and empty state.
-          - Improved English wording in satellite search, pass filters, Wavelog, match search, QSO editing, data sources, permissions, and radio controls.
-          - Kept the existing Opposite Station, Opposite grid, Opposite IOTA, and Opposite labels unchanged.
-          - No changes to logbook filtering, confirmed-grid display, or other application behavior.
+          ## v20.2 — Station-specific VUCC map marks
+          - Store manually marked grid targets with the operated-station scope where they were created.
+          - In All, hide station-specific red marks so the aggregate green worked-grid layer is not mixed with another station's red mark.
+          - Clear a station-specific mark only after the same operated-station scope works that grid; preserve compatibility with marks saved by older versions.
+          - Prevent red marks from painting over green worked cells at every map zoom level.
 
-          ## v20.1 — 英文界面文案优化
-          - 将日志本 Query 按钮改为 Search，并完善搜索标题、提示、清除操作和空结果提示。
-          - 优化卫星搜索、过境筛选、Wavelog、匹配页、QSO 编辑、数据源、权限及电台控制中的英文表达。
-          - 按要求保留 Opposite Station、Opposite grid、Opposite IOTA 和 Opposite 等原有表达。
-          - 不改变日志筛选、绿色确认网格显示及其他功能逻辑。
+          ## v20.2 — VUCC 地图台址独立标记
+          - 手动标记的目标网格与创建时选中的发射台址绑定并持久化保存。
+          - 切换到 All 时隐藏台址专属红色标记，避免与其他台址的绿色已通联网格混色。
+          - 只有对应台址完成该网格通联后才清除标记，同时兼容旧版本保存的标记数据。
+          - 修复不同地图缩放级别下红色标记覆盖绿色已通联网格的问题。
           RELEASE_NOTES
           )"
           fi
