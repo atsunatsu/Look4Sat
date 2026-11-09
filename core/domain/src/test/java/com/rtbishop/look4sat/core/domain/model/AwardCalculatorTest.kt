@@ -447,9 +447,10 @@ class AwardCalculatorTest {
         val ambiguous = qso("YB7UCC", dxcc = 327, fineGrids = listOf("OJ82MA"))
         val insufficient = qso("YB0ABC/P", dxcc = 327)
         val assigned = qso("YB0ABC", dxcc = 327, state = "JK")
+        val assignedByCallsign = qso("YB0ABC", dxcc = 327)
         val foreign = qso("JH0ABC", dxcc = 339)
         val store = mapOf(
-            GRIDLESS_QSO_BUCKET to listOf(ambiguous, insufficient, assigned, foreign)
+            GRIDLESS_QSO_BUCKET to listOf(ambiguous, insufficient, assigned, assignedByCallsign, foreign)
         )
         val candidatesForGrid: (String) -> Set<String> = {
             if (it == "OJ82MA") setOf("KI", "KU") else emptySet()
