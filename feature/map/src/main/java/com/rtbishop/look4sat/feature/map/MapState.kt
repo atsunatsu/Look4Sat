@@ -71,9 +71,21 @@ sealed interface MapAction {
     data class SelectDefaultItem(val catnum: Int) : MapAction
     data class ToggleGridMode(val value: Boolean) : MapAction
     data class ToggleFirstCallLabels(val value: Boolean) : MapAction
-    data class SetMarkedStation(val grid: String, val call: String) : MapAction
-    data class RemoveMarkedStation(val grid: String, val call: String) : MapAction
-    data class PinMarkedStation(val grid: String, val call: String) : MapAction
+    data class SetMarkedStation(
+        val grid: String,
+        val call: String,
+        val stationIds: Set<String> = emptySet()
+    ) : MapAction
+    data class RemoveMarkedStation(
+        val grid: String,
+        val call: String,
+        val stationIds: Set<String> = emptySet()
+    ) : MapAction
+    data class PinMarkedStation(
+        val grid: String,
+        val call: String,
+        val stationIds: Set<String> = emptySet()
+    ) : MapAction
     data class SetVisible(val isVisible: Boolean) : MapAction
     /** Time scrub: [offsetMs] ahead of now; the ViewModel clamps it at 0. */
     data class SetTimeOffset(val offsetMs: Long) : MapAction

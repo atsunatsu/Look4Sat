@@ -113,6 +113,7 @@ import com.rtbishop.look4sat.core.domain.model.myStationGrids
 import com.rtbishop.look4sat.core.domain.model.scopedToStation
 import com.rtbishop.look4sat.core.domain.model.scopedToStations
 import com.rtbishop.look4sat.core.domain.model.stationGridSetKey
+import com.rtbishop.look4sat.core.domain.model.visibleInStationScope
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.predict.OrbitalObject
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
@@ -558,6 +559,11 @@ private fun MapScreen(
             .flatMap { it.worked.asSequence() }
             .toSet()
     }
+    // A station-specific red reminder is visible only in that exact station
+    // selection. All shows the aggregate worked cells without red/green blending.
+    val visibleMarkedGrids = remember(uiState.markedGrids, selectedStationIds) {
+        uiState.markedGrids.visibleInStationScope(selectedStationIds)
+    }
     // The same cached WAIPA boundary polygons drive map fill and award
     // geolocation. Resolves saved QSOs locally, without a new LoTW/Wavelog sync.
     val waipaRegions = remember(mapView.context) {
@@ -789,7 +795,7 @@ private fun MapScreen(
                             // 首通呼号标签只作用于 VUCC 视图(用户要求); "All"/其他奖状不过滤.
                             showFirstCallLabels = uiState.showFirstCallLabels && activeAward == AwardType.VUCC,
                             firstCallsByGrid = firstCallsByGrid,
-                            markedGrids = uiState.markedGrids
+                            markedGrids = visibleMarkedGrids
                         )
                         if (!shouldCenter || uiState.stationPosition != null) {
                             prevGridMode = uiState.isGridMode
@@ -962,14 +968,18 @@ private fun MapScreen(
             qsos = uiState.workedGridQsos[grid].orEmpty()
                 .scopedToStations(selectedStationIds)
                 .sortedBy { it.epochMs },
-            marked = uiState.markedGrids[grid].orEmpty(),
+            marked = visibleMarkedGrids[grid].orEmpty(),
             isUtc = uiState.isUtc,
             matchCalculating = matchCalculating,
             onDismiss = { selectedGrid = null },
             onMatch = { onMatchGrid(grid) },
-            onMark = { call -> onAction(MapAction.SetMarkedStation(grid, call)) },
-            onRemoveMark = { call -> onAction(MapAction.RemoveMarkedStation(grid, call)) },
-            onPinMark = { call -> onAction(MapAction.PinMarkedStation(grid, call)) }
+            onMark = { call -> onAction(MapAction.SetMarkedStation(grid, call, selectedStationIds)) },
+            onRemoveMark = { station ->
+                onAction(MapAction.RemoveMarkedStation(grid, station.call, station.stationIds))
+            },
+            onPinMark = { station ->
+                onAction(MapAction.PinMarkedStation(grid, station.call, station.stationIds))
+            }
         )
     }
     // Region detail dialog for a tapped award region. Match and station marks
@@ -1111,8 +1121,8 @@ private fun WorkedGridQsoDialog(
     onDismiss: () -> Unit,
     onMatch: () -> Unit,
     onMark: (String) -> Unit,
-    onRemoveMark: (String) -> Unit,
-    onPinMark: (String) -> Unit
+    onRemoveMark: (com.rtbishop.look4sat.core.domain.model.MarkedStation) -> Unit,
+    onPinMark: (com.rtbishop.look4sat.core.domain.model.MarkedStation) -> Unit
 ) {
     var showMarkInput by remember { mutableStateOf(false) }
     var callInput by remember { mutableStateOf("") }
@@ -1183,8 +1193,8 @@ private fun WorkedGridQsoDialog(
                             isPinned = index == 0,
                             showPin = showPin,
                             isUtc = isUtc,
-                            onRemoveMark = { onRemoveMark(station.call) },
-                            onPinMark = { onPinMark(station.call) }
+                            onRemoveMark = { onRemoveMark(station) },
+                            onPinMark = { onPinMark(station) }
                         )
                         androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     }

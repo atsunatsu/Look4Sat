@@ -21,6 +21,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.rtbishop.look4sat.core.domain.model.workedGridsForStations
 import com.rtbishop.look4sat.core.domain.predict.CelestialComputer
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.predict.OrbitalObject
@@ -229,16 +230,26 @@ class MapViewModel(
     /** Loads the worked-grid / mark data into the map state (see the visibility collector). */
     private fun refreshMapGridData() {
         val workedGrids = settingsRepo.getWorkedGrids()
+        val workedGridQsos = settingsRepo.getWorkedGridQsos()
         val markedGrids = settingsRepo.getMarkedGridStations()
-        // Marked stations auto-clear once their grid becomes worked:
-        // the reminder has served its purpose (user req: 网格变绿后标记自动清除).
-        val stale = markedGrids.keys.filter { it in workedGrids }
-        val activeMarks = if (stale.isEmpty()) markedGrids else markedGrids - stale.toSet()
-        if (stale.isNotEmpty()) settingsRepo.setMarkedGridStations(activeMarks)
+        // Cache worked cells by every station scope that currently owns a mark.
+        // A QSO from another operated station must not clear this reminder.
+        val workedByScope = markedGrids.values.flatten()
+            .mapNotNull { it.stationIds.takeIf { ids -> ids.isNotEmpty() } }
+            .toSet()
+            .associateWith { stationIds -> workedGridQsos.workedGridsForStations(stationIds) }
+        val activeMarks = markedGrids.mapNotNull { (grid, marks) ->
+            val remaining = marks.filterNot { mark ->
+                if (mark.stationIds.isEmpty()) grid in workedGrids
+                else grid in workedByScope[mark.stationIds].orEmpty()
+            }
+            if (remaining.isEmpty()) null else grid to remaining
+        }.toMap()
+        if (activeMarks != markedGrids) settingsRepo.setMarkedGridStations(activeMarks)
         _uiState.update {
             it.copy(
                 workedGrids = workedGrids,
-                workedGridQsos = settingsRepo.getWorkedGridQsos(),
+                workedGridQsos = workedGridQsos,
                 roamedGrids = settingsRepo.getRoamedGrids(),
                 markedGrids = activeMarks
             )
@@ -259,11 +270,13 @@ class MapViewModel(
                 val call = action.call.trim().uppercase()
                 val existing = settingsRepo.getMarkedGridStations()
                 val current = existing[action.grid].orEmpty()
-                // 重复呼号忽略: 同一网格已标记过的呼号不再重复添加.
-                val updated = if (current.any { it.call == call }) existing
+                val stationIds = action.stationIds.toSet()
+                // The same callsign may be a reminder at different operated stations.
+                val updated = if (current.any { it.call == call && it.stationIds == stationIds }) existing
                 else existing + (action.grid to current + com.rtbishop.look4sat.core.domain.model.MarkedStation(
                     call = call,
-                    epochMs = System.currentTimeMillis()
+                    epochMs = System.currentTimeMillis(),
+                    stationIds = stationIds
                 ))
                 settingsRepo.setMarkedGridStations(updated)
                 _uiState.update { it.copy(markedGrids = updated) }
@@ -271,7 +284,9 @@ class MapViewModel(
             is MapAction.RemoveMarkedStation -> {
                 val existing = settingsRepo.getMarkedGridStations()
                 val current = existing[action.grid].orEmpty()
-                val remaining = current.filterNot { it.call == action.call }
+                val remaining = current.filterNot {
+                    it.call == action.call && it.stationIds == action.stationIds
+                }
                 val updated = if (remaining.isEmpty()) existing - action.grid
                 else existing + (action.grid to remaining)
                 settingsRepo.setMarkedGridStations(updated)
@@ -280,9 +295,13 @@ class MapViewModel(
             is MapAction.PinMarkedStation -> {
                 val existing = settingsRepo.getMarkedGridStations()
                 val current = existing[action.grid].orEmpty()
-                val target = current.firstOrNull { it.call == action.call }
+                val target = current.firstOrNull {
+                    it.call == action.call && it.stationIds == action.stationIds
+                }
                 if (target != null) {
-                    val updated = existing + (action.grid to listOf(target) + current.filterNot { it.call == action.call })
+                    val updated = existing + (action.grid to listOf(target) + current.filterNot {
+                        it.call == action.call && it.stationIds == action.stationIds
+                    })
                     settingsRepo.setMarkedGridStations(updated)
                     _uiState.update { it.copy(markedGrids = updated) }
                 }

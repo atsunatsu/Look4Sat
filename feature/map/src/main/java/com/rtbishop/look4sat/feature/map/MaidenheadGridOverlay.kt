@@ -195,7 +195,7 @@ class MaidenheadGridOverlay : Overlay() {
         //  - Field zoom (two-char labels): do NOT fill whole fields; instead fill
         //    the individual 2°x1° squares that were worked, without drawing the
         //    square grid lines — so you see green patches inside the field.
-        if (workedGrids.isNotEmpty()) {
+        if (workedGrids.isNotEmpty() || markedGrids.isNotEmpty()) {
             if (zoom >= GRID_ZOOM_SUB) {
                 for (row in firstRow..lastRow) {
                     val lat = row * cellLat
@@ -215,10 +215,11 @@ class MaidenheadGridOverlay : Overlay() {
                         val xLeft = xLeftBase + turn * worldWidthPx.toFloat()
                         val xRight = xRightBase + turn * worldWidthPx.toFloat()
                         if (xRight < 0f || xLeft > canvas.width) continue
-                        if (cellLabel(lat, lon, zoom) in workedGrids) {
+                        val gridLabel = cellLabel(lat, lon, zoom)
+                        if (gridLabel in workedGrids) {
                             canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
                         }
-                        if (cellLabel(lat, lon, zoom) in markedGrids) {
+                        if (gridLabel in markedGrids && gridLabel !in workedGrids) {
                             canvas.drawRect(xLeft, yTop, xRight, yBottom, markedPaint)
                         }
                     }
@@ -248,6 +249,7 @@ class MaidenheadGridOverlay : Overlay() {
                     }
                 }
                 for (grid in markedGrids.keys) {
+                    if (grid in workedGrids) continue
                     val cell = gridCellBounds(grid) ?: continue
                     for (turn in -colRepeats..colRepeats) {
                         val dLon = turn * 360.0
