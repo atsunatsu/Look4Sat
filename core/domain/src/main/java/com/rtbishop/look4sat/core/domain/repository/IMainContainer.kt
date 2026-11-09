@@ -68,7 +68,10 @@ data class MutualPassData(
     /** Maidenhead locator entered for station B; coordinates are its grid centre. */
     val stationBGrid: String = "",
     val stationBLatitude: Double? = null,
-    val stationBLongitude: Double? = null
+    val stationBLongitude: Double? = null,
+    /** Match search's station-A viewpoint, which may differ from the app location. */
+    val stationALatitude: Double? = null,
+    val stationALongitude: Double? = null
 )
 
 /** Minimal track sample for cross-module sharing (angles in degrees). */
