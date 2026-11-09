@@ -442,4 +442,31 @@ class AwardCalculatorTest {
         )
     }
 
+    @Test
+    fun \`waipa unassigned list includes QSOs with no candidate provinces\`() {
+        val ambiguous = qso("YB7UCC", dxcc = 327, fineGrids = listOf("OJ82MA"))
+        val insufficient = qso("YB0ABC/P", dxcc = 327)
+        val assigned = qso("YB0ABC", dxcc = 327, state = "JK")
+        val foreign = qso("JH0ABC", dxcc = 339)
+        val store = mapOf(
+            GRIDLESS_QSO_BUCKET to listOf(ambiguous, insufficient, assigned, foreign)
+        )
+        val candidatesForGrid: (String) -> Set<String> = {
+            if (it == "OJ82MA") setOf("KI", "KU") else emptySet()
+        }
+
+        val unassigned = AwardCalculator.waipaUnassignedQsos(
+            store, { null }, candidatesForGrid
+        )
+        assertEquals(listOf(ambiguous, insufficient), unassigned.map { it.qso })
+        assertEquals(setOf("KI", "KU"), unassigned[0].candidateProvinceCodes)
+        assertEquals(emptySet<String>(), unassigned[1].candidateProvinceCodes)
+
+        val overrides = mapOf(AwardCalculator.waipaQsoKey(insufficient) to "BA")
+        val afterManualAssignment = AwardCalculator.waipaUnassignedQsos(
+            store, { null }, candidatesForGrid, overrides
+        )
+        assertEquals(listOf(ambiguous), afterManualAssignment.map { it.qso })
+    }
+
 }
