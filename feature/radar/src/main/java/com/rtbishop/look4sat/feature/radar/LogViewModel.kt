@@ -214,7 +214,7 @@ class LogViewModel(
         // interval. The opposite station may already be below the horizon while this
         // station is still in pass; that must not trigger the out-of-window warning.
         // Only a time outside our own pass is stored at the midpoint after confirmation.
-        if (isOutsideLogPassWindow(now, passWindow)) {
+        if (passWindow != null && isOutsideLogPassWindow(now, passWindow)) {
             val midpoint = ((passWindow.start + passWindow.endInclusive) / 2L)
                 .let { it / 60_000L * 60_000L }
                 .coerceIn(passWindow.start, passWindow.endInclusive)
