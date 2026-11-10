@@ -72,7 +72,12 @@ import com.rtbishop.look4sat.core.presentation.WavelogUploadPreviewDialog
 
 /** Shared radar log and CW quick-Log pass/frequency selection. */
 internal data class LogRecordTarget(
-    val catnum: Int, val satName: String, val txHz: Long?, val rxHz: Long?, val passWindow: LongRange?
+    val catnum: Int,
+    val satName: String,
+    val txHz: Long?,
+    val rxHz: Long?,
+    val passWindow: LongRange?,
+    val isMutualPassWindow: Boolean
 )
 
 internal fun RadarState.logRecordTarget(): LogRecordTarget {
@@ -88,8 +93,13 @@ internal fun RadarState.logRecordTarget(): LogRecordTarget {
         else calculatorTxHz ?: repeaterTxHz ?: selectedTxHz
     val rxHz = if (useRepeater) repeaterRxHz ?: calculatorRxHz ?: selectedRxHz
         else calculatorRxHz ?: repeaterRxHz ?: selectedRxHz
-    return LogRecordTarget(catnum, currentPass?.name?.trim().orEmpty(), txHz, rxHz,
-        currentPass?.let { it.aosTime..it.losTime })
+    // Radar countdown uses the full local pass. QSO logging instead uses the
+    // simultaneous-visibility interval when this radar was opened from Match.
+    val qsoWindow = mutualPassWindow ?: currentPass?.let { it.aosTime..it.losTime }
+    return LogRecordTarget(
+        catnum, currentPass?.name?.trim().orEmpty(), txHz, rxHz,
+        qsoWindow, mutualPassWindow != null
+    )
 }
 
 @Composable
@@ -108,7 +118,7 @@ fun LogPage(
     // Record currently open in the edit dialog (null when closed).
     var editTarget by remember { mutableStateOf<QsoRecord?>(null) }
 
-    val target = remember(uiState.currentPass, uiState.transceivers.transmitters,
+    val target = remember(uiState.currentPass, uiState.mutualPassWindow, uiState.transceivers.transmitters,
         uiState.transceivers.selectedUuid, uiState.calculatorTxHz, uiState.calculatorRxHz) {
         uiState.logRecordTarget()
     }
@@ -144,7 +154,7 @@ fun LogPage(
                             imeAction = ImeAction.Done
                         ),
                         keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
-                            logViewModel.record(satName, mode, txHz, rxHz, logUiState.stationGrid, passWindow, overrides)
+                            logViewModel.record(satName, mode, txHz, rxHz, logUiState.stationGrid, passWindow, overrides, target.isMutualPassWindow)
                         })
                     )
                     else Text(logUiState.callsignInput, modifier = Modifier.weight(1f))
@@ -315,8 +325,19 @@ fun LogPage(
             onDismissRequest = logViewModel::dismissOutOfWindowLog,
             shape = sheetDialogShape(),
             containerColor = sheetDialogContainerColor(),
-            title = { SheetDialogTitle(stringResource(R.string.log_out_window_title)) },
-            text = { Text(stringResource(R.string.log_out_window_message, midpointText)) },
+            title = {
+                SheetDialogTitle(stringResource(
+                    if (pending.isMutualPassWindow) R.string.log_out_mutual_window_title
+                    else R.string.log_out_window_title
+                ))
+            },
+            text = {
+                Text(stringResource(
+                    if (pending.isMutualPassWindow) R.string.log_out_mutual_window_message
+                    else R.string.log_out_window_message,
+                    midpointText
+                ))
+            },
             confirmButton = {
                 TextButton(onClick = logViewModel::confirmOutOfWindowLog) {
                     Text(stringResource(R.string.log_out_window_confirm))
