@@ -6,28 +6,22 @@ import org.junit.Test
 
 class LogPassWindowTest {
     @Test
-    fun loggingRemainsInsideLocalPassAfterOppositeStationHasSet() {
+    fun qsoTimeAfterOppositeLosIsOutsideMutualWindowEvenWhileLocalPassContinues() {
         val minute = 60_000L
         val localAos = 12L * 60L * minute
-        val mutualAos = 12L * 60L * minute + 2L * minute
-        val mutualLos = 12L * 60L * minute + 9L * minute
-        val localLos = 12L * 60L * minute + 12L * minute
-        val now = 12L * 60L * minute + 10L * minute
+        val mutualAos = localAos + 2L * minute
+        val mutualLos = localAos + 9L * minute
+        val localLos = localAos + 12L * minute
+        val now = localAos + 10L * minute
 
         val localWindow = localAos..localLos
         val mutualWindow = mutualAos..mutualLos
 
-        // Opposite station is already below the horizon, but our pass is active.
-        assertTrue(now !in mutualWindow)
         assertTrue(now in localWindow)
-        assertFalse(isOutsideLogPassWindow(now, localWindow))
-    }
-
-    @Test
-    fun loggingOutsideOurOwnPassStillRequiresConfirmation() {
-        val localWindow = 12L * 60L * 60_000L..(12L * 60L * 60_000L + 12L * 60_000L)
-        val afterLocalLos = localWindow.endInclusive + 1L
-        assertTrue(isOutsideLogPassWindow(afterLocalLos, localWindow))
+        assertTrue(now !in mutualWindow)
+        // Logging is checked against the mutual QSO window, not the local radar window.
+        assertTrue(isOutsideLogPassWindow(now, mutualWindow))
+        assertFalse(isOutsideLogPassWindow(localAos + 5L * minute, mutualWindow))
     }
 
     @Test
