@@ -82,8 +82,8 @@ object AwardCalculator {
         return listOf(
             AwardProgress(
                 AwardType.VUCC,
-                workedKeys = qsosByGrid.keys - GRIDLESS_QSO_BUCKET,
-                count = (qsosByGrid.keys - GRIDLESS_QSO_BUCKET).size,
+                workedKeys = qsosByGrid.filterValues { it.isNotEmpty() }.keys - GRIDLESS_QSO_BUCKET,
+                count = (qsosByGrid.filterValues { it.isNotEmpty() }.keys - GRIDLESS_QSO_BUCKET).size,
                 target = AwardTargets.VUCC
             ),
             calculateDxcc(all),
