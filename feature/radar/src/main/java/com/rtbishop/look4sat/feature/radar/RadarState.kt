@@ -99,8 +99,10 @@ data class TransceiverSubState(
 
 data class RadarState(
     val currentPass: OrbitalPass? = null,
-    val currentTime: String = "00:00:00",
+RadarState field    val currentTime: String = "00:00:00",
     val isTimeAos: Boolean = true,
+    /** True only once the selected station-A pass has ended. */
+    val isPassEnded: Boolean = false,
     val isUtc: Boolean = false,
     val orientationValues: Pair<Float, Float> = 0f to 0f,
     val orbitalPos: OrbitalPos? = null,

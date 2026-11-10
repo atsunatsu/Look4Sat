@@ -72,7 +72,11 @@ import com.rtbishop.look4sat.core.presentation.WavelogUploadPreviewDialog
 
 /** Shared radar log and CW quick-Log pass/frequency selection. */
 internal data class LogRecordTarget(
-    val catnum: Int, val satName: String, val txHz: Long?, val rxHz: Long?, val passWindow: LongRange?
+    val catnum: Int,
+    val satName: String,
+    val txHz: Long?,
+    val rxHz: Long?,
+    val passWindow: LongRange?
 )
 
 internal fun RadarState.logRecordTarget(): LogRecordTarget {
@@ -88,8 +92,12 @@ internal fun RadarState.logRecordTarget(): LogRecordTarget {
         else calculatorTxHz ?: repeaterTxHz ?: selectedTxHz
     val rxHz = if (useRepeater) repeaterRxHz ?: calculatorRxHz ?: selectedRxHz
         else calculatorRxHz ?: repeaterRxHz ?: selectedRxHz
-    return LogRecordTarget(catnum, currentPass?.name?.trim().orEmpty(), txHz, rxHz,
-        currentPass?.let { it.aosTime..it.losTime })
+    // The log page follows the selected radar's local AOS–LOS window.
+    // The opposite station's visibility does not restrict logging here.
+    return LogRecordTarget(
+        catnum, currentPass?.name?.trim().orEmpty(), txHz, rxHz,
+        currentPass?.let { it.aosTime..it.losTime }
+    )
 }
 
 @Composable
@@ -124,7 +132,7 @@ fun LogPage(
     val passWindow = target.passWindow
     val recent = records
         .filter { satelliteIdentity(it.satelliteName) == satIdentity }
-        // Only contacts inside the current pass window: the log page is the "this pass" sheet.
+        // Only contacts inside the current local pass window.
         .filter { passWindow?.contains(it.startUtcMillis) == true }
         .sortedByDescending { it.startUtcMillis }
     val maxElev = uiState.currentPass?.maxElevation ?: 0.0
@@ -302,9 +310,9 @@ fun LogPage(
         )
     }
 
-    // Out-of-window notice: the clock is outside the current pass [aos, los], so the record
-    // would never show in the window-filtered list. Confirm first, then store it at the pass
-    // midpoint (there is always an edit dialog afterwards for the exact time).
+    // Out-of-window notice: the current time is outside this station's local AOS–LOS.
+    // Store at the local pass midpoint after confirmation; the operator can then edit
+    // the exact QSO time.
     logUiState.outOfWindowLog?.let { pending ->
         val midpointText = remember(pending.midpointUtcMillis) {
             java.text.SimpleDateFormat("HH:mm'Z'", java.util.Locale.US).apply {

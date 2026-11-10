@@ -432,7 +432,7 @@ private fun RadarScreen(
                 // carry weight(1f), so side by side they split the width into two halves.
                 TopBar {
                     IconCard(action = navigateUp, resId = R.drawable.ic_back)
-                    TimerRow(timeString = uiState.currentTime, isTimeAos = uiState.isTimeAos)
+                    TimerRow(timeString = uiState.currentTime, isTimeAos = uiState.isTimeAos, isEnded = uiState.isPassEnded)
                     toolsMenu()
                 }
                 TopBar {
@@ -447,7 +447,7 @@ private fun RadarScreen(
             } else {
                 TopBar {
                     IconCard(action = navigateUp, resId = R.drawable.ic_back)
-                    TimerRow(timeString = uiState.currentTime, isTimeAos = uiState.isTimeAos)
+                    TimerRow(timeString = uiState.currentTime, isTimeAos = uiState.isTimeAos, isEnded = uiState.isPassEnded)
                     NextPassRow(pass = upcomingPass, modifier = Modifier.weight(1f), isUtc = uiState.isUtc)
                     toolsMenu()
                 }

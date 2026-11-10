@@ -1,5 +1,7 @@
 package com.rtbishop.look4sat.feature.radar
 
+import com.rtbishop.look4sat.core.domain.predict.GeoPos
+import com.rtbishop.look4sat.core.domain.repository.MutualPassData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -62,6 +64,22 @@ class MatchedRadarTrackWindowTest {
         assertTrue(isWithinMatchedRadarWindow(600_000L, remoteWindow))
         assertTrue(!isWithinMatchedRadarWindow(660_000L, remoteWindow))
         assertTrue(!isWithinMatchedRadarWindow(720_000L, remoteWindow))
+    }
+
+    @Test
+    fun matchedRadarUsesTheStationAThatWasSearched() {
+        val actualStation = GeoPos(22.2, 113.5)
+        val plannedStation = matchedRadarObserverPosition(
+            MutualPassData(stationALatitude = 35.0, stationALongitude = 139.0), actualStation
+        )
+        assertEquals(35.0, plannedStation.latitude, 0.0)
+        assertEquals(139.0, plannedStation.longitude, 0.0)
+
+        val invalid = matchedRadarObserverPosition(
+            MutualPassData(stationALatitude = 95.0, stationALongitude = 139.0), actualStation
+        )
+        assertEquals(actualStation, invalid)
+        assertEquals(actualStation, matchedRadarObserverPosition(MutualPassData(), actualStation))
     }
 
     @Test
