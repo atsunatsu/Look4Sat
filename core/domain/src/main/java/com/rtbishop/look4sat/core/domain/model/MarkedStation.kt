@@ -43,7 +43,14 @@ fun Map<String, List<MarkedStation>>.visibleInStationScope(
     mapNotNull { (grid, marks) ->
         val visible = marks.filter { mark ->
             mark.stationIds.isEmpty() ||
-                (selectedStationIds.isNotEmpty() && mark.stationIds == selectedStationIds)
+                (selectedStationIds.isNotEmpty() && (
+                    mark.stationIds == selectedStationIds ||
+                        // Pre-upgrade reminders were keyed by grid sets only.
+                        // Keep them visible under the corresponding new station
+                        // identities instead of silently losing the reminder.
+                        ('#' !in mark.stationIds.joinToString("") &&
+                            mark.stationIds == selectedStationIds.map { it.substringBefore('#') }.toSet())
+                    ))
         }
         if (visible.isEmpty()) null else grid to visible
     }.toMap()
