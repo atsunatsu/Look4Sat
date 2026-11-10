@@ -76,8 +76,7 @@ data class OutOfWindowLog(
     val rxHz: Long?,
     val myGrid: String,
     val midpointUtcMillis: Long,
-    val overrides: LogRecordOverrides = LogRecordOverrides(),
-    val isMutualPassWindow: Boolean = false
+    val overrides: LogRecordOverrides = LogRecordOverrides()
 )
 
 data class LogUiState(
@@ -202,8 +201,7 @@ class LogViewModel(
         rxHz: Long?,
         myGrid: String,
         passWindow: ClosedRange<Long>?,
-        overrides: LogRecordOverrides = LogRecordOverrides(),
-        isMutualPassWindow: Boolean = false
+        overrides: LogRecordOverrides = LogRecordOverrides()
     ) {
         if (_uiState.value.recordSaving) return
         val call = _uiState.value.callsignInput.trim()
@@ -211,16 +209,15 @@ class LogViewModel(
         // Whole minutes (seconds zeroed): matches the edit dialog's HH:mm granularity and the
         // minute-resolution of LoTW reports, so re-saving an unchanged record never looks edited.
         val now = System.currentTimeMillis() / 60_000L * 60_000L
-        // Radar's AOS/LOS/countdown use station A's local visibility. For a matched
-        // QSO, however, this window is the mutual overlap: a two-way satellite contact
-        // requires both stations to see the satellite at the QSO time.
+        // Validate against this radar station's own AOS–LOS window.
+        // The opposite station's horizon does not affect log entry.
         if (passWindow != null && isOutsideLogPassWindow(now, passWindow)) {
             val midpoint = ((passWindow.start + passWindow.endInclusive) / 2L)
                 .let { it / 60_000L * 60_000L }
                 .coerceIn(passWindow.start, passWindow.endInclusive)
             _uiState.update {
                 it.copy(outOfWindowLog = OutOfWindowLog(
-                    call, satName, mode, txHz, rxHz, myGrid, midpoint, overrides, isMutualPassWindow
+                    call, satName, mode, txHz, rxHz, myGrid, midpoint, overrides
                 ))
             }
             return
