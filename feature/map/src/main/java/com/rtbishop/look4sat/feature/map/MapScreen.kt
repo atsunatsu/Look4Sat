@@ -110,9 +110,10 @@ import com.rtbishop.look4sat.core.domain.model.AwardType
 import com.rtbishop.look4sat.core.domain.model.firstCallsByGrid
 import com.rtbishop.look4sat.core.domain.model.MapSource
 import com.rtbishop.look4sat.core.domain.model.myStationGrids
+import com.rtbishop.look4sat.core.domain.model.migrateStationSelections
 import com.rtbishop.look4sat.core.domain.model.scopedToStation
 import com.rtbishop.look4sat.core.domain.model.scopedToStations
-import com.rtbishop.look4sat.core.domain.model.stationGridSetKey
+import com.rtbishop.look4sat.core.domain.model.stationSelectionKey
 import com.rtbishop.look4sat.core.domain.model.visibleInStationScope
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.predict.OrbitalObject
@@ -516,45 +517,54 @@ private fun MapScreen(
     var selectedAward by mapFilterViewModel.selectedAward
     // Grid picking always shows the VUCC grid fill, while keeping the user's saved station selection.
     val activeAward = if (gridPickerMode) AwardType.VUCC else selectedAward
-    // 台址名单: QSOs grouped by the 台址's GRID SET. A station location (台址)
-    // can span several grids (MY_GRIDSQUARE + MY_VUCC_GRIDS), and QSOs whose
-    // location covers the same grid set belong to the same 台址; groups with an
-    // identical grid set merge (they are VUCC-equivalent — the MY_* snapshot
-    // can differ between records of the same physical 台址 when LoTW omits
-    // optional fields). Data synced before multi-grid support falls back to
-    // one group per grid, preserving the old selector exactly.
-    // Each group's `worked` cells are derived through scopedToStation (the
-    // covering rule): a single-grid 台址 also counts the cells worked by any
-    // multi-grid 台址 covering it (OL62 ← OL62/63, 四格点同理) — the reverse
-    // never leaks (2026-10-05 用户定稿, 方案 A).
+    // 台址身份 = 本台网格集合 + STATION_CALLSIGN/MY_* 身份。不同呼号或
+    // 不同 LoTW MY_* 台址不能只因为都在 OL62 就被合并。
+    // VUCC 方案 A 仍保留：同一身份的 OL62/OL63 通联覆盖 OL62 选择，
+    // 但 OL62 单格通联不会计入 OL62/OL63 选择。
     val stationGroups: List<StationGroup> = remember(uiState.workedGridQsos) {
-        val gridSets = LinkedHashMap<String, Set<String>>()
+        val stations = LinkedHashMap<String, com.rtbishop.look4sat.core.domain.model.GridQso>()
         for ((_, qsos) in uiState.workedGridQsos) {
             for (q in qsos) {
-                val key = q.stationGridSetKey() ?: continue
-                gridSets.getOrPut(key) { q.myStationGrids() }
+                val key = q.stationSelectionKey() ?: continue
+                stations.putIfAbsent(key, q)
             }
         }
-        gridSets.mapNotNull { (key, grids) ->
+        val groups = stations.mapNotNull { (key, qso) ->
             val worked = uiState.workedGridQsos.filterValues { qsos ->
                 qsos.scopedToStation(key).isNotEmpty()
             }.keys - GRIDLESS_QSO_BUCKET
-            // No-grid-only station locations cannot contribute VUCC cells.
-            if (worked.isEmpty()) null else StationGroup(id = key, grids = grids, worked = worked)
+            if (worked.isEmpty()) null else StationGroup(
+                id = key,
+                grids = qso.myStationGrids(),
+                worked = worked,
+                callsign = qso.myCallsign?.takeIf { it.isNotBlank() }
+                    ?: qso.stationKey?.substringBefore('|')?.takeIf { it.isNotBlank() },
+                identityDetails = qso.stationKey?.split('|')?.drop(1)
+                    ?.filter { it.isNotBlank() }?.joinToString("/").orEmpty()
+            )
         }.sortedByDescending { it.workedCount }
+        // Show the distinguishing MY_* data only when callsign+grid labels collide.
+        val labelCounts = groups.groupingBy { it.baseLabel }.eachCount()
+        groups.map { group ->
+            if ((labelCounts[group.baseLabel] ?: 0) > 1) group.copy(showIdentityDetails = true)
+            else group
+        }
     }
-    // Restore valid saved station IDs when data arrives or is refreshed.
-    // Do not clear a saved selection while the station list is still loading.
+    // Saved older grid-only selections expand to the new, identity-aware
+    // station keys instead of silently resetting to All after an upgrade.
     LaunchedEffect(stationGroups, selectedStationIds) {
         if (stationGroups.isNotEmpty() && selectedStationIds.isNotEmpty()) {
-            val valid = selectedStationIds.intersect(stationGroups.map { it.id }.toSet())
+            val valid = selectedStationIds.migrateStationSelections(stationGroups.map { it.id }.toSet())
             if (valid != selectedStationIds) onSelectedStationIdsChange(valid)
         }
     }
-    // Union of worked squares across the selected stations. Each station's
-    // existing covering rule is preserved by StationGroup.worked.
-    val workedGrids = remember(uiState.workedGrids, stationGroups, selectedStationIds) {
-        if (selectedStationIds.isEmpty()) uiState.workedGrids
+    // One source of truth for VUCC: only confirmed QSO buckets contribute.
+    // Old standalone grid flags have no attribution and must not inflate All.
+    val allWorkedGrids = remember(uiState.workedGridQsos) {
+        uiState.workedGridQsos.filterValues { it.isNotEmpty() }.keys - GRIDLESS_QSO_BUCKET
+    }
+    val workedGrids = remember(allWorkedGrids, stationGroups, selectedStationIds) {
+        if (selectedStationIds.isEmpty()) allWorkedGrids
         else stationGroups.asSequence()
             .filter { it.id in selectedStationIds }
             .flatMap { it.worked.asSequence() }
@@ -929,7 +939,7 @@ private fun MapScreen(
                 if (uiState.isGridMode && activeAward == AwardType.VUCC && stationGroups.isNotEmpty()) {
                     VuccGridSelector(
                         stations = stationGroups,
-                        allCount = uiState.workedGrids.size,
+                        allCount = allWorkedGrids.size,
                         selected = selectedStationIds,
                         onSelect = onSelectedStationIdsChange,
                         modifier = Modifier
@@ -2201,17 +2211,21 @@ private fun AwardChipsRow(
  * per grid.
  */
 private data class StationGroup(
-    /** Grid-set key (sorted 4-char grids joined by ","). */
+    /** Grid-set key plus operator / MY_* station identity. */
     val id: String,
     /** Full grid set of this 台址 (1..n 4-char grids). */
     val grids: Set<String>,
-    /** Distinct worked grids worked under this 台址 (any of its grids). */
-    val worked: Set<String>
+    /** Distinct confirmed worked grids for this identity and its covering locations. */
+    val worked: Set<String>,
+    val callsign: String?,
+    val identityDetails: String,
+    val showIdentityDetails: Boolean = false
 ) {
     val workedCount: Int get() = worked.size
-    /** Selector label: the grids themselves — "OL62" for a single-grid 台址,
-     *  "OM60,PM01" for a multi-grid one (matches how 台址 are described). */
-    val label: String get() = grids.sorted().joinToString(",")
+    val baseLabel: String get() = grids.sorted().joinToString(",") +
+        callsign?.let { " · $it" }.orEmpty()
+    val label: String get() = baseLabel +
+        if (showIdentityDetails) " [${identityDetails.ifBlank { "unspecified" }}]" else ""
 }
 
 /** Compact pill toggle for switching between satellite view and grid mode,
