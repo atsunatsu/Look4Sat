@@ -260,13 +260,13 @@ class RadarViewModel(
             }
             trackingService.setTransponder(initialTransponder)
         }
-        val matchedPass = !pass.isDeepSpace &&
-            mutualSession.trackSamples.isNotEmpty() &&
+        val hasMutualPass = !pass.isDeepSpace &&
             mutualSession.startTime == satelliteRepo.selectedPass.value.second &&
             mutualSession.endTime > mutualSession.startTime
+        val matchedPass = hasMutualPass && mutualSession.trackSamples.isNotEmpty()
         _uiState.update {
             it.copy(
-                mutualPassWindow = if (matchedPass) mutualSession.startTime..mutualSession.endTime else null
+                mutualPassWindow = if (hasMutualPass) mutualSession.startTime..mutualSession.endTime else null
             )
         }
         val latB = mutualSession.stationBLatitude
