@@ -94,7 +94,7 @@ internal fun CwConsole(
     val stepPrefs = remember(context) {
         context.getSharedPreferences("cw_console", android.content.Context.MODE_PRIVATE)
     }
-    var frequencyStepHz by remember(context) {
+    var frequencyStepHz by rememberSaveable {
         mutableStateOf(stepPrefs.getLong("frequency_step_hz", 1_000L)
             .takeIf { saved -> CW_CALCULATOR_FREQUENCY_STEPS.any { it.first == saved } } ?: 1_000L)
     }
