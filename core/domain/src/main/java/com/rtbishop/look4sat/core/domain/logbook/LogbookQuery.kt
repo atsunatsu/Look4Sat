@@ -46,15 +46,28 @@ fun QsoRecord.ownStationIdentity(): OwnStationFilter? {
     val stamped = grids(vuccGrids)
     val full = grids(myFullGrids)
     val primary = grids(listOf(myGrid))
-    // Prefer the set stamped at upload or provided by LoTW. A legacy ADIF
-    // import may instead have its multi-grid set only in MY_GRIDSQUARE.
-    val multi = listOf(stamped, full, primary).firstOrNull { candidates ->
-        candidates.map { it.take(4) }.distinct().size > 1
-    }
-    val grid = if (multi != null) {
-        multi.map { it.take(4) }.distinct().sorted().joinToString(",")
+    // An accepted upload stamps the actual transmitting squares. Older releases
+    // updated this stamp but left MY_GRIDSQUARE/MY_FULL_GRIDS at the old station,
+    // so prefer the stamp if it disagrees with the local locators.
+    val stampedSquares = stamped.map { it.take(4) }.distinct().sorted()
+    val grid = if (stampedSquares.isNotEmpty()) {
+        if (stampedSquares.size > 1) {
+            stampedSquares.joinToString(",")
+        } else {
+            val square = stampedSquares.single()
+            // Keep precise 6/8-character locators when they agree with the signed
+            // square; do not silently keep an old locator from another square.
+            primary.firstOrNull { it.take(4) == square }
+                ?: full.firstOrNull { it.take(4) == square }
+                ?: stamped.first()
+        }
     } else {
-        primary.firstOrNull() ?: full.firstOrNull() ?: stamped.firstOrNull() ?: ""
+        // Legacy imports can have multiple grids without an upload stamp.
+        val multi = listOf(full, primary).firstOrNull { candidates ->
+            candidates.map { it.take(4) }.distinct().size > 1
+        }
+        multi?.map { it.take(4) }?.distinct()?.sorted()?.joinToString(",")
+            ?: primary.firstOrNull() ?: full.firstOrNull() ?: ""
     }
     return OwnStationFilter(call, grid)
 }

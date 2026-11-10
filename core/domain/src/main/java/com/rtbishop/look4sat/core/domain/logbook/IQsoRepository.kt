@@ -20,7 +20,8 @@ interface IQsoRepository {
     /**
      * Marks the batch as uploaded and stamps the station-location grids the batch was
      * signed with (1–4 gridsquares: inside a grid / on a line / on a corner), so the
-     * logbook row can show which grids the QSO went out under.
+     * logbook row and own-station selector reflect a corrected resubmission instead
+     * of retaining the previously signed location.
      */
     suspend fun markUploaded(ids: List<Long>, grids: List<String> = emptyList(), certificateCallsign: String = "")
 

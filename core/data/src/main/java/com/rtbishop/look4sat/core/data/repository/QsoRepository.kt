@@ -86,13 +86,24 @@ class QsoRepository(
     override suspend fun markUploaded(ids: List<Long>, grids: List<String>, certificateCallsign: String) = withContext(dispatcher) {
         if (ids.isEmpty()) return@withContext
         dao.markUploaded(ids)
-        // Stamp the station grid set this batch went out under (a line/corner prefill from
-        // the grid finder carries 2–4 grids). The logbook row shows it after the timestamp.
-        val normalized = grids.map { it.trim().uppercase(Locale.US).take(4) }
-            .filter { it.length >= 4 }.distinct().sorted()
-        if (normalized.isNotEmpty()) {
+        // The accepted LoTW station location is authoritative, including on a resubmit.
+        // Update all own-grid fields together: keeping an old MY_GRIDSQUARE or
+        // MY_FULL_GRIDS would leave a phantom station in the logbook query selector.
+        val gridPattern = Regex("[A-R]{2}[0-9]{2}([A-X]{2}([0-9]{2})?)?")
+        val signedGrids = grids.flatMap { it.split(',') }
+            .map { it.trim().uppercase(Locale.US) }
+            .filter { it.matches(gridPattern) }.distinct()
+        if (signedGrids.isNotEmpty()) {
+            val signedSquares = signedGrids.map { it.take(4) }.distinct().sorted()
             val stamped = ids.mapNotNull { id ->
-                dao.find(id)?.toDomain()?.takeIf { it.vuccGrids != normalized }?.copy(vuccGrids = normalized)
+                dao.find(id)?.toDomain()?.takeIf {
+                    it.myGrid != signedGrids.first() ||
+                        it.myFullGrids != signedGrids || it.vuccGrids != signedSquares
+                }?.copy(
+                    myGrid = signedGrids.first(),
+                    myFullGrids = signedGrids,
+                    vuccGrids = signedSquares
+                )
             }
             if (stamped.isNotEmpty()) dao.saveBatch(stamped.map { it.toEntity() })
         }

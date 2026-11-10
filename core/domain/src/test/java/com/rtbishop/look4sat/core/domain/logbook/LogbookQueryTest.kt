@@ -125,6 +125,30 @@ class LogbookQueryTest {
     }
 
     @Test
+    fun ownStationSelectorDoesNotRetainOldGridAfterLegacyResubmission() {
+        val corrected = record().copy(
+            myGrid = "OL62TI",
+            myFullGrids = listOf("OL62TI", "OL61AT"),
+            vuccGrids = listOf("OL63")
+        )
+        assertEquals(listOf(OwnStationFilter("BA7OPF", "OL63")), ownStationOptions(listOf(corrected)))
+        assertEquals(
+            listOf(corrected),
+            filterRecords(listOf(corrected), "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL63"))
+        )
+        assertEquals(
+            emptyList<QsoRecord>(),
+            filterRecords(listOf(corrected), "", "", LogbookFilter.ALL, OwnStationFilter("BA7OPF", "OL62TI"))
+        )
+    }
+
+    @Test
+    fun ownStationSelectorKeepsPreciseGridWhenItMatchesSignedSquare() {
+        val signed = record().copy(myGrid = "OL62TI", vuccGrids = listOf("OL62"))
+        assertEquals(listOf(OwnStationFilter("BA7OPF", "OL62TI")), ownStationOptions(listOf(signed)))
+    }
+
+    @Test
     fun ownStationSelectorReadsMultiGridsFromDownloadedLoTWAndLegacyAdif() {
         val downloaded = record(callsign = "BG7XYZ").copy(
             myGrid = "OL62TI", myFullGrids = listOf("OL62TI", "OL61AT"),
