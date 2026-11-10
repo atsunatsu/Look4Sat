@@ -110,6 +110,7 @@ import com.rtbishop.look4sat.core.domain.model.AwardType
 import com.rtbishop.look4sat.core.domain.model.firstCallsByGrid
 import com.rtbishop.look4sat.core.domain.model.MapSource
 import com.rtbishop.look4sat.core.domain.model.myStationGrids
+import com.rtbishop.look4sat.core.domain.model.confirmedVuccGridKeys
 import com.rtbishop.look4sat.core.domain.model.migrateStationSelections
 import com.rtbishop.look4sat.core.domain.model.scopedToStation
 import com.rtbishop.look4sat.core.domain.model.scopedToStations
@@ -561,7 +562,7 @@ private fun MapScreen(
     // One source of truth for VUCC: only confirmed QSO buckets contribute.
     // Old standalone grid flags have no attribution and must not inflate All.
     val allWorkedGrids = remember(uiState.workedGridQsos) {
-        uiState.workedGridQsos.filterValues { it.isNotEmpty() }.keys - GRIDLESS_QSO_BUCKET
+        uiState.workedGridQsos.confirmedVuccGridKeys()
     }
     val workedGrids = remember(allWorkedGrids, stationGroups, selectedStationIds) {
         if (selectedStationIds.isEmpty()) allWorkedGrids
