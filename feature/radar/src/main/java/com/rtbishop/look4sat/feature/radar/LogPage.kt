@@ -157,7 +157,7 @@ fun LogPage(
                     )
                     else Text(logUiState.callsignInput, modifier = Modifier.weight(1f))
                     if (showRecordButton) Button(
-                        onClick = { logViewModel.record(satName, mode, txHz, rxHz, logUiState.stationGrid, passWindow, overrides, target.isMutualPassWindow) },
+                        onClick = { logViewModel.record(satName, mode, txHz, rxHz, logUiState.stationGrid, passWindow, overrides) },
                         enabled = !logUiState.recordSaving && logUiState.callsignInput.isNotBlank() && satName.isNotBlank()
                     ) { Text("Log") }
                 }
