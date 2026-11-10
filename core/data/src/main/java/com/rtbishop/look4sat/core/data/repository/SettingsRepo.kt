@@ -27,6 +27,7 @@ import com.rtbishop.look4sat.core.domain.model.DataSourcesSettings
 import com.rtbishop.look4sat.core.domain.model.DatabaseState
 import com.rtbishop.look4sat.core.domain.model.MapSource
 import com.rtbishop.look4sat.core.domain.model.OtherSettings
+import com.rtbishop.look4sat.core.domain.model.UpdateSource
 import com.rtbishop.look4sat.core.domain.model.PassesSettings
 import com.rtbishop.look4sat.core.domain.model.RCSettings
 import com.rtbishop.look4sat.core.domain.model.supportedRadioBaudRates
@@ -85,6 +86,7 @@ class SettingsRepo(
     private val keySelectedTypes = "selectedTypes"
     private val keySelectedModes = "selectedModes"
     private val keyStateOfAutoUpdate = "stateOfAutoUpdate"
+    private val keyUpdateSource = "updateSource"
     private val keyStateOfAutoLotwSync = "stateOfAutoLotwSync"
     private val keyStateOfSensors = "stateOfSensors"
     private val keyCompassOffsetDegrees = "compassOffsetDegrees"
@@ -910,6 +912,7 @@ class SettingsRepo(
             }
             preferences.edit {
                 putBoolean(keyStateOfAutoUpdate, new.stateOfAutoUpdate)
+                putString(keyUpdateSource, new.updateSource.name)
                 putBoolean(keyStateOfAutoLotwSync, new.stateOfAutoLotwSync)
                 putBoolean(keyStateOfSensors, new.stateOfSensors)
                 putFloat(keyCompassOffsetDegrees, new.compassOffsetDegrees.coerceIn(-180f, 180f))
@@ -933,6 +936,7 @@ class SettingsRepo(
 
     private fun getOtherSettings(): OtherSettings = OtherSettings(
         stateOfAutoUpdate = preferences.getBoolean(keyStateOfAutoUpdate, true),
+        updateSource = UpdateSource.fromStored(preferences.getString(keyUpdateSource, null)),
         stateOfAutoLotwSync = preferences.getBoolean(keyStateOfAutoLotwSync, true),
         stateOfSensors = preferences.getBoolean(keyStateOfSensors, true),
         compassOffsetDegrees = preferences.getFloat(keyCompassOffsetDegrees, 0f).coerceIn(-180f, 180f),
