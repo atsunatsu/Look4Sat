@@ -264,6 +264,11 @@ class RadarViewModel(
             mutualSession.trackSamples.isNotEmpty() &&
             mutualSession.startTime == satelliteRepo.selectedPass.value.second &&
             mutualSession.endTime > mutualSession.startTime
+        _uiState.update {
+            it.copy(
+                mutualPassWindow = if (matchedPass) mutualSession.startTime..mutualSession.endTime else null
+            )
+        }
         val latB = mutualSession.stationBLatitude
         val lonB = mutualSession.stationBLongitude
         oppositeStation = if (matchedPass && latB != null && lonB != null &&
