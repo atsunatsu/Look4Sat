@@ -131,20 +131,20 @@ class UpdateRepository(private val remoteSource: IRemoteSource) : IUpdateReposit
     }
 
     private fun parseRelease(html: String, source: UpdateSource): LatestRelease? {
-        // releases/latest redirects to a tag page. Do not guess a version from its title.
-        val ogUrl = Regex("<meta\\s+property=\\\"og:url\\\"\\s+content=\\\"([^\\\"]*)\\\"")
+        // releases/latest redirects to a tag page. Do not guess the tag from its title.
+        val ogUrl = Regex("""<meta\s+property=["']og:url["']\s+content=["']([^"']*)["']""")
             .find(html)?.groupValues?.get(1) ?: return null
-        val tag = Regex("/releases/tag/(v[0-9][0-9A-Za-z.\\-]*)")
+        val tag = Regex("""/releases/tag/(v[0-9][0-9A-Za-z.-]*)""")
             .find(ogUrl)?.groupValues?.get(1) ?: return null
         if (!TAG_PATTERN.matches(tag)) return null
-        val title = Regex("<title>(.*?)</title>", RegexOption.DOT_MATCHES_ALL)
+        val title = Regex("""<title>(.*?)</title>""", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1)?.trim()
             ?.substringBefore("·")?.removePrefix("Release")?.trim() ?: tag
-        val raw = Regex("<div[^>]*class=\\\"[^\\\"]*markdown-body[^\\\"]*\\\"[^>]*>(.*?)</div>", RegexOption.DOT_MATCHES_ALL)
+        val raw = Regex("""<div[^>]*class=["'][^"']*markdown-body[^"']*["'][^>]*>(.*?)</div>""", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1) ?: ""
-        val body = raw.replace(Regex("<[^>]+>"), "")
+        val body = raw.replace(Regex("""<[^>]+>"""), "")
             .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-            .replace("&quot;", "\\"").replace("&#39;", "'").trim()
+            .replace("&quot;", "\"").replace("&#39;", "'").trim()
         return LatestRelease(
             versionTag = tag,
             title = title,
@@ -174,6 +174,6 @@ class UpdateRepository(private val remoteSource: IRemoteSource) : IUpdateReposit
         const val DOWNLOAD_TIMEOUT_MS = 180_000L
         const val MAX_APK_BYTES = 200L * 1024 * 1024
         val ALL_SOURCES = listOf(UpdateSource.GITHUB, UpdateSource.GHFAST, UpdateSource.LLKK, UpdateSource.MOEYY)
-        val TAG_PATTERN = Regex("^v[0-9][0-9A-Za-z.\\-]*$")
+        val TAG_PATTERN = Regex("""^v[0-9][0-9A-Za-z.-]*$""")
     }
 }
