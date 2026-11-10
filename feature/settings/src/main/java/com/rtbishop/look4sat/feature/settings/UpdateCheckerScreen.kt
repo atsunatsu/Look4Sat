@@ -35,11 +35,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.rtbishop.look4sat.core.domain.model.UpdateSource
 import com.rtbishop.look4sat.core.presentation.CardButton
 import com.rtbishop.look4sat.core.presentation.IconCard
 import com.rtbishop.look4sat.core.presentation.R
@@ -65,9 +73,11 @@ fun UpdateCheckerScreen(
     onBack: () -> Unit,
     onCheck: () -> Unit,
     onDownload: () -> Unit,
+    onSourceChange: (UpdateSource) -> Unit,
     onConsumeApk: () -> Unit
 ) {
     val context = LocalContext.current
+    var sourceMenuExpanded by remember { mutableStateOf(false) }
 
     // When the APK finishes downloading, hand it to the system installer.
     LaunchedEffect(state.apkFile) {
@@ -117,6 +127,30 @@ fun UpdateCheckerScreen(
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        TextButton(
+                            onClick = { sourceMenuExpanded = true },
+                            enabled = !state.isChecking && !state.isDownloading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.update_source_selection, updateSourceLabel(state.selectedSource)))
+                        }
+                        DropdownMenu(
+                            expanded = sourceMenuExpanded,
+                            onDismissRequest = { sourceMenuExpanded = false }
+                        ) {
+                            UpdateSource.entries.forEach { source ->
+                                DropdownMenuItem(
+                                    text = { Text(updateSourceLabel(source)) },
+                                    onClick = {
+                                        sourceMenuExpanded = false
+                                        onSourceChange(source)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     CardButton(
                         onClick = onCheck,
                         text = stringResource(R.string.update_check_button),
@@ -125,10 +159,24 @@ fun UpdateCheckerScreen(
                 }
             }
 
+            state.activeSource?.let { source ->
+                Text(
+                    text = stringResource(
+                        if (state.isChecking || state.isDownloading) R.string.update_source_trying
+                        else R.string.update_source_served,
+                        updateSourceLabel(source)
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             when {
                 state.isChecking -> StatusRow(showSpinner = true)
-                state.errorResId != null -> StatusRow(showSpinner = false, message = stringResource(state.errorResId))
-                state.release == null -> Unit // not checked yet
+                state.release == null -> {
+                    state.errorResId?.let { error ->
+                        StatusRow(showSpinner = false, message = stringResource(error))
+                    }
+                }
                 !state.hasUpdate -> StatusRow(showSpinner = false, message = stringResource(R.string.update_check_up_to_date))
                 else -> ReleaseCard(
                     state = state,
@@ -210,6 +258,13 @@ private fun ReleaseCard(state: UpdateCheckerState, onDownload: () -> Unit, modif
                 Spacer(modifier = Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(10.dp))
+            state.errorResId?.let { error ->
+                Text(
+                    text = stringResource(error),
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp
+                )
+            }
             when {
                 release.apkUrl == null -> Text(
                     text = stringResource(R.string.update_check_no_apk),
@@ -234,3 +289,14 @@ private fun ReleaseCard(state: UpdateCheckerState, onDownload: () -> Unit, modif
         }
     }
 }
+
+@Composable
+private fun updateSourceLabel(source: UpdateSource): String = stringResource(
+    when (source) {
+        UpdateSource.AUTO -> R.string.update_source_auto
+        UpdateSource.GITHUB -> R.string.update_source_github
+        UpdateSource.GHFAST -> R.string.update_source_ghfast
+        UpdateSource.LLKK -> R.string.update_source_llkk
+        UpdateSource.MOEYY -> R.string.update_source_moeyy
+    }
+)
