@@ -76,7 +76,8 @@ data class OutOfWindowLog(
     val rxHz: Long?,
     val myGrid: String,
     val midpointUtcMillis: Long,
-    val overrides: LogRecordOverrides = LogRecordOverrides()
+    val overrides: LogRecordOverrides = LogRecordOverrides(),
+    val isMutualPassWindow: Boolean = false
 )
 
 data class LogUiState(
@@ -201,7 +202,8 @@ class LogViewModel(
         rxHz: Long?,
         myGrid: String,
         passWindow: ClosedRange<Long>?,
-        overrides: LogRecordOverrides = LogRecordOverrides()
+        overrides: LogRecordOverrides = LogRecordOverrides(),
+        isMutualPassWindow: Boolean = false
     ) {
         if (_uiState.value.recordSaving) return
         val call = _uiState.value.callsignInput.trim()
@@ -209,17 +211,17 @@ class LogViewModel(
         // Whole minutes (seconds zeroed): matches the edit dialog's HH:mm granularity and the
         // minute-resolution of LoTW reports, so re-saving an unchanged record never looks edited.
         val now = System.currentTimeMillis() / 60_000L * 60_000L
-        // passWindow comes from RadarState.currentPass. In matched radar that is
-        // station A's full local AOS–LOS window, NOT the shorter mutual-visibility
-        // interval. The opposite station may already be below the horizon while this
-        // station is still in pass; that must not trigger the out-of-window warning.
-        // Only a time outside our own pass is stored at the midpoint after confirmation.
+        // Radar's AOS/LOS/countdown use station A's local visibility. For a matched
+        // QSO, however, this window is the mutual overlap: a two-way satellite contact
+        // requires both stations to see the satellite at the QSO time.
         if (passWindow != null && isOutsideLogPassWindow(now, passWindow)) {
             val midpoint = ((passWindow.start + passWindow.endInclusive) / 2L)
                 .let { it / 60_000L * 60_000L }
                 .coerceIn(passWindow.start, passWindow.endInclusive)
             _uiState.update {
-                it.copy(outOfWindowLog = OutOfWindowLog(call, satName, mode, txHz, rxHz, myGrid, midpoint, overrides))
+                it.copy(outOfWindowLog = OutOfWindowLog(
+                    call, satName, mode, txHz, rxHz, myGrid, midpoint, overrides, isMutualPassWindow
+                ))
             }
             return
         }
