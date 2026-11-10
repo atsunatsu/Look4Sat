@@ -229,8 +229,11 @@ class MapViewModel(
 
     /** Loads the worked-grid / mark data into the map state (see the visibility collector). */
     private fun refreshMapGridData() {
-        val workedGrids = settingsRepo.getWorkedGrids()
         val workedGridQsos = settingsRepo.getWorkedGridQsos()
+        // Same confirmed-QSO source as the VUCC award and station selector.
+        // Old standalone flags must not clear station-specific red reminders.
+        val workedGrids = workedGridQsos.filterValues { it.isNotEmpty() }.keys -
+            com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
         val markedGrids = settingsRepo.getMarkedGridStations()
         // Cache worked cells by every station scope that currently owns a mark.
         // A QSO from another operated station must not clear this reminder.
