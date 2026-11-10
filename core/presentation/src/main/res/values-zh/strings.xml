@@ -497,9 +497,7 @@
     <string name="qso_edit_cancel">取消</string>
     <string name="log_out_window_title">不在过境窗口</string>
     <string name="log_out_window_message">当前时间不在该过境窗口内，将默认按过境中点 %1$s 录入；如需修改，请点击该条通联记录。</string>
-    <string name="log_out_mutual_window_title">不在双方共同可见窗口</string>
-    <string name="log_out_mutual_window_message">此时卫星可能仍在你本地地平线上方，但已超出双方同时可见的时间窗口。将默认按双方共同可见窗口的中点 %1$s 录入；如需修改实际通联时间，请点击该条记录。</string>
-    <string name="log_out_window_confirm">录入</string>
+Chinese mutual strings    <string name="log_out_window_confirm">录入</string>
     <string name="qso_edit_err_callsign">呼号不能为空</string>
     <string name="qso_edit_err_datetime">日期或时间格式不对 —— 应为 yyyy-MM-dd 与 HH:mm:ss（UTC）</string>
     <string name="qso_edit_err_frequency">频率格式不对 —— 请输入 MHz，例如 145.850</string>
