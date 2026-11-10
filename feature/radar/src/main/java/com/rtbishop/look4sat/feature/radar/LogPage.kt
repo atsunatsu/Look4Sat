@@ -134,7 +134,7 @@ fun LogPage(
     val passWindow = target.passWindow
     val recent = records
         .filter { satelliteIdentity(it.satelliteName) == satIdentity }
-        // Only contacts inside the current pass window: the log page is the "this pass" sheet.
+        // Only contacts inside the QSO window (the mutual overlap when opened from Match).
         .filter { passWindow?.contains(it.startUtcMillis) == true }
         .sortedByDescending { it.startUtcMillis }
     val maxElev = uiState.currentPass?.maxElevation ?: 0.0
@@ -312,9 +312,9 @@ fun LogPage(
         )
     }
 
-    // Out-of-window notice: the clock is outside the current pass [aos, los], so the record
-    // would never show in the window-filtered list. Confirm first, then store it at the pass
-    // midpoint (there is always an edit dialog afterwards for the exact time).
+    // Out-of-window notice: in matched radar this means outside the mutual QSO window,
+    // even if the local radar countdown is still running. Store at the window midpoint
+    // after confirmation; the operator can then edit the exact QSO time.
     logUiState.outOfWindowLog?.let { pending ->
         val midpointText = remember(pending.midpointUtcMillis) {
             java.text.SimpleDateFormat("HH:mm'Z'", java.util.Locale.US).apply {
