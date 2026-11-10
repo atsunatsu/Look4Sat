@@ -470,4 +470,17 @@ class AwardCalculatorTest {
         assertEquals(listOf(ambiguous), afterManualAssignment.map { it.qso })
     }
 
+
+    @Test
+    fun `vucc ignores empty buckets and gridless records`() {
+        val confirmed = qso("BA7OPF")
+        val store = mapOf(
+            "FN31" to listOf(confirmed),
+            "FN32" to emptyList<GridQso>(),
+            GRIDLESS_QSO_BUCKET to listOf(confirmed)
+        )
+        val vucc = AwardCalculator.calculate(store).first { it.type == AwardType.VUCC }
+        assertEquals(1, vucc.count)
+        assertEquals(setOf("FN31"), vucc.workedKeys)
+    }
 }
