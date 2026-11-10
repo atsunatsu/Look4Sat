@@ -488,6 +488,7 @@ private enum class EditedField { TX, PASSBAND, RX }
 private const val MAX_CALCULATOR_OFFSET_KHZ = 10_000.0
 private const val CALCULATOR_FREQUENCY_STEP_HZ = 1_000L // Default: 1 kHz
 internal val CW_CALCULATOR_FREQUENCY_STEPS = listOf(
+    100L to "0.1k",
     250L to "0.25k",
     500L to "0.5k",
     1_000L to "1k",
@@ -510,7 +511,7 @@ private fun isValidCalculatorOffset(value: String): Boolean {
 
 internal fun adjustCalculatorOffset(offsetKHz: String, increase: Boolean): String {
     val current = offsetKHz.toBigDecimalOrNull() ?: BigDecimal.ZERO
-    val delta = if (increase) BigDecimal("0.25") else BigDecimal("-0.25")
+    val delta = if (increase) BigDecimal("0.1") else BigDecimal("-0.1")
     val limit = BigDecimal("10000")
     return current.add(delta).coerceIn(limit.negate(), limit)
         .stripTrailingZeros().toPlainString()
@@ -704,7 +705,7 @@ private fun CalculatorContent(
     val stepHz = if (showStepSelector) frequencyStepHz else CALCULATOR_FREQUENCY_STEP_HZ
     val stepPrecision = when (stepHz) {
         250L -> 5
-        500L -> 4
+        100L, 500L -> 4
         else -> 3
     }
     val offsetPrecision = when {
