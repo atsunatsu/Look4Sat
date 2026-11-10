@@ -30,6 +30,8 @@ data class NetworkResult(val code: Int, val stream: InputStream?) {
 interface IRemoteSource {
     suspend fun getFileStream(uri: String): InputStream?
     suspend fun getNetworkStream(url: String): NetworkResult
+    /** Total request timeout for update checks/downloads; defaults to the normal client. */
+    suspend fun getNetworkStream(url: String, timeoutMs: Long): NetworkResult = getNetworkStream(url)
     suspend fun getAmSatCatalog(): String?
     suspend fun getAmSatReports(hours: Int, limit: Int): String?
     suspend fun submitAmSatReport(payloadJson: String): Pair<Int, String>?
