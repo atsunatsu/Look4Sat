@@ -218,6 +218,10 @@ fun List<GridQso>.scopedToStations(stationIds: Set<String>): List<GridQso> {
     return filter { qso -> stationIds.any { qso.matchesStationScope(it) } }
 }
 
+/** Confirmed VUCC squares: exclude gridless and empty QSO buckets everywhere. */
+fun Map<String, List<GridQso>>.confirmedVuccGridKeys(): Set<String> =
+    filter { (grid, qsos) -> grid != GRIDLESS_QSO_BUCKET && qsos.isNotEmpty() }.keys
+
 /** 4-char grids worked within the selected operated-station scope (empty keys excluded). */
 fun Map<String, List<GridQso>>.workedGridsForStations(stationIds: Set<String>): Set<String> =
     entries.asSequence()
