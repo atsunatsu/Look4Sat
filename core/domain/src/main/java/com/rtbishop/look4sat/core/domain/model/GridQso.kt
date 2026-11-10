@@ -171,7 +171,7 @@ private fun GridQso.stationIdentityKey(): String {
  * selectors contain only the grid-set key; these are migrated by the map UI.
  */
 fun GridQso.stationSelectionKey(): String? =
-    stationGridSetKey()?.let { "$" + "{it}#$" + "{stationIdentityKey()}" }
+    stationGridSetKey()?.let { "$it#${stationIdentityKey()}" }
 
 /** A saved pre-identity selection of OL62 expands to every OL62 identity. */
 fun Set<String>.migrateStationSelections(availableIds: Set<String>): Set<String> =
