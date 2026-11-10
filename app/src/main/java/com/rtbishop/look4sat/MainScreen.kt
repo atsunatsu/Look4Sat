@@ -125,10 +125,17 @@ fun NavRoot(deeplink: String? = null) {
         }
     }
     val navigateBack: () -> Unit = {
-        if (rootBackStack.lastOrNull() is RadarMatchGridPickerDestination) {
-            finishRadarGridPicker(null)
-        } else {
-            rootBackStack.removeLastOrNull()
+        when (rootBackStack.lastOrNull()) {
+            is RadarMatchGridPickerDestination -> finishRadarGridPicker(null)
+            is RadarDestination, is RadarMatchDestination -> {
+                // NavDisplay.onBack (system/predictive Back) bypasses RadarDestination's
+                // toolbar callback. Clear the shared opposite-station track here too.
+                if (container.mutualPassData.value.endTime > 0L) {
+                    container.setMutualPassData(MutualPassData())
+                }
+                rootBackStack.removeLastOrNull()
+            }
+            else -> rootBackStack.removeLastOrNull()
         }
     }
     val openRadarGridPicker: () -> Unit = {
