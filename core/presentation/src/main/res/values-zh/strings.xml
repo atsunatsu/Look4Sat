@@ -462,6 +462,14 @@
     <string name="mutual_open_radar">查看雷达</string>
     <string name="mutual_station_a">站点A</string>
     <string name="mutual_station_b">站点B</string>
+    <string name="update_source_selection">更新源：%s</string>
+    <string name="update_source_auto">自动选择（依次尝试）</string>
+    <string name="update_source_github">GitHub 官方</string>
+    <string name="update_source_ghfast">ghfast.top（代理）</string>
+    <string name="update_source_llkk">gh.llkk.cc（代理）</string>
+    <string name="update_source_moeyy">github.moeyy.xyz（代理）</string>
+    <string name="update_source_trying">正在尝试：%s</string>
+    <string name="update_source_served">使用的更新源：%s</string>
     <string name="update_check_title">检查更新</string>
     <string name="update_check_button">检查更新</string>
     <string name="update_check_current">当前版本：%s</string>
