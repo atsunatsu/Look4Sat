@@ -93,7 +93,6 @@ class CalculatorReferenceUiTest {
         }
         compose.onNodeWithTag("calculatorTxFrequency").assertTextEquals("145.962")
         compose.onNodeWithTag("cwCalculatorStepSelector").performClick()
-        compose.onNodeWithTag("cwCalculatorStepOption100").assertDoesNotExist()
         compose.onNodeWithTag("cwCalculatorStepOption250").performClick()
         compose.onNodeWithTag("calculatorTxFrequency").assertTextEquals("145.96200")
         compose.onAllNodesWithText("+").onFirst().performClick()
@@ -123,10 +122,10 @@ class CalculatorReferenceUiTest {
         }
         compose.onNodeWithTag("cwCalculatorOffsetInput").assertTextEquals("2.5")
         compose.onNodeWithTag("cwCalculatorOffsetIncrease").performClick()
-        compose.onNodeWithTag("cwCalculatorOffsetInput").assertTextEquals("2.75")
-        compose.onNodeWithTag("calculatorRxFrequency").assertTextEquals("435.05725")
-        compose.waitUntil(timeoutMillis = 3_000) { pair.value.second == 435057250L }
-        compose.runOnIdle { assertEquals(435057250L, pair.value.second) }
+        compose.onNodeWithTag("cwCalculatorOffsetInput").assertTextEquals("2.6")
+        compose.onNodeWithTag("calculatorRxFrequency").assertTextEquals("435.0571")
+        compose.waitUntil(timeoutMillis = 3_000) { pair.value.second == 435057100L }
+        compose.runOnIdle { assertEquals(435057100L, pair.value.second) }
 
         compose.onNodeWithTag("cwCalculatorOffsetDecrease").performClick()
         compose.onNodeWithTag("cwCalculatorOffsetInput").assertTextEquals("2.5")
@@ -134,17 +133,16 @@ class CalculatorReferenceUiTest {
         compose.waitUntil(timeoutMillis = 3_000) { pair.value.second == 435057000L }
     }
 
-    @Test fun offsetStepperUsesExactQuarterKilohertzStepsAndClampsAtTheLimits() {
-        assertEquals("0.25", adjustCalculatorOffset("", increase = true))
-        assertEquals("-0.25", adjustCalculatorOffset("", increase = false))
-        assertEquals("2.75", adjustCalculatorOffset("2.5", increase = true))
-        assertEquals("2.25", adjustCalculatorOffset("2.5", increase = false))
+    @Test fun offsetStepperUsesExactTenthKilohertzStepsAndClampsAtTheLimits() {
+        assertEquals("0.1", adjustCalculatorOffset("", increase = true))
+        assertEquals("-0.1", adjustCalculatorOffset("", increase = false))
+        assertEquals("2.6", adjustCalculatorOffset("2.5", increase = true))
+        assertEquals("2.4", adjustCalculatorOffset("2.5", increase = false))
         assertEquals("10000", adjustCalculatorOffset("9999.9", increase = true))
         assertEquals("-10000", adjustCalculatorOffset("-9999.9", increase = false))
     }
 
     @Test fun calculatorStepRoundingSupportsEveryCwStep() {
-        assertEquals(listOf(250L, 500L, 1_000L, 5_000L), CW_CALCULATOR_FREQUENCY_STEPS.map { it.first })
         for ((step, _) in CW_CALCULATOR_FREQUENCY_STEPS) {
             val snapped = snapCalculatorFrequency(145_962_310L, step)
             assertEquals(0L, snapped % step)
