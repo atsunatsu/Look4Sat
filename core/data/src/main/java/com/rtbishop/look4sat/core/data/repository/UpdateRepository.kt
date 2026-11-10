@@ -19,106 +19,161 @@
 package com.rtbishop.look4sat.core.data.repository
 
 import com.rtbishop.look4sat.core.domain.model.LatestRelease
+import com.rtbishop.look4sat.core.domain.model.UpdateSource
 import com.rtbishop.look4sat.core.domain.repository.IUpdateRepository
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.zip.ZipFile
 
-class UpdateRepository(
-    private val remoteSource: IRemoteSource
-) : IUpdateRepository {
+/**
+ * GitHub Releases + multiple independent community accelerators.
+ *
+ * A chosen endpoint is used exclusively; AUTO retries the endpoints in order.
+ * Downloads are first written to a temporary APK and validated before being
+ * swapped into the cache path consumed by Android's installer.
+ */
+class UpdateRepository(private val remoteSource: IRemoteSource) : IUpdateRepository {
 
-    override suspend fun getLatestRelease(): LatestRelease? = withContext(Dispatchers.IO) {
-        // Use the GitHub releases web page instead of the REST API endpoint:
-        // the API endpoint is rate-limited to 60 requests/hour per IP, which is
-        // quickly exhausted on shared egress IPs (e.g. VPN proxies), causing 403
-        // failures. The web endpoint redirects to the latest tag with no such limit.
-        // When GitHub is unreachable (common on mainland-China networks without a
-        // proxy), fall back to community GitHub accelerator mirrors that proxy the
-        // same page; each mirror resolves the identical tag and asset URLs.
-        for (baseUrl in LATEST_RELEASE_URLS) {
-            val result = remoteSource.getNetworkStream(baseUrl)
-            val stream = result.stream ?: continue
-            val parsed = try {
-                parseRelease(stream.bufferedReader().use { it.readText() }, baseUrl)
+    override suspend fun getLatestRelease(): LatestRelease? =
+        getLatestRelease(UpdateSource.AUTO) {}
+
+    override suspend fun getLatestRelease(
+        source: UpdateSource,
+        onSourceChanged: (UpdateSource) -> Unit
+    ): LatestRelease? = withContext(Dispatchers.IO) {
+        for (candidate in orderedSources(source)) {
+            onSourceChanged(candidate)
+            val url = releasePageUrl(candidate)
+            try {
+                val network = remoteSource.getNetworkStream(url, CHECK_TIMEOUT_MS)
+                val page = network.stream?.bufferedReader()?.use { it.readText() } ?: continue
+                if (network.code !in 200..299) continue
+                parseRelease(page, candidate)?.let { return@withContext it }
             } catch (e: Exception) {
-                println("UpdateRepository parse failure: $e")
-                null
+                println("UpdateRepository check failed for $candidate: $e")
             }
-            if (parsed != null) return@withContext parsed
         }
         null
     }
 
-    override suspend fun downloadApk(url: String, dest: File): Boolean = withContext(Dispatchers.IO) {
-        if (url.isBlank()) return@withContext false
-        val result = remoteSource.getNetworkStream(url)
-        val stream = result.stream ?: return@withContext false
+    /** Legacy single-URL download for other callers; still rejects HTML responses. */
+    override suspend fun downloadApk(url: String, dest: File): Boolean =
+        downloadCandidate(url, dest) { true }
+
+    override suspend fun downloadApk(
+        release: LatestRelease,
+        dest: File,
+        source: UpdateSource,
+        preferred: UpdateSource?,
+        onSourceChanged: (UpdateSource) -> Unit,
+        validate: (File) -> Boolean
+    ): Boolean {
+        val tag = release.versionTag
+        // Do not construct download requests from arbitrary URLs or markup.
+        if (!TAG_PATTERN.matches(tag)) return false
+        for (candidate in orderedSources(source, preferred)) {
+            onSourceChanged(candidate)
+            if (downloadCandidate(downloadUrl(candidate, tag), dest, validate)) return true
+        }
+        return false
+    }
+
+    private suspend fun downloadCandidate(
+        url: String,
+        dest: File,
+        validate: (File) -> Boolean
+    ): Boolean = withContext(Dispatchers.IO) {
+        dest.parentFile?.mkdirs()
+        // Keep the .apk suffix for PackageManager.getPackageArchiveInfo().
+        val temp = File(dest.parentFile, "${dest.nameWithoutExtension}.download.apk")
+        temp.delete()
         try {
-            dest.outputStream().use { out -> stream.use { it.copyTo(out) } }
-            true
+            val network = remoteSource.getNetworkStream(url, DOWNLOAD_TIMEOUT_MS)
+            val stream = network.stream ?: return@withContext false
+            if (network.code !in 200..299) {
+                stream.close()
+                return@withContext false
+            }
+            stream.use { input ->
+                temp.outputStream().use { output ->
+                    val buffer = ByteArray(16 * 1024)
+                    var copied = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        copied += count
+                        if (copied > MAX_APK_BYTES) throw IllegalStateException("APK exceeded safe size")
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
+            // Reject proxy error pages, incomplete archives and a substituted package.
+            if (!hasApkStructure(temp) || !validate(temp)) return@withContext false
+            // A candidate is made visible to FileProvider only after all checks pass.
+            if (dest.exists() && !dest.delete()) return@withContext false
+            temp.renameTo(dest)
         } catch (e: Exception) {
-            println("UpdateRepository download failure: $e")
+            println("UpdateRepository download failed: $e")
             false
+        } finally {
+            temp.delete()
         }
     }
 
-    private fun parseRelease(html: String, sourceUrl: String): LatestRelease? {
-        // The redirect target is the latest release's tag page. Extract the tag
-        // from the og:url meta tag ("…/releases/tag/v4.4.6-ba7opf.8") — stable and
-        // unambiguous. The <title> also holds the release name, but that is free
-        // text and cannot be used to build the asset URL.
-        val ogUrl = Regex("<meta\\s+property=\"og:url\"\\s+content=\"([^\"]*)\"").find(html)
-            ?.groupValues?.get(1) ?: return null
-        val tag = Regex("/releases/tag/(v[0-9][0-9A-Za-z.\\-]*)$").find(ogUrl)
-            ?.groupValues?.get(1) ?: return null
+    private fun hasApkStructure(file: File): Boolean = try {
+        file.length() > 0 && ZipFile(file).use { zip ->
+            zip.getEntry("AndroidManifest.xml") != null && zip.getEntry("classes.dex") != null
+        }
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun parseRelease(html: String, source: UpdateSource): LatestRelease? {
+        // releases/latest redirects to a tag page. Do not guess a version from its title.
+        val ogUrl = Regex("<meta\\s+property=\\\"og:url\\\"\\s+content=\\\"([^\\\"]*)\\\"")
+            .find(html)?.groupValues?.get(1) ?: return null
+        val tag = Regex("/releases/tag/(v[0-9][0-9A-Za-z.\\-]*)")
+            .find(ogUrl)?.groupValues?.get(1) ?: return null
+        if (!TAG_PATTERN.matches(tag)) return null
         val title = Regex("<title>(.*?)</title>", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1)?.trim()
             ?.substringBefore("·")?.removePrefix("Release")?.trim() ?: tag
-        // Release notes live in the page's markdown-body section (first occurrence
-        // is the release description). Strip HTML tags for plain-text display.
-        val raw = Regex("<div[^>]*class=\"[^\"]*markdown-body[^\"]*\"[^>]*>(.*?)</div>", RegexOption.DOT_MATCHES_ALL)
+        val raw = Regex("<div[^>]*class=\\\"[^\\\"]*markdown-body[^\\\"]*\\\"[^>]*>(.*?)</div>", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1) ?: ""
         val body = raw.replace(Regex("<[^>]+>"), "")
             .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-            .replace("&quot;", "\"").replace("&#39;", "'")
-            .trim()
-        // The release APK asset naming: Look4Sat-<tag without leading v>.apk
-        // (since v4.4.6-ba7opf.9.9 the releases are uploaded with the bare
-        // versioned filename, no "-release" suffix). When the page was fetched
-        // through an accelerator mirror (https://<mirror>/https://github.com/...),
-        // download through the same mirror — raw github.com is unreachable on the
-        // networks that needed the mirror in the first place.
-        val mirrorPrefix = sourceUrl.substringBefore("https://github.com")
-        val apkName = "Look4Sat-${tag.removePrefix("v")}.apk"
-        val apkUrl = if (mirrorPrefix.isEmpty()) {
-            "$DOWNLOAD_BASE_URL/$tag/$apkName"
-        } else {
-            "${mirrorPrefix}https://github.com/atsunatsu/Look4Sat/releases/download/$tag/$apkName"
-        }
+            .replace("&quot;", "\\"").replace("&#39;", "'").trim()
         return LatestRelease(
             versionTag = tag,
             title = title,
             body = body,
-            apkUrl = apkUrl
+            apkUrl = downloadUrl(source, tag)
         )
     }
 
+    private fun orderedSources(source: UpdateSource, preferred: UpdateSource? = null): List<UpdateSource> =
+        if (source != UpdateSource.AUTO) listOf(source)
+        else (listOfNotNull(preferred?.takeUnless { it == UpdateSource.AUTO }) + ALL_SOURCES).distinct()
+
+    private fun releasePageUrl(source: UpdateSource): String = prefix(source) + RELEASE_PAGE
+    private fun downloadUrl(source: UpdateSource, tag: String): String =
+        prefix(source) + "https://github.com/atsunatsu/Look4Sat/releases/download/$tag/Look4Sat-${tag.removePrefix("v")}.apk"
+
+    private fun prefix(source: UpdateSource): String = when (source) {
+        UpdateSource.AUTO, UpdateSource.GITHUB -> ""
+        UpdateSource.GHFAST -> "https://ghfast.top/"
+        UpdateSource.LLKK -> "https://gh.llkk.cc/"
+        UpdateSource.MOEYY -> "https://github.moeyy.xyz/"
+    }
+
     private companion object {
-        // Web pages are used instead of api.github.com to avoid the 60 req/hour
-        // anonymous rate limit (see getLatestRelease above). The GitHub URL is
-        // tried first; if it is unreachable (no proxy on mainland networks) the
-        // accelerator mirrors are tried in order. Download URLs always point at
-        // the mirrors too — raw github.com release downloads are equally blocked
-        // without a proxy, so a mirror-resolved tag must be downloaded via the
-        // same mirror.
-        val LATEST_RELEASE_URLS = listOf(
-            "https://github.com/atsunatsu/Look4Sat/releases/latest",
-            "https://ghfast.top/https://github.com/atsunatsu/Look4Sat/releases/latest",
-            "https://gh.llkk.cc/https://github.com/atsunatsu/Look4Sat/releases/latest",
-            "https://github.moeyy.xyz/https://github.com/atsunatsu/Look4Sat/releases/latest"
-        )
-        const val DOWNLOAD_BASE_URL = "https://github.com/atsunatsu/Look4Sat/releases/download"
+        const val RELEASE_PAGE = "https://github.com/atsunatsu/Look4Sat/releases/latest"
+        const val CHECK_TIMEOUT_MS = 9_000L
+        const val DOWNLOAD_TIMEOUT_MS = 180_000L
+        const val MAX_APK_BYTES = 200L * 1024 * 1024
+        val ALL_SOURCES = listOf(UpdateSource.GITHUB, UpdateSource.GHFAST, UpdateSource.LLKK, UpdateSource.MOEYY)
+        val TAG_PATTERN = Regex("^v[0-9][0-9A-Za-z.\\-]*$")
     }
 }
