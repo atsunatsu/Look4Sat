@@ -60,7 +60,7 @@ class UpdateRepositoryTest {
             assertTrue(ok)
             assertEquals(listOf(UpdateSource.GITHUB, UpdateSource.GHFAST), seen)
             assertTrue(dest.readBytes().contentEquals(apk))
-            assertFalse(File(dest.parentFile, "\${dest.nameWithoutExtension}.download.apk").exists())
+            assertFalse(File(dest.parentFile, "${dest.nameWithoutExtension}.download.apk").exists())
         } finally {
             dest.delete()
         }
@@ -76,7 +76,7 @@ class UpdateRepositoryTest {
             )
             assertFalse(ok)
             assertFalse(dest.exists())
-            assertFalse(File(dest.parentFile, "\${dest.nameWithoutExtension}.download.apk").exists())
+            assertFalse(File(dest.parentFile, "${dest.nameWithoutExtension}.download.apk").exists())
             assertEquals(1, remote.requests.size)
         } finally {
             dest.delete()
