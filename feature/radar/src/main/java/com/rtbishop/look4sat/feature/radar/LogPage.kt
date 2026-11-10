@@ -76,8 +76,7 @@ internal data class LogRecordTarget(
     val satName: String,
     val txHz: Long?,
     val rxHz: Long?,
-    val passWindow: LongRange?,
-    val isMutualPassWindow: Boolean
+    val passWindow: LongRange?
 )
 
 internal fun RadarState.logRecordTarget(): LogRecordTarget {
@@ -93,12 +92,11 @@ internal fun RadarState.logRecordTarget(): LogRecordTarget {
         else calculatorTxHz ?: repeaterTxHz ?: selectedTxHz
     val rxHz = if (useRepeater) repeaterRxHz ?: calculatorRxHz ?: selectedRxHz
         else calculatorRxHz ?: repeaterRxHz ?: selectedRxHz
-    // Radar countdown uses the full local pass. QSO logging instead uses the
-    // simultaneous-visibility interval when this radar was opened from Match.
-    val qsoWindow = mutualPassWindow ?: currentPass?.let { it.aosTime..it.losTime }
+    // The log page follows the selected radar's local AOS–LOS window.
+    // The opposite station's visibility does not restrict logging here.
     return LogRecordTarget(
         catnum, currentPass?.name?.trim().orEmpty(), txHz, rxHz,
-        qsoWindow, mutualPassWindow != null
+        currentPass?.let { it.aosTime..it.losTime }
     )
 }
 
@@ -118,7 +116,7 @@ fun LogPage(
     // Record currently open in the edit dialog (null when closed).
     var editTarget by remember { mutableStateOf<QsoRecord?>(null) }
 
-    val target = remember(uiState.currentPass, uiState.mutualPassWindow, uiState.transceivers.transmitters,
+    val target = remember(uiState.currentPass, uiState.transceivers.transmitters,
         uiState.transceivers.selectedUuid, uiState.calculatorTxHz, uiState.calculatorRxHz) {
         uiState.logRecordTarget()
     }
@@ -134,7 +132,7 @@ fun LogPage(
     val passWindow = target.passWindow
     val recent = records
         .filter { satelliteIdentity(it.satelliteName) == satIdentity }
-        // Only contacts inside the QSO window (the mutual overlap when opened from Match).
+        // Only contacts inside the current local pass window.
         .filter { passWindow?.contains(it.startUtcMillis) == true }
         .sortedByDescending { it.startUtcMillis }
     val maxElev = uiState.currentPass?.maxElevation ?: 0.0
@@ -154,7 +152,7 @@ fun LogPage(
                             imeAction = ImeAction.Done
                         ),
                         keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
-                            logViewModel.record(satName, mode, txHz, rxHz, logUiState.stationGrid, passWindow, overrides, target.isMutualPassWindow)
+                            logViewModel.record(satName, mode, txHz, rxHz, logUiState.stationGrid, passWindow, overrides)
                         })
                     )
                     else Text(logUiState.callsignInput, modifier = Modifier.weight(1f))
@@ -312,9 +310,9 @@ fun LogPage(
         )
     }
 
-    // Out-of-window notice: in matched radar this means outside the mutual QSO window,
-    // even if the local radar countdown is still running. Store at the window midpoint
-    // after confirmation; the operator can then edit the exact QSO time.
+    // Out-of-window notice: the current time is outside this station's local AOS–LOS.
+    // Store at the local pass midpoint after confirmation; the operator can then edit
+    // the exact QSO time.
     logUiState.outOfWindowLog?.let { pending ->
         val midpointText = remember(pending.midpointUtcMillis) {
             java.text.SimpleDateFormat("HH:mm'Z'", java.util.Locale.US).apply {
@@ -325,19 +323,8 @@ fun LogPage(
             onDismissRequest = logViewModel::dismissOutOfWindowLog,
             shape = sheetDialogShape(),
             containerColor = sheetDialogContainerColor(),
-            title = {
-                SheetDialogTitle(stringResource(
-                    if (pending.isMutualPassWindow) R.string.log_out_mutual_window_title
-                    else R.string.log_out_window_title
-                ))
-            },
-            text = {
-                Text(stringResource(
-                    if (pending.isMutualPassWindow) R.string.log_out_mutual_window_message
-                    else R.string.log_out_window_message,
-                    midpointText
-                ))
-            },
+            title = { SheetDialogTitle(stringResource(R.string.log_out_window_title)) },
+            text = { Text(stringResource(R.string.log_out_window_message, midpointText)) },
             confirmButton = {
                 TextButton(onClick = logViewModel::confirmOutOfWindowLog) {
                     Text(stringResource(R.string.log_out_window_confirm))
