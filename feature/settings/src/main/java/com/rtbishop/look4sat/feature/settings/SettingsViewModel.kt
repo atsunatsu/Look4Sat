@@ -1007,7 +1007,7 @@ class SettingsViewModel(
                 onSourceChanged = { candidate ->
                     _uiState.update { it.copy(updateChecker = it.updateChecker.copy(activeSource = candidate)) }
                 },
-                validate = { candidate -> isTrustedUpdateApk(candidate) }
+                validate = { candidate -> isTrustedUpdateApk(candidate, release.versionTag) }
             )
             _uiState.update {
                 it.copy(
@@ -1027,7 +1027,7 @@ class SettingsViewModel(
      * before giving them to FileProvider in the first place.
      */
     @Suppress("DEPRECATION")
-    private fun isTrustedUpdateApk(file: File): Boolean {
+    private fun isTrustedUpdateApk(file: File, expectedTag: String): Boolean {
         val context = apkVerificationContext ?: return false
         return try {
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
@@ -1035,7 +1035,8 @@ class SettingsViewModel(
             val pm = context.packageManager
             val installed = pm.getPackageInfo(context.packageName, flags)
             val candidate = pm.getPackageArchiveInfo(file.absolutePath, flags) ?: return false
-            if (candidate.packageName != context.packageName) return false
+            if (candidate.packageName != context.packageName ||
+                candidate.versionName != expectedTag.removePrefix("v")) return false
             fun signers(info: PackageInfo): Set<String> {
                 val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
                     info.signingInfo?.apkContentsSigners else info.signatures
