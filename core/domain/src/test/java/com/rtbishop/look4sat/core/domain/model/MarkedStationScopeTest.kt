@@ -60,4 +60,30 @@ class MarkedStationScopeTest {
         assertEquals(listOf(ol62), marks.visibleInStationScope(setOf("OL62"))["FN31"])
         assertEquals(listOf(ol63), marks.visibleInStationScope(setOf("OL63"))["FN31"])
     }
+
+    @Test
+    fun legacyGridOnlyMarksRemainVisibleAfterStationIdentityUpgrade() {
+        val old = MarkedStation(call = "BA4ABC", epochMs = 1L, stationIds = setOf("OL62"))
+        val fresh = MarkedStation(call = "BA4DEF", epochMs = 2L,
+            stationIds = setOf("OL62#BA7OPF"))
+        val marks = mapOf("FN31" to listOf(old, fresh))
+
+        assertEquals(listOf(old, fresh),
+            marks.visibleInStationScope(setOf("OL62#BA7OPF"))["FN31"])
+        assertEquals(listOf(old),
+            marks.visibleInStationScope(setOf("OL62#BA7OPF/P"))["FN31"])
+        assertEquals(emptyMap<String, List<MarkedStation>>(),
+            marks.visibleInStationScope(emptySet()))
+    }
+
+    @Test
+    fun newStationSpecificMarksNeverLeakBetweenCallsigns() {
+        val home = MarkedStation(call = "BG7XYZ", epochMs = 1L,
+            stationIds = setOf("OL62#BA7OPF"))
+        val marks = mapOf("FN31" to listOf(home))
+        assertEquals(emptyMap<String, List<MarkedStation>>(),
+            marks.visibleInStationScope(setOf("OL62#BA7OPF/P")))
+        assertEquals(listOf(home),
+            marks.visibleInStationScope(setOf("OL62#BA7OPF"))["FN31"])
+    }
 }
