@@ -525,6 +525,8 @@ Upstream: https://github.com/rt-bishop/Look4Sat</string>
     <string name="qso_edit_cancel">Cancel</string>
     <string name="log_out_window_title">Outside pass window</string>
     <string name="log_out_window_message">The current time is outside this pass window. The contact will be logged at the pass midpoint %1$s by default; tap the record afterwards to change the time if needed.</string>
+    <string name="log_out_mutual_window_title">Outside mutual visibility window</string>
+    <string name="log_out_mutual_window_message">The current time is outside the interval when both stations can see this satellite. The contact will be logged at the mutual-window midpoint %1$s by default; tap the record afterwards to set the actual QSO time.</string>
     <string name="log_out_window_confirm">Log it</string>
     <string name="qso_edit_err_callsign">Callsign is required</string>
     <string name="qso_edit_err_datetime">Invalid date/time — use yyyy-MM-dd and HH:mm:ss (UTC)</string>
