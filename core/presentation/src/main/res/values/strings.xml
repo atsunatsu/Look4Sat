@@ -490,6 +490,14 @@ Upstream: https://github.com/rt-bishop/Look4Sat</string>
     <string name="mutual_open_radar">Open Radar</string>
     <string name="mutual_station_a">Station A</string>
     <string name="mutual_station_b">Station B</string>
+    <string name="update_source_selection">Update source: %s</string>
+    <string name="update_source_auto">Automatic (try all)</string>
+    <string name="update_source_github">GitHub official</string>
+    <string name="update_source_ghfast">ghfast.top (mirror)</string>
+    <string name="update_source_llkk">gh.llkk.cc (mirror)</string>
+    <string name="update_source_moeyy">github.moeyy.xyz (mirror)</string>
+    <string name="update_source_trying">Trying: %s</string>
+    <string name="update_source_served">Last source: %s</string>
     <string name="update_check_title">Check for updates</string>
     <string name="update_check_button">Check for updates</string>
     <string name="update_check_current">Current version: %s</string>
