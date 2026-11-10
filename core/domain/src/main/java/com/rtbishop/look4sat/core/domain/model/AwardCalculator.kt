@@ -79,11 +79,12 @@ object AwardCalculator {
         waipaManualOverrides: Map<String, String> = emptyMap()
     ): List<AwardProgress> {
         val all = qsosByGrid.values.flatten()
+        val confirmedVucc = qsosByGrid.confirmedVuccGridKeys()
         return listOf(
             AwardProgress(
                 AwardType.VUCC,
-                workedKeys = qsosByGrid.filterValues { it.isNotEmpty() }.keys - GRIDLESS_QSO_BUCKET,
-                count = (qsosByGrid.filterValues { it.isNotEmpty() }.keys - GRIDLESS_QSO_BUCKET).size,
+                workedKeys = confirmedVucc,
+                count = confirmedVucc.size,
                 target = AwardTargets.VUCC
             ),
             calculateDxcc(all),
