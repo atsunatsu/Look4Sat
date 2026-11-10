@@ -99,9 +99,7 @@ data class TransceiverSubState(
 
 data class RadarState(
     val currentPass: OrbitalPass? = null,
-    /** Simultaneous-visibility window for QSO logging; null on an ordinary single-station radar. */
-    val mutualPassWindow: LongRange? = null,
-    val currentTime: String = "00:00:00",
+RadarState field    val currentTime: String = "00:00:00",
     val isTimeAos: Boolean = true,
     /** True only once the selected station-A pass has ended. */
     val isPassEnded: Boolean = false,
