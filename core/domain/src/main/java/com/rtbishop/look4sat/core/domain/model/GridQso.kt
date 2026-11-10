@@ -146,10 +146,57 @@ fun GridQso.stationGridSetKey(): String? =
     myStationGrids().takeIf { it.isNotEmpty() }?.sorted()?.joinToString(",")
 
 /**
+ * Identity of the logging station, independent of its VUCC grid coverage.
+ * LoTW may omit some MY_* fields from older records, so normalize empty
+ * trailing fields; the callsign is still useful if stationKey is absent.
+ * When no identity is reported, leave it empty rather than guessing.
+ */
+private fun GridQso.stationIdentityKey(): String {
+    val parts = stationKey?.split('|').orEmpty()
+    val call = myCallsign.orEmpty().trim().uppercase(java.util.Locale.US)
+        .ifBlank { parts.firstOrNull().orEmpty().trim().uppercase(java.util.Locale.US) }
+    val metadata = parts.drop(1)
+        .map { it.trim().uppercase(java.util.Locale.US) }
+        .dropLastWhile { it.isBlank() }
+    return (listOf(call) + metadata).joinToString("|")
+}
+
+/**
+ * Selection identity combines the station's grid set and its operator/MY_*
+ * identity. Two station locations in OL62 with different callsigns or MY_*
+ * metadata must not be merged, while OL62 and OL62/OL63 for the SAME
+ * identity continue to use the covering rule.
+ *
+ * The '#' delimiter cannot occur in a Maidenhead grid-set key. Old saved
+ * selectors contain only the grid-set key; these are migrated by the map UI.
+ */
+fun GridQso.stationSelectionKey(): String? =
+    stationGridSetKey()?.let { "$" + "{it}#$" + "{stationIdentityKey()}" }
+
+/** A saved pre-identity selection of OL62 expands to every OL62 identity. */
+fun Set<String>.migrateStationSelections(availableIds: Set<String>): Set<String> =
+    flatMap { selected ->
+        when {
+            selected in availableIds -> listOf(selected)
+            '#' !in selected -> availableIds.filter { it.substringBefore('#') == selected }
+            else -> emptyList()
+        }
+    }.toSet()
+
+private fun GridQso.matchesStationScope(stationId: String): Boolean {
+    val gridSet = stationId.substringBefore('#').split(',').filter { it.isNotBlank() }.toSet()
+    if (gridSet.isEmpty() || !myStationGrids().containsAll(gridSet)) return false
+    // Legacy grid-only identifiers retain their old covering semantics.
+    // New keys constrain the scope to a single station identity as well.
+    return '#' !in stationId || stationIdentityKey() == stationId.substringAfter('#')
+}
+
+/**
  * Scopes a per-grid QSO list to the operated-grid selector's choice with
  * COVERING semantics (2026-10-05): [stationId] is a grid-set key such as
- * "OL62" or "OL62,OL63", and a record stays when its own [myStationGrids]
- * COVER that key (record grid set ⊇ key set). So a multi-grid 台址 that
+ * "OL62" or "OL62,OL63" (plus an optional #station-identity suffix), and a
+ * record stays when its own [myStationGrids] COVER the grid set (record grid
+ * set ⊇ key set), AND its station identity matches if specified. Thus a multi-grid 台址 that
  * covers a single-grid one (OL62/63 covers OL62) contributes its records to
  * the single-grid scope's statistics — map fills, dialog lists and first-call
  * labels all derive from this one rule. The reverse does NOT hold: records
@@ -158,11 +205,7 @@ fun GridQso.stationGridSetKey(): String? =
  * no 台址 and are dropped under any specific scope.
  */
 fun List<GridQso>.scopedToStation(stationId: String?): List<GridQso> =
-    if (stationId == null) this
-    else {
-        val scope = stationId.split(',').toSet()
-        filter { it.myStationGrids().containsAll(scope) }
-    }
+    if (stationId == null) this else filter { it.matchesStationScope(stationId) }
 
 /**
  * Scope to any selected operated-station grid-set. This is a UNION of the
@@ -172,11 +215,7 @@ fun List<GridQso>.scopedToStation(stationId: String?): List<GridQso> =
  */
 fun List<GridQso>.scopedToStations(stationIds: Set<String>): List<GridQso> {
     if (stationIds.isEmpty()) return this
-    val scopes = stationIds.map { it.split(',').toSet() }
-    return filter { qso ->
-        val grids = qso.myStationGrids()
-        scopes.any { grids.containsAll(it) }
-    }
+    return filter { qso -> stationIds.any { qso.matchesStationScope(it) } }
 }
 
 /** 4-char grids worked within the selected operated-station scope (empty keys excluded). */
