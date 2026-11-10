@@ -21,6 +21,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.rtbishop.look4sat.core.domain.model.confirmedVuccGridKeys
 import com.rtbishop.look4sat.core.domain.model.workedGridsForStations
 import com.rtbishop.look4sat.core.domain.predict.CelestialComputer
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
@@ -232,8 +233,7 @@ class MapViewModel(
         val workedGridQsos = settingsRepo.getWorkedGridQsos()
         // Same confirmed-QSO source as the VUCC award and station selector.
         // Old standalone flags must not clear station-specific red reminders.
-        val workedGrids = workedGridQsos.filterValues { it.isNotEmpty() }.keys -
-            com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
+        val workedGrids = workedGridQsos.confirmedVuccGridKeys()
         val markedGrids = settingsRepo.getMarkedGridStations()
         // Cache worked cells by every station scope that currently owns a mark.
         // A QSO from another operated station must not clear this reminder.
