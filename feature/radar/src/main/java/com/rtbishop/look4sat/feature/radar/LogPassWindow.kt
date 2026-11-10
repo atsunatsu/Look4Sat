@@ -10,10 +10,11 @@
 package com.rtbishop.look4sat.feature.radar
 
 /**
- * Log-window validation is based on the selected radar pass's observer-local
- * AOS/LOS. For matched radar this must not be replaced by the mutual overlap.
+ * Check the QSO-eligible window supplied by the radar. For a matched pass this
+ * is the simultaneous-visibility interval; for a normal radar pass it is the
+ * station's local AOS/LOS interval.
  */
 internal fun isOutsideLogPassWindow(
     timeMillis: Long,
-    localPassWindow: ClosedRange<Long>?
-): Boolean = localPassWindow != null && timeMillis !in localPassWindow
+    qsoWindow: ClosedRange<Long>?
+): Boolean = qsoWindow != null && timeMillis !in qsoWindow
