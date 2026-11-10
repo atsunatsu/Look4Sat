@@ -246,17 +246,15 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v20.3 — Matched radar pass timing and logging
-          - Use station A's full local AOS–LOS for the matched radar header, countdown, pass phase and plotted track.
-          - Keep station B's moving marker tied to station B's own horizon window.
-          - Keep log entry validation and the current-pass log list tied only to station A's local pass; station B's LOS no longer blocks logging while station A remains in pass.
-          - Preserve the station A coordinates used by Match, including when a match is launched from the radar page.
+          ## v20.4 — Clear matched radar overlays on Back
+          - Clear the remote station's radar track when returning from the matched radar via Android system or predictive Back.
+          - Keep the normal radar's own track, matched radar display, and grid-picker navigation unchanged.
+          - Verification: Full unit-test suite (excluding the known unrelated RadioConfigurationSaveTest timeouts); signed APK certificate, version, and both ARM ABIs verified before publication.
 
-          ## v20.3 — 匹配雷达过境时间与日志修复
-          - 匹配雷达的 AOS/LOS、倒计时、过境状态和轨迹统一使用本台完整的可见窗口。
-          - 对方卫星标记按照对方自己的地平线窗口显示。
-          - 日志录入校验和本次过境日志列表只使用本台过境窗口；对方先落下不再阻止本台仍在过境时写入日志。
-          - 保留匹配计算时使用的本台坐标；从雷达页发起匹配时也使用当前雷达台址。
+          ## v20.4 — 返回普通雷达图时清除匹配轨迹
+          - 通过 Android 系统返回键或预测性返回手势退出匹配雷达后，清除对方台站的雷达轨迹。
+          - 保留普通雷达图的本台轨迹，匹配雷达的显示和网格选择器导航均不变。
+          - 验证：运行完整单元测试（排除已知无关的 RadioConfigurationSaveTest 超时测试）；发布前核验 APK 签名证书、版本及两个 ARM ABI。
           RELEASE_NOTES
           )"
           fi
