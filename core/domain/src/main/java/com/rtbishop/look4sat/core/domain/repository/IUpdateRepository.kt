@@ -19,6 +19,7 @@
 package com.rtbishop.look4sat.core.domain.repository
 
 import com.rtbishop.look4sat.core.domain.model.LatestRelease
+import com.rtbishop.look4sat.core.domain.model.UpdateSource
 import java.io.File
 
 interface IUpdateRepository {
@@ -27,4 +28,20 @@ interface IUpdateRepository {
 
     /** Download the release APK from [url] into [dest]; true on success. */
     suspend fun downloadApk(url: String, dest: File): Boolean
+
+    /** Preferred endpoint, with transparent fallback only in AUTO mode. */
+    suspend fun getLatestRelease(
+        source: UpdateSource,
+        onSourceChanged: (UpdateSource) -> Unit
+    ): LatestRelease? = getLatestRelease()
+
+    /** Validate each downloaded candidate before allowing the installer to see it. */
+    suspend fun downloadApk(
+        release: LatestRelease,
+        dest: File,
+        source: UpdateSource,
+        preferred: UpdateSource?,
+        onSourceChanged: (UpdateSource) -> Unit,
+        validate: (File) -> Boolean
+    ): Boolean = release.apkUrl?.let { downloadApk(it, dest) } ?: false
 }
