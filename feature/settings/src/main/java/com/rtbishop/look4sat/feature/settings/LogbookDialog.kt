@@ -161,6 +161,17 @@ fun LogbookDialog(
     var modeFilter by rememberSaveable { mutableStateOf("") }
     var confirmationFilter by rememberSaveable { mutableStateOf(LogbookFilter.ALL) }
     val ownStations = remember(records) { ownStationOptions(records) }
+    LaunchedEffect(ownStations) {
+        if (ownStationFilterActive &&
+            OwnStationFilter(ownStationFilterCallsign, ownStationFilterGrid) !in ownStations
+        ) {
+            // A corrected resubmit or sync can remove the selected old station.
+            // Do not leave the query stuck on an identity that no longer exists.
+            ownStationFilterActive = false
+            ownStationFilterCallsign = ""
+            ownStationFilterGrid = ""
+        }
+    }
     val selectedOwnStation = if (ownStationFilterActive) {
         OwnStationFilter(ownStationFilterCallsign, ownStationFilterGrid)
     } else {
