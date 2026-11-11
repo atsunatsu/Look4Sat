@@ -2,6 +2,12 @@
 <resources>
     <string name="map_grid_activity_toggle">Most Wanted</string>
     <string name="map_grid_activity_title">Most Wanted</string>
+    <string name="map_grid_activity_award">Award</string>
+    <string name="map_grid_activity_award_satellite">Satellite</string>
+    <string name="map_grid_activity_award_leo">LEO</string>
+    <string name="map_grid_activity_award_meo">MEO</string>
+    <string name="map_grid_activity_award_geo">GEO</string>
+    <string name="map_grid_activity_award_ngs">Non-Geostationary (NGS)</string>
     <string name="map_grid_activity_min">Minimum: %1$d%%</string>
     <string name="map_grid_activity_max">Maximum: %1$d%%</string>
     <string name="map_grid_activity_loading">Loading GridMaster data…</string>
