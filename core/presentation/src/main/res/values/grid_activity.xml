@@ -10,5 +10,5 @@
     <string name="map_grid_activity_source">Source: GridMaster.fr (FG8OJ). Red = rare, yellow = intermediate, green = common. Your confirmed and marked grids retain their existing colours.</string>
     <string name="map_grid_activity_last_updated">Last downloaded: %1$s</string>
     <string name="map_grid_activity_refresh">Refresh data</string>
-    <string name="map_grid_activity_percent">Rarity: %1$d%%</string>
+    <string name="map_grid_activity_percent">Activity: %1$d%%</string>
 </resources>
