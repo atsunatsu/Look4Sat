@@ -10,5 +10,5 @@
     <string name="map_grid_activity_source">数据来源：GridMaster.fr（FG8OJ）。红色表示稀有，黄色表示中等，绿色表示常见。已通联和标记网格保留原有颜色。</string>
     <string name="map_grid_activity_last_updated">上次下载：%1$s</string>
     <string name="map_grid_activity_refresh">刷新数据</string>
-    <string name="map_grid_activity_percent">出现在 %1$d%% 的卫星日志中</string>
+    <string name="map_grid_activity_percent">稀有度：%1$d%%</string>
 </resources>
