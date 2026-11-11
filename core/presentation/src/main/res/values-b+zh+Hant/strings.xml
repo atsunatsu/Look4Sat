@@ -676,4 +676,12 @@
     <string name="lotw_upload_result_copy_details">复制错误详情</string>
     <string name="lotw_upload_result_retry">安全重试</string>
     <string name="lotw_upload_result_close">关闭</string>
+    <string name="update_source_selection">更新源</string>
+    <string name="update_source_auto">自动选择（依次尝试）</string>
+    <string name="update_source_github">GitHub 官方</string>
+    <string name="update_source_ghfast">ghfast.top（代理）</string>
+    <string name="update_source_llkk">gh.llkk.cc（代理）</string>
+    <string name="update_source_moeyy">github.moeyy.xyz（代理）</string>
+    <string name="update_source_trying">正在尝试：%s</string>
+    <string name="update_source_served">使用的更新源：%s</string>
 </resources>
