@@ -66,6 +66,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -148,6 +149,7 @@ import org.osmdroid.views.overlay.TilesOverlay
 import java.net.URLEncoder
 import kotlin.math.abs
 import kotlin.math.exp
+import kotlin.math.roundToInt
 
 // Overlay indices
 private const val OVERLAY_TDT_LABELS = 0
@@ -2695,17 +2697,30 @@ private fun GridActivitySettingsDialog(
                             }
                         }
                     }
-                    Text(stringResource(R.string.map_grid_activity_min, minPercent))
-                    Slider(
-                        value = minPercent.toFloat(),
-                        onValueChange = { onMinChange(it.toInt()) },
-                        valueRange = 0f..100f
-                    )
-                    Text(stringResource(R.string.map_grid_activity_max, maxPercent))
-                    Slider(
-                        value = maxPercent.toFloat(),
-                        onValueChange = { onMaxChange(it.toInt()) },
-                        valueRange = 0f..100f
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_min, minPercent),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_max, maxPercent),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    RangeSlider(
+                        value = minPercent.toFloat()..maxPercent.toFloat(),
+                        onValueChange = { range ->
+                            val min = range.start.roundToInt().coerceIn(0, 100)
+                            val max = range.endInclusive.roundToInt().coerceIn(min, 100)
+                            if (min != minPercent) onMinChange(min)
+                            if (max != maxPercent) onMaxChange(max)
+                        },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
