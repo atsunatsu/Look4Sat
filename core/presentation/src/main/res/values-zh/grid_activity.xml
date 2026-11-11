@@ -2,6 +2,12 @@
 <resources>
     <string name="map_grid_activity_toggle">网格活跃度</string>
     <string name="map_grid_activity_title">网格活跃度</string>
+    <string name="map_grid_activity_award">统计类别</string>
+    <string name="map_grid_activity_award_satellite">综合卫星</string>
+    <string name="map_grid_activity_award_leo">LEO（低轨）</string>
+    <string name="map_grid_activity_award_meo">MEO（中轨）</string>
+    <string name="map_grid_activity_award_geo">GEO（地球静止轨道）</string>
+    <string name="map_grid_activity_award_ngs">非地球静止轨道（NGS）</string>
     <string name="map_grid_activity_min">最低：%1$d%%</string>
     <string name="map_grid_activity_max">最高：%1$d%%</string>
     <string name="map_grid_activity_loading">正在载入 GridMaster 数据…</string>

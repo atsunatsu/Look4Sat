@@ -37,11 +37,26 @@ internal fun gridActivityColorIndex(percentage: Int, dataMax: Int, filterMax: In
 }
 
 /**
+ * Match the map's linear zoom scale from zoom 6.5 to 7.0.
+ * Above zoom 7.0, keep the label scale capped to avoid oversized labels
+ * on map sources that support much higher zoom levels.
+ */
+internal fun gridLabelScale(zoom: Double): Float {
+    val clampedZoom = zoom.coerceIn(GRID_LABEL_GROWTH_START_ZOOM, GRID_LABEL_MAX_SCALE_ZOOM)
+    return Math.pow(2.0, clampedZoom - GRID_LABEL_GROWTH_START_ZOOM).toFloat()
+}
+
+private const val GRID_LABEL_GROWTH_START_ZOOM = 6.5
+private const val GRID_LABEL_MAX_SCALE_ZOOM = 7.0
+
+/**
  * Maidenhead locator grid overlay, drawn directly on the map canvas.
  *
- * Zoom levels (map maxZoom = 7):
+ * Zoom levels:
  *  - zoom < GRID_ZOOM_SUB: 10° x 20° fields with 2-character labels (e.g. "PM")
  *  - zoom >= GRID_ZOOM_SUB: 1° x 2° squares with 4-character labels (e.g. "PM95")
+ * Four-character labels stay at 20px through zoom 6.5, then follow the
+ * map's exact zoom scale to 1.414x at zoom 7.0 and remain capped above it.
  *
  * All geometry is computed per-frame from the projection, so the overlay
  * stays correct while panning/zooming. Grid lines that cross the antimeridian
@@ -197,6 +212,12 @@ class MaidenheadGridOverlay : Overlay() {
         if (shadow || !isEnabled) return
         val projection = mapView.projection
         val zoom = mapView.zoomLevelDouble
+        // Four-character labels follow the map's exact zoom scale from 6.5 to 7.0.
+        // Above zoom 7.0 the font scale is capped; two-character field labels stay unchanged.
+        val labelScale = gridLabelScale(zoom)
+        labelPaint.textSize = LABEL_TEXT_SIZE * labelScale
+        firstCallPaint.textSize = LABEL_TEXT_SIZE * labelScale
+        activityLabelPaint.textSize = LABEL_TEXT_SIZE * 0.72f * labelScale
         canvasWidthPx = canvas.width.toFloat()
         val cellLat = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LAT else FIELD_LAT
         val cellLon = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LON else FIELD_LON
@@ -571,14 +592,15 @@ class MaidenheadGridOverlay : Overlay() {
                     // layouts, including activity-only squares in first-call mode.
                     if (mainLabel != null) {
                         canvas.drawText(
-                            mainLabel, xCenter, if (percent != null) yCenter - 9f else yCenter,
+                            mainLabel, xCenter,
+                            if (percent != null) yCenter - 9f * labelScale else yCenter,
                             if (showFirstCallLabels) firstCallPaint else labelPaint
                         )
                     }
                     if (percent != null) {
                         canvas.drawText(
                             "${percent}%", xCenter,
-                            if (mainLabel != null) yCenter + 12f else yCenter,
+                            if (mainLabel != null) yCenter + 12f * labelScale else yCenter,
                             activityLabelPaint
                         )
                     }
