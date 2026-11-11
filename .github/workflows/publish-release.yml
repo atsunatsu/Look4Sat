@@ -246,23 +246,19 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21.3 — Grid Activity controls and update mirror fallback
-          - Add selectable app-update sources: Auto, GitHub, ghfast.top, gh.llkk.cc and github.moeyy.xyz; Auto retries other sources if checking or downloading fails.
-          - Validate downloaded APK package name, release version and signing certificate before installation; reject invalid packages and allow download retries.
-          - Restore the original red (#FF3B30), yellow (#FFC107) and green (#4CD964) grid-activity palette with continuous colour interpolation.
-          - Split worked-grid and marked-grid visibility into two persistent switches, both off by default, with migration of the prior combined setting.
-          - Align the Grid Activity Category dropdown to its field, and combine the minimum/maximum filters into one range slider with live, colour-interpolated endpoint labels.
-          - Colour the worked-grid and marked-grid switch labels green and red, matching their map fill colours.
-          - Verification: release unit tests (excluding the known unrelated RadioConfigurationSaveTest timeout), APK signing-certificate check, version check and both ARM ABIs.
-          
-          ## v21.3 — 网格活跃度设置与更新镜像回退
-          - 应用内更新新增可选来源：自动、GitHub、ghfast.top、gh.llkk.cc 和 github.moeyy.xyz；自动模式下检查或下载失败时依次尝试其他来源。
-          - 安装前验证下载 APK 的包名、发布版本和签名证书；拒绝无效安装包并允许重新下载。
-          - 恢复网格活跃度原有红色（#FF3B30）、黄色（#FFC107）、绿色（#4CD964）配色，保留连续颜色插值。
-          - 将显示已通联网格和已标记网格拆分为两个独立持久化开关，默认均关闭，并迁移旧的组合开关设置。
-          - 统计类别下拉菜单与选择框等宽；最低/最高筛选合并为一条范围滑块，端点数值实时更新并采用颜色插值。
-          - 已通联网格和已标记网格的开关文字分别显示对应的绿色和红色，与地图填色一致。
-          - 发布验证：单元测试（排除已知无关的 RadioConfigurationSaveTest 超时）、APK 签名证书、版本号及双 ARM 架构检查。
+          ## v21.4 — Grid activity Most Wanted colour bands
+          - Replace the continuously interpolated grid activity heatmap with seven fixed percentage bands inspired by Gridmaster SAT / LEO maps: 0–2 deep red, 3–7 red-orange, 8–12 orange, 13–17 yellow, 18–22 yellow-green, 23–32 bright green, 33–100 dark green.
+          - Keep SAT / LEO / MEO / GEO / NGS palette boundaries consistent and independent of dataset maximum and filter range; filtering only changes visible grids.
+          - Use the same seven-band colours for activity percentages in grid details and range-slider endpoint labels.
+          - Preserve map transparency and existing worked/marked grid colours; add unit coverage for the colour thresholds.
+          - Gridmaster band thresholds and colours are estimated from screenshots rather than verified upstream implementation.
+
+          ## v21.4 — 网格活跃度分档填色
+          - 将网格活跃度的连续渐变替换为参考 Gridmaster SAT/LEO 截图估算的七档固定填色：0–2% 深红、3–7% 橘红、8–12% 橙、13–17% 黄、18–22% 黄绿、23–32% 亮绿、33–100% 深绿。
+          - SAT、LEO、MEO、GEO 和 NGS 统一采用固定百分比色阶；筛选范围只控制网格可见性，不再改变颜色对应关系。
+          - 网格详情的活跃度颜色和范围滑块端点文字颜色同步更新。
+          - 保留原有地图透明度和已通联/已标记网格颜色，并为各颜色阈值补充单元测试。
+          - 色阶边界及色值来自截图推断，暂未核实 Gridmaster 上游实现。
           RELEASE_NOTES
           )"
           fi
