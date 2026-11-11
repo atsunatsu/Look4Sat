@@ -2865,6 +2865,8 @@ private fun setGridMode(
         for (index in OVERLAY_STATION..OVERLAY_MOON) {
             mapView.overlays.getOrNull(index)?.isEnabled = !gridMode
         }
+        // Settings can change while the map is stationary; redraw immediately.
+        if (gridMode) mapView.invalidate()
         // Entering grid mode: center on the station's current grid square,
         // keeping the current zoom level unchanged. post{} is essential: on the
         // first composition this runs before MapView's first layout, and a
