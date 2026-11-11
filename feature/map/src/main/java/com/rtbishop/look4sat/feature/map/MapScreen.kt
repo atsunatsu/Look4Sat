@@ -1205,6 +1205,19 @@ private fun ElevationSettingsDialog(
 
 // region Worked-grid QSO dialog
 
+// Use exactly the same red -> amber -> green stops as MaidenheadGridOverlay.
+private fun gridActivityBadgeColor(percent: Int): ComposeColor {
+    val value = percent.coerceIn(0, 100)
+    val rare = ComposeColor(242, 96, 99)
+    val middle = ComposeColor(248, 205, 105)
+    val common = ComposeColor(100, 200, 142)
+    return if (value <= 50) {
+        androidx.compose.ui.graphics.lerp(rare, middle, value / 50f)
+    } else {
+        androidx.compose.ui.graphics.lerp(middle, common, (value - 50) / 50f)
+    }
+}
+
 @Composable
 private fun WorkedGridQsoDialog(
     grid: String,
@@ -1248,11 +1261,29 @@ private fun WorkedGridQsoDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         activityPercentage?.let { percent ->
-                            Text(
-                                text = stringResource(R.string.map_grid_activity_percent, percent),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            val rarityColor = gridActivityBadgeColor(percent)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = rarityColor.copy(alpha = 0.18f),
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.size(8.dp).background(
+                                            rarityColor, RoundedCornerShape(percent = 50)
+                                        )
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = stringResource(R.string.map_grid_activity_percent, percent),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
                         }
                     }
                     TextButton(
