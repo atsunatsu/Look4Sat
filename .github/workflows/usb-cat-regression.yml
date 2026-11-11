@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - 'contrib/cat-l4s-firmware-cw-*'
-      
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -16,23 +15,56 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@v4
+      # This repository rejects external Marketplace action references at workflow startup.
+      # Use the runner's preinstalled tools instead of actions/checkout, setup-java or setup-gradle.
+      - name: Checkout the exact commit
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          mkdir source
+          cd source
+          git init
+          git remote add origin https://github.com/atsunatsu/Look4Sat.git
+          if [ -n "$PR_NUMBER" ]; then
+            git fetch --no-tags --depth=1 origin "refs/pull/$PR_NUMBER/merge"
+          else
+            git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          fi
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Configure Java 21 from the hosted runner
+        run: |
+          set -euo pipefail
+          test -n "$JAVA_HOME_21_X64"
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+          "$JAVA_HOME_21_X64/bin/java" -version
+
       - name: Install Android native components
         run: |
-          yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" 'ndk;26.1.10909125' 'cmake;3.22.1'
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "ndk;26.1.10909125" "cmake;3.22.1"
+
       - name: Compile Android and run radio reconnect tests
-        run: ./gradlew --no-daemon :core:domain:test :core:data:testDebugUnitTest :feature:radar:testDebugUnitTest :feature:map:testDebugUnitTest :app:compileDebugKotlin
+        working-directory: source
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon :core:domain:test :core:data:testDebugUnitTest :feature:radar:testDebugUnitTest :feature:map:testDebugUnitTest :app:compileDebugKotlin
+
       - name: Run aislop code quality review of PR changes
         if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/contrib/cat-l4s-firmware-cw-')
         continue-on-error: true
+        working-directory: source
         env:
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
         run: |
+          set -euo pipefail
           git fetch origin "$BASE_BRANCH" --depth=1
           npx --yes aislop@latest scan --changes --base "origin/$BASE_BRANCH" --json > "$RUNNER_TEMP/aislop-report.json"
           test -s "$RUNNER_TEMP/aislop-report.json"

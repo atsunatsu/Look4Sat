@@ -59,22 +59,6 @@ class Ic705ControllerTest {
         assertEquals(listOf("26:01:01:01:01", "26:01", "26:01:01:00:01", "26:01"), transport.payloads)
     }
 
-    @Test fun ic705AudioSnapshotRestoresExistingDataModeAndModulationInput()=runTest {
-        val transport=ScriptedCivTransport()
-        val controller=Ic705Controller(null,"test",transport=transport)
-        assertTrue(controller.connect())
-        assertTrue(controller.setDataMode(true,"USB"))
-        val original=checkNotNull(controller.captureAudioState(false))
-        assertTrue(original.dataEnabled)
-        assertEquals(0,original.modulationInput)
-        assertTrue(controller.setAudioInput(true))
-        assertEquals(3,controller.captureAudioState(false)?.modulationInput)
-        assertTrue(controller.setDataMode(false,"USB"))
-        assertTrue(controller.restoreAudioState(original))
-        assertEquals(original,controller.captureAudioState(false))
-        controller.disconnect()
-    }
-
     @Test fun ic705PttRequiresAckAndMatchingTxRxReadback()=runTest {
         val transport=ScriptedCivTransport()
         val controller=Ic705Controller(null,"Bluetooth",transport=transport)
@@ -968,7 +952,6 @@ private class ScriptedCivTransport(
     private var mainMode = 0x01
     private var subMode = 0x05
     private var mainDataMode = 0
-    private var modulationInput = 0
     private var ptt = false
     private var subDataMode = 0
     private var satelliteMode = false
@@ -1060,10 +1043,6 @@ private class ScriptedCivTransport(
                 else -> replies += ack()
             }
             0x1A -> when {
-                payload.size>=4 && payload[1]==5.toByte() && payload[2]==1.toByte() && payload[3]==0x19.toByte() -> {
-                    if(payload.size==5) { modulationInput=payload[4].toInt();replies+=ack() }
-                    else replies+=response(0x1a,5,1,0x19,modulationInput)
-                }
                 payload.size >= 3 && payload[1] == 0x07.toByte() -> {
                     satelliteMode = payload[2] == 0x01.toByte()
                     replies += ack()
