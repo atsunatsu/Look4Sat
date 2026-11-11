@@ -22,13 +22,14 @@ import java.util.Locale
 /** GridMaster award codes exposed by its public API for the satellite activity map. */
 internal enum class GridActivityAward(
     val apiCode: String,
-    val cacheFileName: String
+    val cacheFileName: String,
+    val minimumGridCount: Int
 ) {
-    SATELLITE("sat", "gridmaster_sat_activity.json"),
-    LEO("sat/leo", "gridmaster_sat_leo_activity.json"),
-    MEO("sat/meo", "gridmaster_sat_meo_activity.json"),
-    GEO("sat/geo", "gridmaster_sat_geo_activity.json"),
-    NON_GEOSTATIONARY("sat/ngs", "gridmaster_sat_ngs_activity.json");
+    SATELLITE("sat", "gridmaster_sat_activity.json", 50),
+    LEO("sat/leo", "gridmaster_sat_leo_activity.json", 1),
+    MEO("sat/meo", "gridmaster_sat_meo_activity.json", 1),
+    GEO("sat/geo", "gridmaster_sat_geo_activity.json", 1),
+    NON_GEOSTATIONARY("sat/ngs", "gridmaster_sat_ngs_activity.json", 1);
 
     companion object {
         fun fromApiCode(code: String?): GridActivityAward =
@@ -66,7 +67,7 @@ internal object GridActivityStore {
             val file = File(context.applicationContext.filesDir, award.cacheFileName)
             val cached = try {
                 if (file.isFile) {
-                    GridActivitySnapshot(parse(file.readText()), file.lastModified(), fromCache = true)
+                    GridActivitySnapshot(parse(file.readText(), award.minimumGridCount), file.lastModified(), fromCache = true)
                 } else null
             } catch (_: Exception) {
                 null
@@ -102,7 +103,7 @@ internal object GridActivityStore {
                 } finally {
                     connection.disconnect()
                 }
-                val parsed = parse(response)
+                val parsed = parse(response, award.minimumGridCount)
                 // Only a fully validated download replaces the previous good cache.
                 val tmp = File(file.parentFile, file.name + ".tmp")
                 tmp.writeText(response)
@@ -117,7 +118,7 @@ internal object GridActivityStore {
         }
 
     /** Parse the Wavelog-compatible format: { "OL62": 12, ... } (values in 0..100). */
-    internal fun parse(json: String): Map<String, Int> {
+    internal fun parse(json: String, minimumEntries: Int = 50): Map<String, Int> {
         val obj = JSONObject(json)
         val result = LinkedHashMap<String, Int>()
         val keys = obj.keys()
@@ -135,7 +136,7 @@ internal object GridActivityStore {
             }
         }
         // Prevent empty/error documents from masquerading as a successful refresh.
-        if (result.size < 50) throw IOException("GridMaster dataset is empty or incomplete")
+        if (result.size < minimumEntries) throw IOException("GridMaster dataset is empty or incomplete")
         return result
     }
 }
