@@ -2741,6 +2741,7 @@ private fun GridActivitySettingsDialog(
                         Text(
                             text = stringResource(R.string.map_grid_activity_show_worked),
                             style = MaterialTheme.typography.bodyMedium,
+                            color = gridActivityBadgeColor(100, 100),
                             modifier = Modifier.weight(1f).clickable {
                                 onShowWorkedChange(!showWorked)
                             }
@@ -2757,6 +2758,7 @@ private fun GridActivitySettingsDialog(
                         Text(
                             text = stringResource(R.string.map_grid_activity_show_marked),
                             style = MaterialTheme.typography.bodyMedium,
+                            color = gridActivityBadgeColor(0, 100),
                             modifier = Modifier.weight(1f).clickable {
                                 onShowMarkedChange(!showMarked)
                             }
