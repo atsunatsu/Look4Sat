@@ -516,16 +516,20 @@ private fun MapScreen(
         val forceRefresh = activityRefreshSerial != handledActivityRefreshSerial
         handledActivityRefreshSerial = activityRefreshSerial
         // Never leave the previous award's percentages visible while another award loads.
+        val requestedAward = activityAward
         activitySnapshot = null
         activityLoading = true
         try {
-            activitySnapshot = GridActivityStore.load(
+            val loaded = GridActivityStore.load(
                 mapView.context.applicationContext,
-                award = activityAward,
+                award = requestedAward,
                 forceRefresh = forceRefresh
             )
+            if (activityAward == requestedAward) activitySnapshot = loaded
         } finally {
-            activityLoading = false
+            // A cancelled, slower request for the previous award must not hide the
+            // loading indicator for the currently selected award.
+            if (activityAward == requestedAward) activityLoading = false
         }
     }
     val setActivityEnabled: (Boolean) -> Unit = { enabled ->
