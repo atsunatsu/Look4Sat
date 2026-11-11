@@ -66,6 +66,12 @@ class GridActivityStoreTest {
     }
 
     @Test
+    fun acceptsNonEmptySpecializedAwardDatasetsWithFewerThanFiftyGrids() {
+        val oneGrid = JSONObject().put("OL62", 7).toString()
+        assertEquals(mapOf("OL62" to 7), GridActivityStore.parse(oneGrid, minimumEntries = 1))
+    }
+
+    @Test
     fun activityColourScaleUsesDatasetMaximumAndFilterUpperLimit() {
         // The dataset only reaches 20%, so 10% maps to yellow instead of red.
         assertEquals(0, gridActivityColorIndex(0, 20, 100))
