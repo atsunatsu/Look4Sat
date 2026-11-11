@@ -246,18 +246,22 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21.2 — GridMaster award selector and zoom-scaled grid labels
-          - Add a GridMaster Award selector to Most Wanted settings: Satellite, LEO, MEO, GEO and Non-Geostationary (NGS).
-          - Persist the selected Award and keep independent cached datasets and download timestamps for each category; preserve the existing Satellite cache for upgrades.
-          - Scale four-character grid labels, First-call labels and Most Wanted percentages with the map's exact zoom factor from zoom 6.5 to 7.0 (1.0x to 1.414x), then cap the scale above zoom 7.0. Two-character field labels remain unchanged.
-          - Keep the original GridMaster percentages; no second percentage normalization is applied.
+          ## v21.3 — Grid Activity controls and update mirror fallback
+          - Add selectable app-update sources: Auto, GitHub, ghfast.top, gh.llkk.cc and github.moeyy.xyz; Auto retries other sources if checking or downloading fails.
+          - Validate downloaded APK package name, release version and signing certificate before installation; reject invalid packages and allow download retries.
+          - Restore the original red (#FF3B30), yellow (#FFC107) and green (#4CD964) grid-activity palette with continuous colour interpolation.
+          - Split worked-grid and marked-grid visibility into two persistent switches, both off by default, with migration of the prior combined setting.
+          - Align the Grid Activity Category dropdown to its field, and combine the minimum/maximum filters into one range slider with live, colour-interpolated endpoint labels.
+          - Colour the worked-grid and marked-grid switch labels green and red, matching their map fill colours.
           - Verification: release unit tests (excluding the known unrelated RadioConfigurationSaveTest timeout), APK signing-certificate check, version check and both ARM ABIs.
-
-          ## v21.2 — GridMaster Award 选择器与网格文字缩放
-          - 在「网格活跃度 / Most Wanted」设置中增加五种 GridMaster Award：Satellite、LEO、MEO、GEO、Non-Geostationary（NGS）。
-          - 记住所选类别；各类别独立缓存和下载时间；保留升级前 Satellite 缓存，避免重复下载。
-          - 四位网格编号、首通呼号及 Most Wanted 百分比从 Zoom 6.5 到 7.0 严格跟随地图实际缩放倍率（1.0 倍至 1.414 倍），Zoom 7.0 以上封顶；二位网格字母保持原字号。
-          - 直接使用 GridMaster 返回的百分比，不进行二次归一化。
+          
+          ## v21.3 — 网格活跃度设置与更新镜像回退
+          - 应用内更新新增可选来源：自动、GitHub、ghfast.top、gh.llkk.cc 和 github.moeyy.xyz；自动模式下检查或下载失败时依次尝试其他来源。
+          - 安装前验证下载 APK 的包名、发布版本和签名证书；拒绝无效安装包并允许重新下载。
+          - 恢复网格活跃度原有红色（#FF3B30）、黄色（#FFC107）、绿色（#4CD964）配色，保留连续颜色插值。
+          - 将显示已通联网格和已标记网格拆分为两个独立持久化开关，默认均关闭，并迁移旧的组合开关设置。
+          - 统计类别下拉菜单与选择框等宽；最低/最高筛选合并为一条范围滑块，端点数值实时更新并采用颜色插值。
+          - 已通联网格和已标记网格的开关文字分别显示对应的绿色和红色，与地图填色一致。
           - 发布验证：单元测试（排除已知无关的 RadioConfigurationSaveTest 超时）、APK 签名证书、版本号及双 ARM 架构检查。
           RELEASE_NOTES
           )"
