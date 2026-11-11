@@ -2661,7 +2661,7 @@ private fun GridActivitySettingsDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(stringResource(R.string.map_grid_activity_award))
-                    Box(modifier = Modifier.fillMaxWidth()) {
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
@@ -2682,7 +2682,7 @@ private fun GridActivitySettingsDialog(
                         DropdownMenu(
                             expanded = awardMenuExpanded,
                             onDismissRequest = { awardMenuExpanded = false },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.width(maxWidth)
                         ) {
                             awardOptions.forEach { (option, labelRes) ->
                                 DropdownMenuItem(

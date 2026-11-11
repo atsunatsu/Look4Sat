@@ -2,7 +2,7 @@
 <resources>
     <string name="map_grid_activity_toggle">Most Wanted</string>
     <string name="map_grid_activity_title">Most Wanted</string>
-    <string name="map_grid_activity_award">Award</string>
+    <string name="map_grid_activity_award">Category</string>
     <string name="map_grid_activity_award_satellite">Satellite</string>
     <string name="map_grid_activity_award_leo">LEO</string>
     <string name="map_grid_activity_award_meo">MEO</string>
