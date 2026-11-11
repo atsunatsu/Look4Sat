@@ -1,0 +1,17 @@
+name: CI runner startup smoke test
+on:
+  push:
+    branches:
+      - diagnostics/ci-runner-smoke-20261111
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm hosted runner starts
+        run: echo "GitHub-hosted runner started successfully"
