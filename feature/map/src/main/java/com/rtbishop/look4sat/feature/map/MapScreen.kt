@@ -1059,6 +1059,9 @@ private fun MapScreen(
         WorkedGridQsoDialog(
             grid = grid,
             activityPercentage = if (showGridActivity) activitySnapshot?.percentages?.get(grid) else null,
+            activityColourScaleMax = minOf(
+                activitySnapshot?.percentages?.values?.maxOrNull() ?: 0, activityMax
+            ),
             // A multi-selection shows the union of QSO details without duplicates,
             // preserving each station's covering scope; empty selection means All.
             qsos = uiState.workedGridQsos[grid].orEmpty()
@@ -1217,8 +1220,8 @@ private fun ElevationSettingsDialog(
 // region Worked-grid QSO dialog
 
 // Use exactly the same red -> amber -> green stops as MaidenheadGridOverlay.
-private fun gridActivityBadgeColor(percent: Int): ComposeColor {
-    val value = percent.coerceIn(0, 100)
+private fun gridActivityBadgeColor(percent: Int, scaleMax: Int): ComposeColor {
+    val value = gridActivityColorIndex(percent, scaleMax, scaleMax)
     val rare = ComposeColor(242, 96, 99)
     val middle = ComposeColor(248, 205, 105)
     val common = ComposeColor(100, 200, 142)
@@ -1233,6 +1236,7 @@ private fun gridActivityBadgeColor(percent: Int): ComposeColor {
 private fun WorkedGridQsoDialog(
     grid: String,
     activityPercentage: Int?,
+    activityColourScaleMax: Int,
     qsos: List<com.rtbishop.look4sat.core.domain.model.GridQso>,
     marked: List<com.rtbishop.look4sat.core.domain.model.MarkedStation>,
     isUtc: Boolean,
@@ -1272,10 +1276,10 @@ private fun WorkedGridQsoDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         activityPercentage?.let { percent ->
-                            val rarityColor = gridActivityBadgeColor(percent)
+                            val activityColor = gridActivityBadgeColor(percent, activityColourScaleMax)
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = rarityColor.copy(alpha = 0.18f),
+                                color = activityColor.copy(alpha = 0.18f),
                                 modifier = Modifier.padding(top = 4.dp)
                             ) {
                                 Row(
@@ -1284,7 +1288,7 @@ private fun WorkedGridQsoDialog(
                                 ) {
                                     Box(
                                         modifier = Modifier.size(8.dp).background(
-                                            rarityColor, RoundedCornerShape(percent = 50)
+                                            activityColor, RoundedCornerShape(percent = 50)
                                         )
                                     )
                                     Spacer(Modifier.width(6.dp))
