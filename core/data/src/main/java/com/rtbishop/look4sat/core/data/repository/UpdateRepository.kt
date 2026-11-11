@@ -22,6 +22,7 @@ import com.rtbishop.look4sat.core.domain.model.LatestRelease
 import com.rtbishop.look4sat.core.domain.model.UpdateSource
 import com.rtbishop.look4sat.core.domain.repository.IUpdateRepository
 import com.rtbishop.look4sat.core.domain.source.IRemoteSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -51,6 +52,8 @@ class UpdateRepository(private val remoteSource: IRemoteSource) : IUpdateReposit
                 val page = network.stream?.bufferedReader()?.use { it.readText() } ?: continue
                 if (network.code !in 200..299) continue
                 parseRelease(page, candidate)?.let { return@withContext it }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 println("UpdateRepository check failed for $candidate: $e")
             }
@@ -114,6 +117,8 @@ class UpdateRepository(private val remoteSource: IRemoteSource) : IUpdateReposit
             // A candidate is made visible to FileProvider only after all checks pass.
             if (dest.exists() && !dest.delete()) return@withContext false
             temp.renameTo(dest)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             println("UpdateRepository download failed: $e")
             false

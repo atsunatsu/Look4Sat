@@ -246,17 +246,19 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v20.3 — Matched radar pass timing and logging
-          - Use station A's full local AOS–LOS for the matched radar header, countdown, pass phase and plotted track.
-          - Keep station B's moving marker tied to station B's own horizon window.
-          - Keep log entry validation and the current-pass log list tied only to station A's local pass; station B's LOS no longer blocks logging while station A remains in pass.
-          - Preserve the station A coordinates used by Match, including when a match is launched from the radar page.
+          ## v21.2 — GridMaster award selector and zoom-scaled grid labels
+          - Add a GridMaster Award selector to Most Wanted settings: Satellite, LEO, MEO, GEO and Non-Geostationary (NGS).
+          - Persist the selected Award and keep independent cached datasets and download timestamps for each category; preserve the existing Satellite cache for upgrades.
+          - Scale four-character grid labels, First-call labels and Most Wanted percentages with the map's exact zoom factor from zoom 6.5 to 7.0 (1.0x to 1.414x), then cap the scale above zoom 7.0. Two-character field labels remain unchanged.
+          - Keep the original GridMaster percentages; no second percentage normalization is applied.
+          - Verification: release unit tests (excluding the known unrelated RadioConfigurationSaveTest timeout), APK signing-certificate check, version check and both ARM ABIs.
 
-          ## v20.3 — 匹配雷达过境时间与日志修复
-          - 匹配雷达的 AOS/LOS、倒计时、过境状态和轨迹统一使用本台完整的可见窗口。
-          - 对方卫星标记按照对方自己的地平线窗口显示。
-          - 日志录入校验和本次过境日志列表只使用本台过境窗口；对方先落下不再阻止本台仍在过境时写入日志。
-          - 保留匹配计算时使用的本台坐标；从雷达页发起匹配时也使用当前雷达台址。
+          ## v21.2 — GridMaster Award 选择器与网格文字缩放
+          - 在「网格活跃度 / Most Wanted」设置中增加五种 GridMaster Award：Satellite、LEO、MEO、GEO、Non-Geostationary（NGS）。
+          - 记住所选类别；各类别独立缓存和下载时间；保留升级前 Satellite 缓存，避免重复下载。
+          - 四位网格编号、首通呼号及 Most Wanted 百分比从 Zoom 6.5 到 7.0 严格跟随地图实际缩放倍率（1.0 倍至 1.414 倍），Zoom 7.0 以上封顶；二位网格字母保持原字号。
+          - 直接使用 GridMaster 返回的百分比，不进行二次归一化。
+          - 发布验证：单元测试（排除已知无关的 RadioConfigurationSaveTest 超时）、APK 签名证书、版本号及双 ARM 架构检查。
           RELEASE_NOTES
           )"
           fi

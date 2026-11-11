@@ -160,17 +160,16 @@ class RadioTrackingServiceTest {
         fixture.close()
     }
 
-    @Test fun enablingN76AudioRecreatesTheConnectionOnNextConnect() = runTest {
+    @Test fun enablingN76AudioRecreatesThePreviouslyConnectedRadioWithoutManualReconnect() = runTest {
         val tx = FakeRadioController()
         val fixture = Fixture(backgroundScope, tx, FakeRadioController(),
             radioModel = RadioControlSettings.MODEL_VERO_N76,
             transport = RadioControlSettings.TRANSPORT_BLUETOOTH)
         fixture.service.connectRadios()
         assertTrue(fixture.service.applyRadioControlSettings(fixture.settings.radioControlSettings.value.copy(n76BluetoothAudio = true)))
-        assertFalse(fixture.service.state.value.txConnected)
-        assertTrue("disconnect" in tx.operations)
-        fixture.service.connectRadios()
         assertTrue(fixture.service.state.value.txConnected)
+        assertTrue("disconnect" in tx.operations)
+        assertEquals(2, tx.operations.count { it == "connect" })
         fixture.close()
     }
 
@@ -225,15 +224,19 @@ class RadioTrackingServiceTest {
         RadioControlSettings.MODEL_ICOM_IC705,RadioControlSettings.MODEL_ICOM_IC9700,
         RadioControlSettings.MODEL_ICOM_IC910,RadioControlSettings.MODEL_ICOM_IC820)
 
-    @Test fun connectionSettingsChangeClosesOldControllersAndRequiresExplicitReconnect()=runTest {
-        val fixture=Fixture(backgroundScope,FakeRadioController(),FakeRadioController())
+    @Test fun connectionSettingsChangeReopensPreviouslyConnectedCatWithoutRestartingTracking()=runTest {
+        val tx=FakeRadioController()
+        val rx=FakeRadioController()
+        val fixture=Fixture(backgroundScope,tx,rx)
         fixture.service.connectRadios();fixture.startTracking();runCurrent()
         assertTrue(fixture.service.applyRadioControlSettings(fixture.settings.radioControlSettings.value.copy(baudRate=38400)))
-        assertFalse(fixture.service.state.value.txConnected)
-        assertFalse(fixture.service.state.value.rxConnected)
+        assertTrue(fixture.service.state.value.txConnected)
+        assertTrue(fixture.service.state.value.rxConnected)
         assertFalse(fixture.service.state.value.isActive)
         assertNull(fixture.service.state.value.nominalRxFrequencyHz)
-        fixture.service.connectRadios();fixture.startTracking();runCurrent()
+        assertEquals(2, tx.operations.count { it == "connect" })
+        assertEquals(2, rx.operations.count { it == "connect" })
+        fixture.startTracking();runCurrent()
         assertTrue(fixture.service.state.value.isActive);fixture.close()
     }
 

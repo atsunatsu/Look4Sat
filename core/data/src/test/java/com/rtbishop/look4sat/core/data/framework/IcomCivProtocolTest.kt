@@ -29,6 +29,7 @@ class IcomCivProtocolTest {
     fun ic820UsesItsOwnBandAccessAndSplitTableWithoutChangingModernCommands() {
         assertArrayEquals(civCommand(0x07, 0xD1), IcomCivProtocol.buildIc820BandAccessCommand(main = true))
         assertArrayEquals(civCommand(0x07, 0xD0), IcomCivProtocol.buildIc820BandAccessCommand(main = false))
+        assertArrayEquals(civCommand(0x07, 0xB0), IcomCivProtocol.buildIc820MainSubExchangeCommand())
         assertArrayEquals(civCommand(0x0F, 0x00), IcomCivProtocol.buildIc820SplitModeCommand(true))
         assertArrayEquals(civCommand(0x0F, 0x01), IcomCivProtocol.buildIc820SplitModeCommand(false))
         assertArrayEquals(civCommand(0x07, 0xD0), IcomCivProtocol.buildSelectMainCommand())
@@ -250,6 +251,24 @@ class IcomCivProtocolTest {
         assertEquals(true, IcomCivProtocol.ackStatus(ack))
         assertEquals(false, IcomCivProtocol.ackStatus(nak))
         assertNull(IcomCivProtocol.ackStatus(byteArrayOf()))
+    }
+
+    @Test
+    fun ic820RecoversEchoAssociatedShortPreambleButNeverUnrelatedOrMissingFrames() {
+        val sent = byteArrayOf(0xFE.toByte(), 0xFE.toByte(), 0x42, 0xE0.toByte(),
+            0x07, 0xD0.toByte(), 0xFD.toByte())
+        val ackSuffix = byteArrayOf(0xFE.toByte(), 0xE0.toByte(), 0x42, 0xFB.toByte(), 0xFD.toByte())
+        val exactLog = sent + ackSuffix
+        assertNull(IcomCivProtocol.ackStatus(exactLog, 0x42))
+        assertEquals(true, IcomCivProtocol.ackStatusAfterEcho(exactLog, 0x42, sent))
+        assertEquals(false, IcomCivProtocol.ackStatusAfterEcho(sent +
+            ackSuffix.copyOf().also { it[3] = 0xFA.toByte() }, 0x42, sent))
+        assertNull(IcomCivProtocol.ackStatusAfterEcho(ackSuffix, 0x42, sent))
+        assertNull(IcomCivProtocol.ackStatusAfterEcho(exactLog, 0x43, sent))
+        assertNull(IcomCivProtocol.ackStatusAfterEcho(exactLog, 0x42,
+            sent.copyOf().also { it[5] = 0xD1.toByte() }))
+        assertNull(IcomCivProtocol.ackStatusAfterEcho(sent +
+            ackSuffix.copyOf().also { it[2] = 0x43 }, 0x42, sent))
     }
 
     @Test

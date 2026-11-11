@@ -25,6 +25,8 @@ interface IRadioController {
 
     val remoteState: kotlinx.coroutines.flow.StateFlow<RemoteRadioState>? get() = null
     val supportsAtomicPair: Boolean get() = false
+    /** Align physical MAIN/SUB roles to TX/RX bands before preset-mode configuration. */
+    suspend fun prepareSatelliteBands(rxHz: Long, txHz: Long): Boolean = true
     suspend fun setTrackingFrequencies(rxHz: Long, txHz: Long?): FrequencyPairResult = FrequencyPairResult.UNSUPPORTED
     suspend fun startCw(text: String, wpm: Int): Boolean = false
     suspend fun updateTrackingDisplay(display: RadioTrackingDisplay): Boolean = true

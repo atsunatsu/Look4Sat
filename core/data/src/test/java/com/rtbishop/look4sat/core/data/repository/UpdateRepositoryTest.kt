@@ -83,6 +83,55 @@ class UpdateRepositoryTest {
         }
     }
 
+
+    @Test fun manuallySelectedDownloadNeverFallsBackToAnotherProvider() = runBlocking {
+        val remote = FakeRemoteSource { url ->
+            if (url.startsWith("https://ghfast.top/")) 200 to smallApk()
+            else 200 to "<html>Invalid proxy response</html>".toByteArray()
+        }
+        val dest = File.createTempFile("look4sat-manual-", ".apk")
+        dest.delete()
+        try {
+            val seen = mutableListOf<UpdateSource>()
+            val ok = UpdateRepository(remote).downloadApk(
+                release, dest, UpdateSource.GITHUB, UpdateSource.GHFAST,
+                { seen += it }, { true }
+            )
+            assertFalse(ok)
+            assertEquals(listOf(UpdateSource.GITHUB), seen)
+            assertEquals(1, remote.requests.size)
+            assertFalse(dest.exists())
+        } finally {
+            dest.delete()
+        }
+    }
+
+    @Test fun automaticDownloadAlsoRetriesWhenApkVerifierRejectsSource() = runBlocking {
+        val apk = smallApk()
+        val remote = FakeRemoteSource { 200 to apk }
+        val dest = File.createTempFile("look4sat-verification-", ".apk")
+        dest.delete()
+        try {
+            var attempts = 0
+            val seen = mutableListOf<UpdateSource>()
+            val ok = UpdateRepository(remote).downloadApk(
+                release, dest, UpdateSource.AUTO, UpdateSource.GITHUB,
+                { seen += it },
+                {
+                    attempts++
+                    attempts == 2
+                }
+            )
+            assertTrue(ok)
+            assertEquals(2, attempts)
+            assertEquals(listOf(UpdateSource.GITHUB, UpdateSource.GHFAST), seen)
+            assertTrue(dest.exists())
+            assertTrue(dest.readBytes().contentEquals(apk))
+        } finally {
+            dest.delete()
+        }
+    }
+
     private fun releasePage() = """
         <html><head><meta property="og:url" content="https://github.com/atsunatsu/Look4Sat/releases/tag/$tag">
         <title>Release $tag</title></head><body></body></html>

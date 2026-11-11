@@ -352,8 +352,11 @@ class L4sController(
 
     override suspend fun setMode(mode: String): Boolean = if(selectedRx) setSplitModes(mode,null) else setSplitModes(null,mode)
     override suspend fun setSplitModes(rxMode: String?, txMode: String?): Boolean = withContext(dispatcher) {
-        val rx=L4sProtocol.modeNumber(rxMode ?: state.value.rxMode) ?: return@withContext false
+        val requestedRx=L4sProtocol.modeNumber(rxMode ?: state.value.rxMode) ?: return@withContext false
         val tx=L4sProtocol.modeNumber(txMode ?: state.value.txMode) ?: return@withContext false
+        // The current handset firmware maps CW/CW to USB/CW. Send the effective
+        // modes so both new and older USB-capable firmware report the same result.
+        val rx=L4sProtocol.effectiveRxMode(requestedRx,tx)
         val caps=state.value.capabilities ?: return@withContext false
         if(caps.rxModeMask and (1 shl rx)==0 || caps.txModeMask and (1 shl tx)==0) {
             state.update { it.copy(error="L4S supports FM/CW transmit; AM/USB are receive-only") };return@withContext false

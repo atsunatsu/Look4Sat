@@ -27,13 +27,36 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
+
+/** Wavelog's palette normalization: 0 is red; the lower of data maximum and filter maximum is green. */
+internal fun gridActivityColorIndex(percentage: Int, dataMax: Int, filterMax: Int): Int {
+    val scaleMax = min(dataMax.coerceIn(0, 100), filterMax.coerceIn(0, 100))
+    if (scaleMax == 0) return 0
+    return (percentage.coerceIn(0, 100) * 100f / scaleMax).roundToInt().coerceIn(0, 100)
+}
+
+/**
+ * Match the map's linear zoom scale from zoom 6.5 to 7.0.
+ * Above zoom 7.0, keep the label scale capped to avoid oversized labels
+ * on map sources that support much higher zoom levels.
+ */
+internal fun gridLabelScale(zoom: Double): Float {
+    val clampedZoom = zoom.coerceIn(GRID_LABEL_GROWTH_START_ZOOM, GRID_LABEL_MAX_SCALE_ZOOM)
+    return Math.pow(2.0, clampedZoom - GRID_LABEL_GROWTH_START_ZOOM).toFloat()
+}
+
+private const val GRID_LABEL_GROWTH_START_ZOOM = 6.5
+private const val GRID_LABEL_MAX_SCALE_ZOOM = 7.0
 
 /**
  * Maidenhead locator grid overlay, drawn directly on the map canvas.
  *
- * Zoom levels (map maxZoom = 7):
+ * Zoom levels:
  *  - zoom < GRID_ZOOM_SUB: 10° x 20° fields with 2-character labels (e.g. "PM")
  *  - zoom >= GRID_ZOOM_SUB: 1° x 2° squares with 4-character labels (e.g. "PM95")
+ * Four-character labels stay at 20px through zoom 6.5, then follow the
+ * map's exact zoom scale to 1.414x at zoom 7.0 and remain capped above it.
  *
  * All geometry is computed per-frame from the projection, so the overlay
  * stays correct while panning/zooming. Grid lines that cross the antimeridian
@@ -60,6 +83,14 @@ class MaidenheadGridOverlay : Overlay() {
         color = Color.argb(230, 255, 224, 130)
         setShadowLayer(3f, 2f, 2f, Color.BLACK)
     }
+    // Smaller second line when GridMaster activity values are shown inside squares.
+    private val activityLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = LABEL_TEXT_SIZE * 0.72f
+        style = Paint.Style.FILL
+        textAlign = Paint.Align.CENTER
+        color = Color.argb(220, 255, 224, 130)
+        setShadowLayer(3f, 2f, 2f, Color.BLACK)
+    }
     private val workedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = android.graphics.Paint.Style.FILL
         color = Color.argb(90, 76, 217, 100)
@@ -69,6 +100,41 @@ class MaidenheadGridOverlay : Overlay() {
         style = android.graphics.Paint.Style.FILL
         color = Color.argb(90, 255, 59, 48)
     }
+    private val activityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val activityColors = IntArray(101) { p ->
+        // Reuse the map's original marked red, WAIPA pending yellow and worked green.
+        val first = if (p <= 50) intArrayOf(255, 59, 48) else intArrayOf(255, 193, 7)
+        val second = if (p <= 50) intArrayOf(255, 193, 7) else intArrayOf(76, 217, 100)
+        val fraction = if (p <= 50) p / 50f else (p - 50) / 50f
+        Color.argb(
+            110,
+            (first[0] + (second[0] - first[0]) * fraction).toInt(),
+            (first[1] + (second[1] - first[1]) * fraction).toInt(),
+            (first[2] + (second[2] - first[2]) * fraction).toInt()
+        )
+    }
+    private data class ActivityCell(val grid: String, val bounds: CellBounds, val percentage: Int)
+    private var activityCells: List<ActivityCell> = emptyList()
+    private var activityMaxPercentage = 0
+
+    /** GridMaster share of participating SAT logs containing a given 4-character grid. */
+    var activityPercentages: Map<String, Int> = emptyMap()
+        set(value) {
+            if (field === value) return
+            field = value
+            activityMaxPercentage = value.values.maxOrNull()?.coerceIn(0, 100) ?: 0
+            activityCells = value.mapNotNull { (grid, percentage) ->
+                gridCellBounds(grid)?.let { ActivityCell(grid, it, percentage.coerceIn(0, 100)) }
+            }
+        }
+    var showActivityOverlay: Boolean = false
+    var activityFilterMin: Int = 0
+    var activityFilterMax: Int = 100
+    /** When false, hide personal green/red fills and include those squares in the activity map. */
+    var showWorkedAndMarkedWithActivity: Boolean = false
+
     private val roamStripePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 14f
@@ -105,6 +171,8 @@ class MaidenheadGridOverlay : Overlay() {
         labelPaint.setShadowLayer(3f, 2f, 2f, halo)
         firstCallPaint.color = label
         firstCallPaint.setShadowLayer(3f, 2f, 2f, halo)
+        activityLabelPaint.color = label
+        activityLabelPaint.setShadowLayer(3f, 2f, 2f, halo)
     }
 
     /** Worked gridsquares (4-char, uppercase) to highlight, e.g. {"OL62", "PM95"}. */
@@ -144,6 +212,12 @@ class MaidenheadGridOverlay : Overlay() {
         if (shadow || !isEnabled) return
         val projection = mapView.projection
         val zoom = mapView.zoomLevelDouble
+        // Four-character labels follow the map's exact zoom scale from 6.5 to 7.0.
+        // Above zoom 7.0 the font scale is capped; two-character field labels stay unchanged.
+        val labelScale = gridLabelScale(zoom)
+        labelPaint.textSize = LABEL_TEXT_SIZE * labelScale
+        firstCallPaint.textSize = LABEL_TEXT_SIZE * labelScale
+        activityLabelPaint.textSize = LABEL_TEXT_SIZE * 0.72f * labelScale
         canvasWidthPx = canvas.width.toFloat()
         val cellLat = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LAT else FIELD_LAT
         val cellLon = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LON else FIELD_LON
@@ -190,12 +264,47 @@ class MaidenheadGridOverlay : Overlay() {
         // The tapped worked grid gets a distinct outline (sub-square zoom only).
         val selectedCell = selectedGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
 
+        // Two modes: preserve personal green/red fills, or show the full GridMaster
+        // heatmap (including worked/marked grids) when that preference is off.
+        // At either zoom level, heatmap geometry always uses four-character squares.
+        val drawPersonalGridFills = !showActivityOverlay || showWorkedAndMarkedWithActivity
+        if (showActivityOverlay && activityCells.isNotEmpty()) {
+            val pixelsPerDegreeLon = worldWidthPx / 360.0
+            for (entry in activityCells) {
+                if (drawPersonalGridFills && (entry.grid in workedGrids || entry.grid in markedGrids)) continue
+                if (entry.percentage !in activityFilterMin..activityFilterMax) continue
+                val cell = entry.bounds
+                if (cell.latTop < bottomLat || cell.latBottom > topLat) continue
+                val yTop = projectionToY(projection, cell.latTop) ?: continue
+                val yBottom = projectionToY(projection, cell.latBottom) ?: continue
+                if (yBottom < 0f || yTop > canvas.height) continue
+                // Match Wavelog: normalize against min(dataset maximum, filter maximum),
+                // leaving the slider's minimum as an inclusion filter only.
+                activityPaint.color = activityColors[
+                    gridActivityColorIndex(entry.percentage, activityMaxPercentage, activityFilterMax)
+                ]
+                for (turn in -colRepeats..colRepeats) {
+                    val lonLeft = cell.lonLeft + turn * 360.0
+                    val lonRight = cell.lonRight + turn * 360.0
+                    if (lonRight < leftLon || lonLeft > rightLon) continue
+                    // Linear unwrapped longitude projection avoids the +/-180-degree
+                    // clipping that occurs when osmdroid wraps normalized tile X.
+                    val xLeft = (canvas.width / 2.0 +
+                        (lonLeft - centerLon) * pixelsPerDegreeLon).toFloat()
+                    val xRight = (canvas.width / 2.0 +
+                        (lonRight - centerLon) * pixelsPerDegreeLon).toFloat()
+                    if (xRight < 0f || xLeft > canvas.width) continue
+                    canvas.drawRect(xLeft, yTop, xRight, yBottom, activityPaint)
+                }
+            }
+        }
+
         // Worked-grid highlight fills.
         //  - Sub-square zoom: fill each worked 4-char cell directly.
         //  - Field zoom (two-char labels): do NOT fill whole fields; instead fill
         //    the individual 2°x1° squares that were worked, without drawing the
         //    square grid lines — so you see green patches inside the field.
-        if (workedGrids.isNotEmpty() || markedGrids.isNotEmpty()) {
+        if (drawPersonalGridFills && (workedGrids.isNotEmpty() || markedGrids.isNotEmpty())) {
             if (zoom >= GRID_ZOOM_SUB) {
                 for (row in firstRow..lastRow) {
                     val lat = row * cellLat
@@ -415,10 +524,10 @@ class MaidenheadGridOverlay : Overlay() {
         // Field (2-char) labels show at every zoom, subject only to the pixel-
         // size check below; sub-square (4-char) labels appear together with the
         // grid LINES at GRID_ZOOM_SUB (user req 2026-09-21: 与首通呼号同一显示缩放).
-        // First-call labels replace the 4-char grid codes and only exist at
-        // sub-square zoom; at field zoom NO labels are drawn at all (the user
-        // requirement is that non-worked cells carry no grid characters).
-        if (showFirstCallLabels && zoom < GRID_ZOOM_SUB) return
+        // In first-call mode, 2-char field zoom still uses the normal field
+        // letters. At 4-char zoom, callsigns replace grid codes; if GridMaster
+        // activity is enabled, percentages are shown beneath the callsigns
+        // (or alone in unworked cells).
         // 网格标签与首通呼号同一显示缩放 (用户要求 2026-09-21): 子方块(4字符)
         // 标签与首通呼号都在网格线出现的 GRID_ZOOM_SUB 同时显示, 不再晚一档.
         val showLabels = zoom >= GRID_ZOOM_SUB || cellLat == FIELD_LAT
@@ -434,7 +543,7 @@ class MaidenheadGridOverlay : Overlay() {
         val minCellPx = MIN_LABEL_CELL_PX * 0.6f
         if (pixelsPerDegree * cellLat < minCellPx) return
 
-        val activePaint = if (showFirstCallLabels) firstCallPaint else labelPaint
+        val activePaint = if (showFirstCallLabels && zoom >= GRID_ZOOM_SUB) firstCallPaint else labelPaint
         activePaint.textAlign = Paint.Align.CENTER
         val fontMetrics = activePaint.fontMetrics
         val textHalfHeight = (fontMetrics.descent + fontMetrics.ascent) / 2f
@@ -463,19 +572,38 @@ class MaidenheadGridOverlay : Overlay() {
                 val xRight = xRightBase + turn * worldWidthPx.toFloat()
                 if (xRight < 0f || xLeft > canvas.width) continue
                 val label = cellLabel(lat, lon, zoom)
-                if (showFirstCallLabels) {
-                    // 首通呼号模式: 绿格(worked)标注该格第一个通联的呼号, 红格(marked)
-                    // 标注用户标记想通联的呼号, 均淡黄文字; 其它格空着不写网格字符.
-                    when {
-                        label in workedGrids -> firstCallsByGrid[label]?.let { call ->
-                            canvas.drawText(call, (xLeft + xRight) / 2f, yCenter, firstCallPaint)
-                        }
-                        label in markedGrids -> markedGrids[label]?.firstOrNull()?.let { station ->
-                            canvas.drawText(station.call, (xLeft + xRight) / 2f, yCenter, firstCallPaint)
-                        }
-                    }
+                val xCenter = (xLeft + xRight) / 2f
+                if (zoom < GRID_ZOOM_SUB) {
+                    // Field zoom is independent of first-call mode: always label
+                    // the two-letter Maidenhead fields, with no percentages.
+                    canvas.drawText(label, xCenter, yCenter, labelPaint)
                 } else {
-                    canvas.drawText(label, (xLeft + xRight) / 2f, yCenter, labelPaint)
+                    val percent = if (showActivityOverlay) {
+                        activityPercentages[label]?.takeIf { it in activityFilterMin..activityFilterMax }
+                    } else null
+                    val mainLabel = if (showFirstCallLabels) {
+                        when {
+                            label in workedGrids -> firstCallsByGrid[label]
+                            label in markedGrids -> markedGrids[label]?.firstOrNull()?.call
+                            else -> null
+                        }
+                    } else label
+                    // Keep the text centred for both single- and double-line
+                    // layouts, including activity-only squares in first-call mode.
+                    if (mainLabel != null) {
+                        canvas.drawText(
+                            mainLabel, xCenter,
+                            if (percent != null) yCenter - 9f * labelScale else yCenter,
+                            if (showFirstCallLabels) firstCallPaint else labelPaint
+                        )
+                    }
+                    if (percent != null) {
+                        canvas.drawText(
+                            "${percent}%", xCenter,
+                            if (mainLabel != null) yCenter + 12f * labelScale else yCenter,
+                            activityLabelPaint
+                        )
+                    }
                 }
             }
         }

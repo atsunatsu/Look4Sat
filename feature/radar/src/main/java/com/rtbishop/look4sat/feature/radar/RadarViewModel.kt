@@ -434,7 +434,21 @@ class RadarViewModel(
                 } else {
                     val pass = _uiState.value.currentPass ?: return
                     val transponder = svc.selectedTransponder ?: return
-                    trackingService.startTracking(pass, transponder, svc.txBaseFrequencyHz)
+                    viewModelScope.launch {
+                        val current = trackingService.state.value
+                        if (current.isActive || current.trackingPhase == TrackingPhase.INITIALIZING) return@launch
+                        // Saving CAT settings closes the old controller. Tracking must reopen
+                        // the selected radio before starting Doppler control.
+                        if (settingsRepo.radioControlSettings.value.catTransport != RadioControlSettings.TRANSPORT_VOX &&
+                            !current.txConnected && !current.rxConnected) {
+                            trackingService.connectRadios()
+                            val connected = trackingService.state.value
+                            if (!connected.txConnected && !connected.rxConnected) return@launch
+                        }
+                        if (_uiState.value.currentPass?.catNum != pass.catNum ||
+                            trackingService.state.value.selectedTransponder?.uuid != transponder.uuid) return@launch
+                        trackingService.startTracking(pass, transponder, trackingService.state.value.txBaseFrequencyHz)
+                    }
                 }
             }
             RadarAction.ConnectRadios -> viewModelScope.launch { trackingService.connectRadios() }

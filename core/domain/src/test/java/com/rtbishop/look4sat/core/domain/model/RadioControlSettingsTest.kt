@@ -25,6 +25,27 @@ class RadioControlSettingsTest {
     }
 
     @Test
+    fun usbCatRtsDtrDefaultToOffAndCanBeConfiguredIndependently() {
+        val original = RadioControlSettings(
+            enabled = true,
+            radioModel = RadioControlSettings.MODEL_ICOM_IC820,
+            txRadioAddress = "USB",
+            rxRadioAddress = "",
+            txRadioName = "",
+            rxRadioName = "",
+            baudRate = 1200
+        )
+        assertEquals(false, original.catRts)
+        assertEquals(false, original.catDtr)
+        val rtsOnly = original.copy(catRts = true)
+        assertEquals(true, rtsOnly.catRts)
+        assertEquals(false, rtsOnly.catDtr)
+        val dtrOnly = original.copy(catDtr = true)
+        assertEquals(false, dtrOnly.catRts)
+        assertEquals(true, dtrOnly.catDtr)
+    }
+
+    @Test
     fun exposesOnlyDocumentedBaudRatesForEachRadioFamily() {
         assertEquals(listOf(4800, 9600, 38400), supportedRadioBaudRates(RadioControlSettings.MODEL_YAESU_FT817))
         assertEquals(listOf(4800, 9600, 38400), supportedRadioBaudRates(RadioControlSettings.MODEL_YAESU_FT857))

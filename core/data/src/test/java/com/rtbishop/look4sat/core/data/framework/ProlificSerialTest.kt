@@ -7,9 +7,12 @@ import org.junit.Test
 class ProlificSerialTest {
     private data class Request(val type: Int, val request: Int, val value: Int, val index: Int, val data: ByteArray?)
     private val descriptors = ByteArray(18).also { it[2] = 0; it[3] = 2; it[7] = 64; it[13] = 6 }
-    private fun configure(product: Int = 0x23A3, stop: Int = 1, failAt: Int = -1): Pair<Boolean, List<Request>> {
+    private fun configure(
+        product: Int = 0x23A3, stop: Int = 1, failAt: Int = -1,
+        rts: Boolean = false, dtr: Boolean = false
+    ): Pair<Boolean, List<Request>> {
         val calls = mutableListOf<Request>()
-        val ok = configureProlificSerial(product, 0, descriptors, 1200, stop) { type, request, value, index, data ->
+        val ok = configureProlificSerial(product, 0, descriptors, 1200, stop, rts, dtr) { type, request, value, index, data ->
             calls += Request(type, request, value, index, data?.copyOf())
             if (calls.lastIndex == failAt) -1 else data?.size ?: 0
         }
@@ -28,9 +31,18 @@ class ProlificSerialTest {
         assertTrue(ok)
         assertEquals(listOf(0x80, 0x22, 0x80, 0x20, 0x80), calls.map { it.request })
         assertEquals(7, calls[0].value); assertEquals(3, calls[0].index)
-        assertEquals(0, calls[1].value) // Never assert DTR or RTS.
+        assertEquals(0, calls[1].value) // Both CAT modem lines default to deasserted.
         assertEquals(0x0A, calls[2].value); assertEquals(0xFF, calls[2].index)
         assertArrayEquals(byteArrayOf(0xB0.toByte(), 4, 0, 0, 0, 0, 8), calls.first { it.request == 0x20 }.data)
+    }
+
+    @Test fun prolificHonorsAllConfiguredCatRtsDtrCombinations() {
+        for (rts in listOf(false, true)) for (dtr in listOf(false, true)) {
+            val (ok, calls) = configure(rts = rts, dtr = dtr)
+            assertTrue(ok)
+            val state = (if (rts) 2 else 0) or (if (dtr) 1 else 0)
+            assertEquals(state, calls.single { it.request == 0x22 }.value)
+        }
     }
 
     @Test fun everyFailedControlRequestStopsConfiguration() {
