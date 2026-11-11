@@ -177,6 +177,7 @@ class RadioTrackingService(
             reconnectRequired=old.radioModel!=settings.radioModel || old.catTransport!=settings.catTransport ||
                 old.txRadioAddress!=settings.txRadioAddress || old.rxRadioAddress!=settings.rxRadioAddress ||
                 old.baudRate!=settings.baudRate || old.civAddress!=settings.civAddress ||
+                old.catRts!=settings.catRts || old.catDtr!=settings.catDtr ||
                 old.splitMode!=settings.splitMode || old.duplexMode!=settings.duplexMode || old.tcpProtocol!=settings.tcpProtocol ||
                 settings.radioModel==RadioControlSettings.MODEL_VERO_N76 && old.n76BluetoothAudio!=settings.n76BluetoothAudio
             if(reconnectRequired) {
@@ -445,6 +446,11 @@ class RadioTrackingService(
                 profile.serialStopBits
             )
         } else null
+        // CAT serial control lines are configured on the USB adapter before opening it.
+        // L4S uses its own firmware-specific DTR handshake.
+        if (settings.catTransport == RadioControlSettings.TRANSPORT_USB && !profile.isL4s) {
+            transport?.setCatSerialControlLines(settings.catRts, settings.catDtr)
+        }
         val controller = injected ?: if (profile.isN76) {
             N76Controller(transport ?: BluetoothSppRadioTransport(bluetoothManager, address, diagnostics), appScope, diagnostics,
                 audio = if (settings.n76BluetoothAudio) n76AudioFactory?.invoke(address) else null,
@@ -1086,18 +1092,29 @@ class RadioTrackingService(
     // A cycle and a settings change own the same lock as transmit preparation.
     // During PTT, hold both CAT legs and suppress dial-change detection.
     private suspend fun runPresetSingleTracking(transponder: SatRadio, initialTxBaseFreqHz: Long?) {
+        val radio = txController ?: return failTrackingInitialization("No CAT radio is connected")
         transmitMutex.withLock {
             val txBase = if (transponder.uplinkLow == null) null else initialTxBaseFreqHz ?: transponder.uplinkCenterFrequency()
             val rxBase = transponder.downlinkLow
+            val ic820 = settingsRepo.radioControlSettings.value.radioModel == RadioControlSettings.MODEL_ICOM_IC820
+            val txMode = controlUplinkMode(transponder)
+            val rxMode = controlDownlinkMode(transponder, txMode)
+            // The IC-820H controls TX on MAIN and RX on SUB through CI-V band access.
+            // Do not change ordinary split or the operator's SATL-N/REV front-panel mode.
+            if (ic820 && !radio.setSplitModes(rxMode, txMode)) {
+                return failTrackingInitialization("IC-820 MAIN/SUB modes were not acknowledged")
+            }
             if (nativeBaseOverride == null && rxBase != null) {
                 val offset = if (DopplerFrequencyCalculator.isLinearTransponder(transponder))
                     DopplerFrequencyCalculator.parseOffsetHz(settingsRepo.getSatelliteOffset(transponder.catnum ?: 0)) else 0L
                 nativeBaseOverride = com.rtbishop.look4sat.core.domain.repository.RadioBaseFrequencies(rxBase + offset, txBase)
             }
             _state.update { it.copy(isActive = true, trackingPhase = TrackingPhase.READY,
-                txMode = controlUplinkMode(transponder), rxMode = controlDownlinkMode(transponder, controlUplinkMode(transponder)),
+                txMode = txMode, rxMode = rxMode,
                 txBaseFrequencyHz = if(nativeBaseOverride!=null) nativeBaseOverride?.txHz else txBase) }
-            diagnose("tracking/ready", "mode=single-radio-preset; radio owns TX/RX mode and VFO selection")
+            diagnose("tracking/ready", if (ic820)
+                "mode=ic820-main-tx-sub-rx; independent CI-V band access"
+                else "mode=single-radio-preset; radio owns TX/RX mode and VFO selection")
         }
         runTrackingLoop(split = true, presetSingle = true)
     }
@@ -1254,7 +1271,10 @@ class RadioTrackingService(
                                 controlSettings.radioModel == RadioControlSettings.MODEL_ICOM_IC820, desiredRx, desiredTx)
                             result.rxHz?.let { lastSetRx = it; observedRx = it }
                             result.txHz?.let { lastSetTx = it; observedTx = it }
-                            if (!result.success) failTrackingCommand("Preset RX/TX VFO could not be identified or tuned; check the radio preset")
+                            if (!result.success) failTrackingCommand(if (
+                                controlSettings.radioModel == RadioControlSettings.MODEL_ICOM_IC820
+                            ) "IC-820 MAIN TX / SUB RX frequency pair failed readback; check SATL tracking coupling"
+                            else "Preset RX/TX VFO could not be identified or tuned; check the radio preset")
                         } else if (split && tx?.supportsAtomicPair == true && desiredRx != null) {
                             when (tx.setTrackingFrequencies(desiredRx, desiredTx)) {
                                 FrequencyPairResult.APPLIED -> {

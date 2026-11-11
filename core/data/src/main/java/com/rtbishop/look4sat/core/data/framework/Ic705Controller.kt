@@ -23,6 +23,7 @@ import com.rtbishop.look4sat.core.domain.control.ControlDiagnosticSeverity
 import com.rtbishop.look4sat.core.domain.control.ControlDiagnosticSource
 import com.rtbishop.look4sat.core.domain.control.IControlDiagnostics
 import com.rtbishop.look4sat.core.domain.control.NoOpControlDiagnostics
+import com.rtbishop.look4sat.core.domain.repository.FrequencyPairResult
 import com.rtbishop.look4sat.core.domain.repository.IRadioController
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
@@ -109,12 +110,14 @@ class Ic705Controller(
                     civSession = Ic705CivSession(transport, civAddress, diagnostics, disconnected = { isConnected = false })
                 }
                 diagnose("connect/probe", "model=$tag mode=${transport.connectionDescription} address=0x${"%02X".format(civAddress.toInt() and 0xFF)}")
-                val ready = if (variant == IcomCivVariant.IC705) {
-                    probeReadOnlyConnection()
-                } else {
-                    // Preserve legacy setup; IC-705 probing never changes radio state.
-                    ioMutex.withLock { sendAndWaitAck(IcomCivProtocol.buildEnterVfoModeCommand()) } &&
-                        readFrequencyAndMode() != null
+                val ready = when (variant) {
+                    IcomCivVariant.IC705 -> probeReadOnlyConnection()
+                    // Do not send 07 without a selector: it can leave the operator's
+                    // satellite preset. The IC-820H has no CI-V SAT-mode command.
+                    IcomCivVariant.IC820 -> readFrequencyAndMode() != null
+                    else -> ioMutex.withLock {
+                        sendAndWaitAck(IcomCivProtocol.buildEnterVfoModeCommand())
+                    } && readFrequencyAndMode() != null
                 }
                 if (ready && isConnected && transport.isConnected) {
                     diagnose("connect/ready", "model=$tag mode=${transport.connectionDescription} CI-V verified")
@@ -319,6 +322,44 @@ class Ic705Controller(
 
     // ── IRadioController – Icom duplex operations ──────────────────────────
 
+    override val supportsAtomicPair: Boolean get() = variant == IcomCivVariant.IC820
+
+    /**
+     * One serialized IC-820 frequency-pair transaction. 07 D1 selects TX MAIN,
+     * 07 D0 selects RX SUB. Confirm both frequencies after the last write:
+     * front-panel satellite tracking may change the other frequency as a side effect.
+     */
+    override suspend fun setTrackingFrequencies(rxHz: Long, txHz: Long?): FrequencyPairResult =
+        withContext(Dispatchers.IO) {
+            if (variant != IcomCivVariant.IC820) return@withContext FrequencyPairResult.UNSUPPORTED
+            if (ic820Band(rxHz) == null || (txHz != null && ic820Band(txHz) == null))
+                return@withContext FrequencyPairResult.FAILED
+            ioMutex.withLock {
+                var verified = true
+                var rxRestored = false
+                try {
+                    if (txHz != null) {
+                        verified = sendAndWaitAck(IcomCivProtocol.buildIc820BandAccessCommand(main = true)) &&
+                            sendAndWaitAck(IcomCivProtocol.buildSetFreqCommand(txHz))
+                    }
+                    if (verified) {
+                        verified = sendAndWaitAck(IcomCivProtocol.buildIc820BandAccessCommand(main = false)) &&
+                            sendAndWaitAck(IcomCivProtocol.buildSetFreqCommand(rxHz)) &&
+                            readFrequencyLocked() == rxHz
+                    }
+                    if (verified && txHz != null) {
+                        verified = sendAndWaitAck(IcomCivProtocol.buildIc820BandAccessCommand(main = true)) &&
+                            readFrequencyLocked() == txHz
+                    }
+                } finally {
+                    rxRestored = withContext(NonCancellable) {
+                        restoreRxVfo()
+                    }
+                }
+                if (verified && rxRestored) FrequencyPairResult.APPLIED else FrequencyPairResult.FAILED
+            }
+        }
+
     /** Modern radios switch bands via frequency; IC-820 needs explicit band access. */
     override suspend fun setBand(frequencyHz: Long): Boolean {
         if (variant != IcomCivVariant.IC820) return frequencyHz > 0L
@@ -338,7 +379,7 @@ class Ic705Controller(
         }
     }
 
-    /** Select VFO-A (main/RX) or VFO-B (sub/TX). */
+    /** Select the logical RX/TX side. On IC-820 RX=SUB and TX=MAIN. */
     override suspend fun setVfo(vfoA: Boolean): Boolean = withContext(Dispatchers.IO) {
         val cmd = selectVfoCommand(vfoA)
         Log.d(tag, "CMD selectVFO${if (vfoA) "A" else "B"} → ${commandHex(cmd)}")
@@ -670,14 +711,17 @@ class Ic705Controller(
                 mode.uppercase(Locale.US) in IC910_MODES)
     }
 
-    private fun selectVfoCommand(vfoA: Boolean): ByteArray = if (!usesDedicatedSatelliteMode) {
-        if (vfoA) {
+    private fun selectVfoCommand(vfoA: Boolean): ByteArray = when {
+        // IC-820H: MAIN is the uplink/transmitter, SUB is the downlink/receiver.
+        // Its D0/D1 CI-V access selectors are inverted relative to newer Icoms.
+        variant == IcomCivVariant.IC820 ->
+            IcomCivProtocol.buildIc820BandAccessCommand(main = !vfoA)
+        !usesDedicatedSatelliteMode -> if (vfoA) {
             IcomCivProtocol.buildSelectVfoACommand()
         } else {
             IcomCivProtocol.buildSelectVfoBCommand()
         }
-    } else {
-        if (vfoA) {
+        else -> if (vfoA) {
             IcomCivProtocol.buildSelectMainCommand()
         } else {
             IcomCivProtocol.buildSelectSubCommand()

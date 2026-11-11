@@ -1092,6 +1092,8 @@ class SettingsRepo(
     private val keyTxRadioName = "txRadioName"
     private val keyRxRadioName = "rxRadioName"
     private val keyRadioBaudRate = "radioBaudRate"
+    private val keyRadioCatRts = "radioCatRts"
+    private val keyRadioCatDtr = "radioCatDtr"
     private val keyRadioSplitMode = "radioSplitMode"
     private val keyRadioCatTransport = "radioCatTransport"
     private val keyRadioDuplexMode = "radioDuplexMode"
@@ -1134,6 +1136,8 @@ class SettingsRepo(
             putString(keyTxRadioName, normalized.txRadioName)
             putString(keyRxRadioName, normalized.rxRadioName)
             putInt(keyRadioBaudRate, normalized.baudRate)
+            putBoolean(keyRadioCatRts, normalized.catRts)
+            putBoolean(keyRadioCatDtr, normalized.catDtr)
             putBoolean(keyRadioSplitMode, normalized.splitMode)
             putString(keyRadioCatTransport, normalized.catTransport)
             putString(keyRadioDuplexMode, normalized.duplexMode)
@@ -1163,6 +1167,8 @@ class SettingsRepo(
             rxRadioName = preferences.getString(keyRxRadioName, null) ?: "RX Radio",
             baudRate = preferences.getInt(keyRadioBaudRate, 4800)
                 .takeIf { it in supportedBaudRates } ?: supportedBaudRates.first(),
+            catRts = preferences.getBoolean(keyRadioCatRts, false),
+            catDtr = preferences.getBoolean(keyRadioCatDtr, false),
             splitMode = preferences.getBoolean(keyRadioSplitMode, false),
             catTransport = preferences.getString(keyRadioCatTransport, null)
                 ?: RadioControlSettings.TRANSPORT_BLUETOOTH,

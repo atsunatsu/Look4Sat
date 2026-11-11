@@ -40,6 +40,8 @@ interface RadioTransport : ControlTransport {
     fun configureBluetoothConnection(secureFirst: Boolean, timeoutMillis: Long) = Unit
     /** Native CDC devices may gate replies on DTR. Generic CAT adapters stay deasserted. */
     fun setCdcDtrOnConnect(enabled: Boolean) = Unit
+    /** Configure physical USB CAT modem-control lines before connect; not CAT PTT. */
+    fun setCatSerialControlLines(rts: Boolean, dtr: Boolean) = Unit
 }
 
 class TcpRadioTransport(
@@ -152,10 +154,20 @@ class UsbSerialRadioTransport(
     private val diagnostics: IControlDiagnostics = NoOpControlDiagnostics
 ) : RadioTransport {
     private var cdcDtrOnConnect = false
+    private var catRtsOnConnect = false
+    private var nativeCdcFastWrites = false
     @Volatile override var lastIoFailure: String? = null
         private set
     private var connectedDevice: UsbDevice? = null
-    override fun setCdcDtrOnConnect(enabled: Boolean) { cdcDtrOnConnect = enabled }
+    override fun setCdcDtrOnConnect(enabled: Boolean) {
+        cdcDtrOnConnect = enabled
+        nativeCdcFastWrites = enabled
+    }
+    override fun setCatSerialControlLines(rts: Boolean, dtr: Boolean) {
+        catRtsOnConnect = rts
+        cdcDtrOnConnect = dtr
+        nativeCdcFastWrites = false
+    }
     private val manager = context.applicationContext.getSystemService(UsbManager::class.java)
     private val selector = parseUsbSerialSelector(deviceSelector)
     private var connection: UsbDeviceConnection? = null
@@ -166,7 +178,7 @@ class UsbSerialRadioTransport(
     private var pendingRead = ByteArray(0)
     private val lineConfiguration = usbSerialLineConfiguration(stopBits)
     override val connectionDescription get() = "usb driver=${selectedPort?.driver ?: "unopened"} " +
-        "control=${selector?.controlInterfaceId} data=${selector?.dataInterfaceId} baud=$baudRate stopBits=$stopBits"
+        "control=${selector?.controlInterfaceId} data=${selector?.dataInterfaceId} baud=$baudRate stopBits=$stopBits RTS=$catRtsOnConnect DTR=$cdcDtrOnConnect"
     override val isConnected: Boolean
         get() = connection != null && claimedInterfaces.isNotEmpty() && input != null && output != null
 
@@ -220,7 +232,8 @@ class UsbSerialRadioTransport(
                 UsbSerialDriverKind.FTDI -> configureFtdi(opened, device, port, serialLine)
                 UsbSerialDriverKind.CH34X -> configureCh34x(opened, baudRate, serialLine)
                 UsbSerialDriverKind.PROLIFIC -> configureProlificSerial(
-                    device.productId, device.deviceClass, descriptors, baudRate, stopBits
+                    device.productId, device.deviceClass, descriptors, baudRate, stopBits,
+                    catRtsOnConnect, cdcDtrOnConnect
                 ) { type, request, value, index, data ->
                     opened.controlTransfer(type, request, value, index, data, data?.size ?: 0, IO_TIMEOUT_MILLIS)
                 }
@@ -301,7 +314,7 @@ class UsbSerialRadioTransport(
         val current = connection ?: run { lastIoFailure="USB connection closed";return@withContext false }
         val endpoint = output ?: run { lastIoFailure="USB OUT endpoint unavailable";return@withContext false }
         lastIoFailure=null
-        val timeout=usbRadioWriteTimeoutMillis(cdcDtrOnConnect,selectedPort?.driver)
+        val timeout=usbRadioWriteTimeoutMillis(nativeCdcFastWrites,selectedPort?.driver)
         var offset = 0
         while (offset < bytes.size) {
             val count = minOf(bytes.size - offset, MAX_USB_TRANSFER_BYTES)
@@ -384,7 +397,7 @@ class UsbSerialRadioTransport(
         return connection.controlTransfer(
             CDC_REQUEST_TYPE,
             CDC_SET_CONTROL_LINE_STATE,
-            cdcControlLineState(cdcDtrOnConnect),
+            cdcControlLineState(cdcDtrOnConnect, catRtsOnConnect),
             intf.id,
             null,
             0,
@@ -401,7 +414,6 @@ class UsbSerialRadioTransport(
         if (!isCp210xLineConfigurationSupported(device.interfaceCount, port.portIndex, serialLine)) return false
         val index = port.portIndex
         if (cp210xOut(connection, CP210X_IFC_ENABLE, 1, index) != 0) return false
-        if (cp210xOut(connection, CP210X_SET_MHS, CP210X_DTR_RTS_DISABLED, index) != 0) return false
         val noFlowControl = ByteArray(CP210X_FLOW_CONTROL_BYTES)
         if (connection.controlTransfer(
                 USB_VENDOR_OUT_INTERFACE,
@@ -429,7 +441,10 @@ class UsbSerialRadioTransport(
                 IO_TIMEOUT_MILLIS
             ) < 0
         ) return false
-        return cp210xOut(connection, CP210X_SET_LINE_CONTROL, serialLine.cp210xLineControl, index) == 0
+        // SET_FLOW can reset manual modem outputs: write the requested levels last.
+        if (cp210xOut(connection, CP210X_SET_LINE_CONTROL, serialLine.cp210xLineControl, index) != 0) return false
+        return cp210xOut(connection, CP210X_SET_MHS,
+            cp210xModemControl(catRtsOnConnect, cdcDtrOnConnect), index) == 0
     }
 
     private fun configureFtdi(
@@ -440,7 +455,7 @@ class UsbSerialRadioTransport(
     ): Boolean {
         val portNumber = port.portIndex + 1
         if (vendorOut(connection, FTDI_RESET, 0, portNumber) != 0) return false
-        if (vendorOut(connection, FTDI_MODEM_CONTROL, FTDI_DTR_RTS_DISABLED, portNumber) != 0) return false
+        if (vendorOut(connection, FTDI_MODEM_CONTROL, ftdiModemControl(catRtsOnConnect, cdcDtrOnConnect), portNumber) != 0) return false
         if (vendorOut(connection, FTDI_FLOW_CONTROL, 0, portNumber) != 0) return false
         val descriptors = connection.rawDescriptors ?: return false
         val deviceType = descriptors.getOrNull(13)?.toInt()?.and(0xFF)
@@ -465,7 +480,7 @@ class UsbSerialRadioTransport(
         if (vendorIn(connection, CH34X_READ_REG, 0x0706, 0, register) != register.size) return false
         if (vendorOut(connection, CH34X_SERIAL_INIT, 0x501F, 0xD90A) < 0) return false
         if (!setCh34xBaudRate(connection, requestedBaudRate)) return false
-        if (vendorOut(connection, CH34X_MODEM_CTRL, CH34X_DTR_RTS_DISABLED, 0) < 0) return false
+        if (vendorOut(connection, CH34X_MODEM_CTRL, ch34xModemControl(catRtsOnConnect, cdcDtrOnConnect), 0) < 0) return false
         return vendorOut(connection, CH34X_WRITE_REG, 0x2518, serialLine.ch34xLineControl) >= 0
     }
 
@@ -527,26 +542,34 @@ class UsbSerialRadioTransport(
         const val CP210X_SET_MHS = 0x07
         const val CP210X_SET_FLOW = 0x13
         const val CP210X_SET_BAUD_RATE = 0x1E
-        const val CP210X_DTR_RTS_DISABLED = 0x0300
         const val CP210X_FLOW_CONTROL_BYTES = 16
         const val FTDI_RESET = 0
         const val FTDI_MODEM_CONTROL = 1
         const val FTDI_FLOW_CONTROL = 2
         const val FTDI_SET_BAUD_RATE = 3
         const val FTDI_SET_DATA = 4
-        const val FTDI_DTR_RTS_DISABLED = 0x0300
         const val CH34X_READ_VERSION = 0x5F
         const val CH34X_SERIAL_INIT = 0xA1
         const val CH34X_READ_REG = 0x95
         const val CH34X_WRITE_REG = 0x9A
         const val CH34X_MODEM_CTRL = 0xA4
-        const val CH34X_DTR_RTS_DISABLED = 0xFFFF
         const val CH34X_DEFAULT_BAUD_RATE = 9_600
     }
 }
 
-// Bit 0 is DTR; bit 1 (RTS) stays clear to avoid keying modem-line PTT adapters.
-internal fun cdcControlLineState(dtr: Boolean): Int = if (dtr) 1 else 0
+// Modem-control line levels are static CAT connection settings, not PTT commands.
+internal fun cdcControlLineState(dtr: Boolean, rts: Boolean = false): Int =
+    (if (dtr) 1 else 0) or (if (rts) 2 else 0)
+
+internal fun cp210xModemControl(rts: Boolean, dtr: Boolean): Int =
+    0x0300 or (if (dtr) 0x0001 else 0) or (if (rts) 0x0002 else 0)
+
+internal fun ftdiModemControl(rts: Boolean, dtr: Boolean): Int =
+    0x0300 or (if (dtr) 0x0001 else 0) or (if (rts) 0x0002 else 0)
+
+internal fun ch34xModemControl(rts: Boolean, dtr: Boolean): Int =
+    0xFFFF and ((if (dtr) 0x20 else 0) or (if (rts) 0x40 else 0)).inv()
+
 internal fun usbRadioWriteTimeoutMillis(nativeCdc: Boolean, driver: UsbSerialDriverKind?): Int =
     if (nativeCdc && driver==UsbSerialDriverKind.CDC_ACM) 150 else 1000
 
