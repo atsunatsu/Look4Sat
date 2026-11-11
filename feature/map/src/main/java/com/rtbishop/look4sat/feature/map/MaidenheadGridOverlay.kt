@@ -37,17 +37,17 @@ internal fun gridActivityColorIndex(percentage: Int, dataMax: Int, filterMax: In
 }
 
 /**
- * Keep four-character grid labels at their base size through zoom 6.5, then
- * grow them smoothly to 1.5x at the active map source's maximum zoom.
+ * Match the map's linear zoom scale from zoom 6.5 to 7.0.
+ * Above zoom 7.0, keep the label scale capped to avoid oversized labels
+ * on map sources that support much higher zoom levels.
  */
-internal fun gridLabelScale(zoom: Double, growthStartZoom: Double, mapMaxZoom: Double): Float {
-    if (mapMaxZoom <= growthStartZoom) return 1f
-    val progress = ((zoom - growthStartZoom) / (mapMaxZoom - growthStartZoom)).coerceIn(0.0, 1.0)
-    return 1f + (MAX_GRID_LABEL_SCALE - 1f) * progress.toFloat()
+internal fun gridLabelScale(zoom: Double): Float {
+    val clampedZoom = zoom.coerceIn(GRID_LABEL_GROWTH_START_ZOOM, GRID_LABEL_MAX_SCALE_ZOOM)
+    return Math.pow(2.0, clampedZoom - GRID_LABEL_GROWTH_START_ZOOM).toFloat()
 }
 
 private const val GRID_LABEL_GROWTH_START_ZOOM = 6.5
-private const val MAX_GRID_LABEL_SCALE = 1.5f
+private const val GRID_LABEL_MAX_SCALE_ZOOM = 7.0
 
 /**
  * Maidenhead locator grid overlay, drawn directly on the map canvas.
@@ -55,8 +55,8 @@ private const val MAX_GRID_LABEL_SCALE = 1.5f
  * Zoom levels:
  *  - zoom < GRID_ZOOM_SUB: 10° x 20° fields with 2-character labels (e.g. "PM")
  *  - zoom >= GRID_ZOOM_SUB: 1° x 2° squares with 4-character labels (e.g. "PM95")
- * Four-character labels stay at 20px through zoom 6.5, then grow smoothly
- * to 30px at the active map source's maximum zoom (offline: 7; Tianditu: 18).
+ * Four-character labels stay at 20px through zoom 6.5, then follow the
+ * map's exact zoom scale to 1.414x at zoom 7.0 and remain capped above it.
  *
  * All geometry is computed per-frame from the projection, so the overlay
  * stays correct while panning/zooming. Grid lines that cross the antimeridian
@@ -212,10 +212,9 @@ class MaidenheadGridOverlay : Overlay() {
         if (shadow || !isEnabled) return
         val projection = mapView.projection
         val zoom = mapView.zoomLevelDouble
-        // Four-character labels stay at base size through zoom 6.5, then
-        // grow smoothly toward 1.5x at the current map source's maximum zoom.
-        // Two-character field labels stay at their original size.
-        val labelScale = gridLabelScale(zoom, GRID_LABEL_GROWTH_START_ZOOM, mapView.maxZoomLevel)
+        // Four-character labels follow the map's exact zoom scale from 6.5 to 7.0.
+        // Above zoom 7.0 the font scale is capped; two-character field labels stay unchanged.
+        val labelScale = gridLabelScale(zoom)
         labelPaint.textSize = LABEL_TEXT_SIZE * labelScale
         firstCallPaint.textSize = LABEL_TEXT_SIZE * labelScale
         activityLabelPaint.textSize = LABEL_TEXT_SIZE * 0.72f * labelScale
