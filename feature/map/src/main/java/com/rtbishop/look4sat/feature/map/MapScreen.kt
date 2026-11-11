@@ -2699,15 +2699,27 @@ private fun GridActivitySettingsDialog(
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.map_grid_activity_min, minPercent),
+                            text = stringResource(R.string.map_grid_activity_filter_title),
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "$"+"{minPercent}%",
+                            fontSize = 18.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = stringResource(R.string.map_grid_activity_max, maxPercent),
+                            text = "...",
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "$"+"{maxPercent}%",
+                            fontSize = 18.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
