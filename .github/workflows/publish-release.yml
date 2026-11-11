@@ -246,21 +246,21 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21 — Satellite Grid Activity (GridMaster)
-          - Add a Grid activity toggle to the VUCC map, showing GridMaster.fr's percentage of submitted satellite logs containing each four-character grid. This is not live activity.
-          - Display a red-to-green activity heatmap and two-line grid labels (locator and percentage), with configurable percentage filters, manual refresh, and an offline cache.
-          - Preserve worked-grid, marked-grid and roamed-grid colours. When First-call labels are enabled, keep callsigns instead of grid text; the activity colours remain visible.
-          - Show an Activity percentage chip in the grid QSO detail dialog; retain all existing match, QSO and marking actions.
-          - Data source: GridMaster.fr (FG8OJ). Only public aggregate statistics are downloaded; no user QSO records are uploaded.
-          - Validation: Run the unit-test suite (excluding the known unrelated RadioConfigurationSaveTest timeouts) and verify APK signing, version and both ARM ABIs before publication.
+          ## v21.1 — Refine Most Wanted grid activity map
+          - Normalize GridMaster heatmap colours using Wavelog's adaptive scale: 0% is red, and min(dataset maximum, filter upper limit) maps to green.
+          - Rename the grid activity toggle and settings to "Most Wanted" (Chinese: 网格活跃度); remove explanatory paragraphs from the settings dialog.
+          - Default the "Show worked/marked grids (green/red)" option to off, so activity data also colours worked and marked cells; the original fills remain available when enabled.
+          - At two-character zoom, show field letters even with First-call labels enabled. At four-character zoom, show activity percentages beneath first-call/marked callsigns when Most Wanted is enabled.
+          - Preserve original QSO data, marked stations, grid selection and roamed stripes, and persist the visibility setting.
+          - Verification: unit tests (excluding known unrelated RadioConfigurationSaveTest timeouts), release-signature check, APK version check and both ARM ABIs before publication.
 
-          ## v21 — 新增卫星网格活跃度图层
-          - VUCC 地图新增「网格稀有度」开关，显示 GridMaster.fr 所收集的卫星日志中各四位网格出现的百分比；该比例并非实时活动情况。
-          - 网格热力图以红色至绿色渐变呈现；四位网格支持两行显示网格编号和百分比，支持范围筛选、手动刷新及离线缓存。
-          - 已通联、已标记及已漫游网格的原有填色与斜纹不变；开启「首通呼号」时仍优先显示呼号。
-          - 网格通联详情新增彩色「活跃度百分比」标签，保留原有匹配、日志和标记功能。
-          - 数据来源：GridMaster.fr（FG8OJ）；仅下载公开汇总统计，不上传用户日志。
-          - 验证：正式发布前执行单元测试（排除已知无关的 RadioConfigurationSaveTest 超时），核验 APK 签名、版本及双 ARM 架构。
+          ## v21.1 — Most Wanted 网格活跃度优化
+          - 热力图按 Wavelog 的动态色阶归一化：红色对应 0%，绿色对应数据最大值与筛选上限的较小值。
+          - 地图开关及设置标题改为「网格活跃度」（英文 Most Wanted），删除设置中的长篇解释文字。
+          - 「显示已通联与已标记网格（绿/红）」默认关闭，所有有数据且符合筛选的网格按活跃度填色；需要时可恢复原来的绿/红网格。
+          - 首通呼号开启时，两位网格缩放仍显示两位字母；四位网格缩放且开启网格活跃度时，在首通或标记呼号下显示百分比。
+          - 保留通联数据、标记、网格选择、漫游斜纹，记住显示设置。
+          - 发布前验证：单元测试（排除已知无关的 RadioConfigurationSaveTest 超时）、签名、APK 版本与双 ARM 架构。
           RELEASE_NOTES
           )"
           fi
