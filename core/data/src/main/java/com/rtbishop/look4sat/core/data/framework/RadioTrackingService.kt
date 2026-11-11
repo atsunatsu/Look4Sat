@@ -852,7 +852,9 @@ class RadioTrackingService(
             nativeBaseOverride=savedBaseFrequencies(transponder)
         }
         if(nativeBaseOverride==null && calculatorTuning==null) nativeBaseOverride=savedBaseFrequencies(transponder)
-        val initialTx = if(nativeBaseOverride!=null) nativeBaseOverride?.txHz else txBaseFreqHz
+        val initialTx = if (transponder.uplinkLow != null) {
+            nativeBaseOverride?.txHz ?: txBaseFreqHz ?: transponder.uplinkCenterFrequency()
+        } else null
         applyDataToneDefault(transponder)
         diagnose("tracking/start", "satellite=${pass.catNum} transponderSelected=true")
         txController?.invalidatePendingPttOn()
@@ -1129,7 +1131,7 @@ class RadioTrackingService(
             }
             _state.update { it.copy(isActive = true, trackingPhase = TrackingPhase.READY,
                 txMode = txMode, rxMode = rxMode,
-                txBaseFrequencyHz = if(nativeBaseOverride!=null) nativeBaseOverride?.txHz else txBase) }
+                txBaseFrequencyHz = if (transponder.uplinkLow != null) nativeBaseOverride?.txHz ?: txBase else null) }
             diagnose("tracking/ready", if (ic820)
                 "mode=ic820-main-tx-sub-rx; independent CI-V band access"
                 else "mode=single-radio-preset; radio owns TX/RX mode and VFO selection")
@@ -1200,6 +1202,11 @@ class RadioTrackingService(
                         current.pttState != PttState.OFF || tx?.remoteState?.value?.txSource?.let { it!=0 }==true ||
                         tx?.remoteState?.value?.nativeMenuOpen==true || tx?.remoteState?.value?.transmitStateKnown==false ||
                         tx?.remoteState?.value?.profileStore?.busy==true || tx?.remoteState?.value?.handsetMacroStatus?.busy==true
+                    if (frozen != frozenLastCycle) {
+                        diagnose(if (frozen) "tracking/frequency-held" else "tracking/frequency-resumed",
+                            "txLease=$hasTransmitClaim catKnown=${current.catTransmitStateKnown} " +
+                                "catTx=${current.catTransmitting} ptt=${current.pttState}")
+                    }
                     if (frozenLastCycle && !frozen) {
                         lastSetTx = null
                         lastSetRx = null
@@ -1348,7 +1355,11 @@ class RadioTrackingService(
                 tuningRevision.incrementAndGet()
             }
             val interval = settingsRepo.radioControlSettings.value.let {
-                if (it.radioModel == RadioControlSettings.MODEL_VERO_N76) it.n76Options.normalized().pollMillis else 1_000L
+                when (it.radioModel) {
+                    RadioControlSettings.MODEL_VERO_N76 -> it.n76Options.normalized().pollMillis
+                    RadioControlSettings.MODEL_ICOM_IC820 -> 350L
+                    else -> 1_000L
+                }
             }
             withTimeoutOrNull(interval) { tuningWake.receive() }
         }

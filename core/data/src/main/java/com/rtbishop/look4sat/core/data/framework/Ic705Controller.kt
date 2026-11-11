@@ -80,9 +80,9 @@ class Ic705Controller(
         else -> 500L
     }
     /** Polling interval while draining the input buffer. */
-    private val POLL_INTERVAL_MS = 20L
-    /** Small pause after writing a command before reading the response. */
-    private val WRITE_SETTLE_MS = 50L
+    private val POLL_INTERVAL_MS get() = if (variant == IcomCivVariant.IC820) 10L else 20L
+    /** IC-820 1200-baud echo/ACK reads already wait for complete frames; no fixed settle delay. */
+    private val WRITE_SETTLE_MS get() = if (variant == IcomCivVariant.IC820) 0L else 50L
 
     // IC-820: maintain a confirmed MAIN/SUB orientation and last ACKed pair.
     // Only the initial transaction and occasional audit require full readback.
@@ -91,8 +91,10 @@ class Ic705Controller(
     private var ic820LastTxHz: Long? = null
     private var ic820FastSubAccess = false
     private var ic820FastCycles = 0
-    private val IC820_TUNE_THRESHOLD_HZ = 60L
+    private var ic820LastAuditNanos = 0L
+    private val IC820_TUNE_THRESHOLD_HZ = 1L
     private val IC820_VERIFY_EVERY_CYCLES = 16
+    private val IC820_AUDIT_INTERVAL_NANOS = 20_000_000_000L
 
     @Volatile override var isConnected: Boolean = false
         private set
@@ -113,6 +115,7 @@ class Ic705Controller(
         ic820LastTxHz = null
         ic820FastSubAccess = false
         ic820FastCycles = 0
+        ic820LastAuditNanos = 0L
         if (deviceAddress.isBlank()) {
             diagnose("connect/invalid", "No radio endpoint configured", ControlDiagnosticSeverity.ERROR)
             return@withContext false
@@ -362,6 +365,7 @@ class Ic705Controller(
             ic820LastRxHz = null
             ic820LastTxHz = null
             ic820FastCycles = 0
+            ic820LastAuditNanos = 0L
             val txBand = ic820Band(txHz) ?: return@withContext false
             val rxBand = ic820Band(rxHz) ?: return@withContext false
             val main = IcomCivProtocol.buildIc820BandAccessCommand(main = true)
@@ -450,9 +454,10 @@ class Ic705Controller(
      * Caller holds ioMutex. null requests the full verified transaction.
      */
     private suspend fun tuneIc820FastLocked(rxHz: Long, txHz: Long?): FrequencyPairResult? {
-        if (!ic820PairReady || txHz == null) return null
+        if (!ic820PairReady) return null
         val startedNanos = System.nanoTime()
-        if (ic820FastCycles >= IC820_VERIFY_EVERY_CYCLES) {
+        if (ic820FastCycles >= IC820_VERIFY_EVERY_CYCLES ||
+            (ic820FastSubAccess && System.nanoTime() - ic820LastAuditNanos >= IC820_AUDIT_INTERVAL_NANOS)) {
             if (!ic820FastSubAccess) return null // Legacy swap fallback audits with the full pair.
             val sub = IcomCivProtocol.buildIc820BandAccessCommand(main = false)
             val main = IcomCivProtocol.buildIc820BandAccessCommand(main = true)
@@ -476,10 +481,13 @@ class Ic705Controller(
                 return FrequencyPairResult.FAILED
             }
             ic820FastCycles = 0
+            ic820LastAuditNanos = System.nanoTime()
             diagnose("pair/audited", "mode=direct-main-sub-readback rx=$actualRx tx=$actualTx")
         }
         val updateRx = ic820LastRxHz?.let { kotlin.math.abs(it - rxHz) >= IC820_TUNE_THRESHOLD_HZ } ?: true
-        val updateTx = ic820LastTxHz?.let { kotlin.math.abs(it - txHz) >= IC820_TUNE_THRESHOLD_HZ } ?: true
+        val updateTx = txHz?.let { target ->
+            ic820LastTxHz?.let { kotlin.math.abs(it - target) >= IC820_TUNE_THRESHOLD_HZ } ?: true
+        } ?: false
         if (!updateRx && !updateTx) return FrequencyPairResult.APPLIED
 
         val main = IcomCivProtocol.buildIc820BandAccessCommand(main = true)
@@ -513,7 +521,7 @@ class Ic705Controller(
         }
         if (failed == null && updateTx) {
             if (!updateRx && !sendAndWaitAck(main)) failed = "fast-select-main"
-            else if (!sendAndWaitAck(IcomCivProtocol.buildSetFreqCommand(txHz))) failed = "fast-write-main"
+            else if (!sendAndWaitAck(IcomCivProtocol.buildSetFreqCommand(checkNotNull(txHz)))) failed = "fast-write-main"
         }
         if (failed != null || swapped) {
             ic820PairReady = false
@@ -671,9 +679,23 @@ class Ic705Controller(
                         ControlDiagnosticSeverity.ERROR)
                     FrequencyPairResult.FAILED
                 } else {
+                    // RX-only entries have no uplink, so there is no satellite-band
+                    // preparation to probe D0. Probe it once after the verified first
+                    // pair to enable subsequent direct SUB writes without B0 swaps.
+                    if (txHz == null && ic820LastRxHz == null) {
+                        val directSub = probeIc820SubAccessLocked(checkNotNull(ic820Band(rxHz)))
+                        if (directSub == null) {
+                            ic820PairReady = false
+                            diagnose("pair/failed", "stage=probe-rx-only-sub-access",
+                                ControlDiagnosticSeverity.ERROR)
+                            return@withLock FrequencyPairResult.FAILED
+                        }
+                        ic820FastSubAccess = directSub
+                    }
                     ic820LastRxHz = rxHz
                     ic820LastTxHz = txHz ?: oldMain
                     ic820FastCycles = 0
+                    ic820LastAuditNanos = System.nanoTime()
                     ic820PairReady = true
                     diagnose("pair/ready", "mode=swapped-main-write-verified targetMainTx=$txHz targetSubRx=$rxHz " +
                         "durationMs=${(System.nanoTime() - startedNanos) / 1_000_000L}")
@@ -925,7 +947,7 @@ class Ic705Controller(
                 timeoutMillis = commandReplyTimeout(cmd), trace = handshaking)?.cmd == IcomCivProtocol.ACK_OK
         }
         if (!write(cmd)) return false
-        delay(WRITE_SETTLE_MS)
+        if (WRITE_SETTLE_MS > 0L) delay(WRITE_SETTLE_MS)
         val echoed = addressCommand(cmd)
         fun ackStatus(buf: ByteArray): Boolean? =
             if (variant == IcomCivVariant.IC820)
@@ -962,7 +984,7 @@ class Ic705Controller(
             return response?.takeIf { it.cmd == expectCmd }?.payload
         }
         if (!write(cmd)) return null
-        delay(WRITE_SETTLE_MS)
+        if (WRITE_SETTLE_MS > 0L) delay(WRITE_SETTLE_MS)
         val buf      = drainWithTimeout(responseTimeoutMs) {
             IcomCivProtocol.parseResponse(it, expectCmd, civAddress, payloadMatches) != null ||
                 IcomCivProtocol.ackStatus(it, civAddress) == false
