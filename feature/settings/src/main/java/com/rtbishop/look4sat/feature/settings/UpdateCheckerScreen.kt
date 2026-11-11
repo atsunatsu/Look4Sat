@@ -35,9 +35,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -66,6 +69,7 @@ import com.rtbishop.look4sat.core.presentation.R
 import com.rtbishop.look4sat.core.presentation.ScreenColumn
 import com.rtbishop.look4sat.core.presentation.TopBar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UpdateCheckerScreen(
     currentVersion: String,
@@ -127,16 +131,30 @@ fun UpdateCheckerScreen(
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        TextButton(
-                            onClick = { sourceMenuExpanded = true },
-                            enabled = !state.isChecking && !state.isDownloading,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(stringResource(R.string.update_source_selection, updateSourceLabel(state.selectedSource)))
-                        }
-                        DropdownMenu(
-                            expanded = sourceMenuExpanded,
+                    val canChangeSource = !state.isChecking && !state.isDownloading
+                    ExposedDropdownMenuBox(
+                        expanded = sourceMenuExpanded && canChangeSource,
+                        onExpandedChange = { if (canChangeSource) sourceMenuExpanded = it },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = updateSourceLabel(state.selectedSource),
+                            onValueChange = {},
+                            readOnly = true,
+                            singleLine = true,
+                            enabled = canChangeSource,
+                            label = { Text(stringResource(R.string.update_source_selection)) },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                    expanded = sourceMenuExpanded && canChangeSource
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = canChangeSource)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = sourceMenuExpanded && canChangeSource,
                             onDismissRequest = { sourceMenuExpanded = false }
                         ) {
                             UpdateSource.entries.forEach { source ->
