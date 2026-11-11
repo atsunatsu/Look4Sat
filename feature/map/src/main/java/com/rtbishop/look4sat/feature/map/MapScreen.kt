@@ -511,11 +511,13 @@ private fun MapScreen(
     var activityLoading by remember { mutableStateOf(false) }
     var activityRefreshSerial by remember { mutableStateOf(0) }
     var handledActivityRefreshSerial by remember { mutableStateOf(0) }
+    var activityLoadSerial by remember { mutableStateOf(0) }
     LaunchedEffect(showGridActivity, activityAward, activityRefreshSerial) {
         if (!showGridActivity) return@LaunchedEffect
         val forceRefresh = activityRefreshSerial != handledActivityRefreshSerial
         handledActivityRefreshSerial = activityRefreshSerial
-        // Never leave the previous award's percentages visible while another award loads.
+        val requestId = activityLoadSerial + 1
+        activityLoadSerial = requestId
         val requestedAward = activityAward
         activitySnapshot = null
         activityLoading = true
@@ -525,11 +527,14 @@ private fun MapScreen(
                 award = requestedAward,
                 forceRefresh = forceRefresh
             )
-            if (activityAward == requestedAward) activitySnapshot = loaded
+            if (activityLoadSerial == requestId && activityAward == requestedAward) {
+                activitySnapshot = loaded
+            }
         } finally {
-            // A cancelled, slower request for the previous award must not hide the
-            // loading indicator for the currently selected award.
-            if (activityAward == requestedAward) activityLoading = false
+            // A slower/cancelled request must not overwrite a newer award's loading state.
+            if (activityLoadSerial == requestId && activityAward == requestedAward) {
+                activityLoading = false
+            }
         }
     }
     val setActivityEnabled: (Boolean) -> Unit = { enabled ->
