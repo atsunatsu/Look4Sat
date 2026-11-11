@@ -512,8 +512,10 @@ private fun MapScreen(
     var activityRefreshSerial by remember { mutableStateOf(0) }
     var handledActivityRefreshSerial by remember { mutableStateOf(0) }
     var activityLoadSerial by remember { mutableStateOf(0) }
-    LaunchedEffect(showGridActivity, activityAward, activityRefreshSerial) {
-        if (!showGridActivity) return@LaunchedEffect
+    LaunchedEffect(showGridActivity, showActivitySettings, activityAward, activityRefreshSerial) {
+        // Load the selected award when the overlay is visible or its settings are open,
+        // so cached timestamps and category data are available before enabling it.
+        if (!showGridActivity && !showActivitySettings) return@LaunchedEffect
         val forceRefresh = activityRefreshSerial != handledActivityRefreshSerial
         handledActivityRefreshSerial = activityRefreshSerial
         val requestId = activityLoadSerial + 1
@@ -1069,7 +1071,8 @@ private fun MapScreen(
             showWorkedAndMarked = showWorkedAndMarkedWithActivity,
             downloadedAt = activitySnapshot?.downloadedAt,
             loading = activityLoading,
-            unavailable = showGridActivity && !activityLoading && activitySnapshot == null,
+            unavailable = (showGridActivity || showActivitySettings) &&
+                !activityLoading && activitySnapshot == null,
             onMinChange = setActivityMin,
             onMaxChange = setActivityMax,
             onAwardChange = setActivityAward,
