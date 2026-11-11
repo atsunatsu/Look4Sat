@@ -1251,12 +1251,12 @@ private fun ElevationSettingsDialog(
 
 // region Worked-grid QSO dialog
 
-// Use exactly the same red -> amber -> green stops as MaidenheadGridOverlay.
+// Use the same original red -> yellow -> green stops as MaidenheadGridOverlay.
 private fun gridActivityBadgeColor(percent: Int, scaleMax: Int): ComposeColor {
     val value = gridActivityColorIndex(percent, scaleMax, scaleMax)
-    val rare = ComposeColor(242, 96, 99)
-    val middle = ComposeColor(248, 205, 105)
-    val common = ComposeColor(100, 200, 142)
+    val rare = ComposeColor(255, 59, 48)
+    val middle = ComposeColor(255, 193, 7)
+    val common = ComposeColor(76, 217, 100)
     return if (value <= 50) {
         androidx.compose.ui.graphics.lerp(rare, middle, value / 50f)
     } else {

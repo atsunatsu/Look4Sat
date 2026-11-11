@@ -104,9 +104,9 @@ class MaidenheadGridOverlay : Overlay() {
         style = Paint.Style.FILL
     }
     private val activityColors = IntArray(101) { p ->
-        // Soft red -> amber -> green; subtle enough to preserve the existing grid lines.
-        val first = if (p <= 50) intArrayOf(242, 96, 99) else intArrayOf(248, 205, 105)
-        val second = if (p <= 50) intArrayOf(248, 205, 105) else intArrayOf(100, 200, 142)
+        // Reuse the map's original marked red, WAIPA pending yellow and worked green.
+        val first = if (p <= 50) intArrayOf(255, 59, 48) else intArrayOf(255, 193, 7)
+        val second = if (p <= 50) intArrayOf(255, 193, 7) else intArrayOf(76, 217, 100)
         val fraction = if (p <= 50) p / 50f else (p - 50) / 50f
         Color.argb(
             110,
