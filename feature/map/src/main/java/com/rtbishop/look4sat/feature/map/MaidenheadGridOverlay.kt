@@ -132,8 +132,10 @@ class MaidenheadGridOverlay : Overlay() {
     var showActivityOverlay: Boolean = false
     var activityFilterMin: Int = 0
     var activityFilterMax: Int = 100
-    /** When false, hide personal green/red fills and include those squares in the activity map. */
-    var showWorkedAndMarkedWithActivity: Boolean = false
+    /** Whether personal green worked fills remain visible over the activity heatmap. */
+    var showWorkedWithActivity: Boolean = false
+    /** Whether personal red marked fills remain visible over the activity heatmap. */
+    var showMarkedWithActivity: Boolean = false
 
     private val roamStripePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -264,14 +266,18 @@ class MaidenheadGridOverlay : Overlay() {
         // The tapped worked grid gets a distinct outline (sub-square zoom only).
         val selectedCell = selectedGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
 
-        // Two modes: preserve personal green/red fills, or show the full GridMaster
-        // heatmap (including worked/marked grids) when that preference is off.
-        // At either zoom level, heatmap geometry always uses four-character squares.
-        val drawPersonalGridFills = !showActivityOverlay || showWorkedAndMarkedWithActivity
+        // Personal worked/marked fills independently replace the activity heatmap.
+        // With activity off, keep normal map coloring for both categories.
+        // Heatmap geometry always uses four-character squares at either zoom.
+        val drawWorkedFills = !showActivityOverlay || showWorkedWithActivity
+        val drawMarkedFills = !showActivityOverlay || showMarkedWithActivity
         if (showActivityOverlay && activityCells.isNotEmpty()) {
             val pixelsPerDegreeLon = worldWidthPx / 360.0
             for (entry in activityCells) {
-                if (drawPersonalGridFills && (entry.grid in workedGrids || entry.grid in markedGrids)) continue
+                val workedVisible = drawWorkedFills && entry.grid in workedGrids
+                val markedVisible = drawMarkedFills && entry.grid in markedGrids &&
+                    (entry.grid !in workedGrids || !drawWorkedFills)
+                if (workedVisible || markedVisible) continue
                 if (entry.percentage !in activityFilterMin..activityFilterMax) continue
                 val cell = entry.bounds
                 if (cell.latTop < bottomLat || cell.latBottom > topLat) continue
@@ -304,7 +310,8 @@ class MaidenheadGridOverlay : Overlay() {
         //  - Field zoom (two-char labels): do NOT fill whole fields; instead fill
         //    the individual 2°x1° squares that were worked, without drawing the
         //    square grid lines — so you see green patches inside the field.
-        if (drawPersonalGridFills && (workedGrids.isNotEmpty() || markedGrids.isNotEmpty())) {
+        if ((drawWorkedFills && workedGrids.isNotEmpty()) ||
+            (drawMarkedFills && markedGrids.isNotEmpty())) {
             if (zoom >= GRID_ZOOM_SUB) {
                 for (row in firstRow..lastRow) {
                     val lat = row * cellLat
@@ -325,16 +332,17 @@ class MaidenheadGridOverlay : Overlay() {
                         val xRight = xRightBase + turn * worldWidthPx.toFloat()
                         if (xRight < 0f || xLeft > canvas.width) continue
                         val gridLabel = cellLabel(lat, lon, zoom)
-                        if (gridLabel in workedGrids) {
+                        if (drawWorkedFills && gridLabel in workedGrids) {
                             canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
                         }
-                        if (gridLabel in markedGrids && gridLabel !in workedGrids) {
+                        if (drawMarkedFills && gridLabel in markedGrids &&
+                            (gridLabel !in workedGrids || !drawWorkedFills)) {
                             canvas.drawRect(xLeft, yTop, xRight, yBottom, markedPaint)
                         }
                     }
                 }
             } else {
-                for (grid in workedGrids) {
+                for (grid in if (drawWorkedFills) workedGrids else emptySet()) {
                     val cell = gridCellBounds(grid) ?: continue
                     // World-repeat copies: a 360° turn shifts the cell by a
                     // full world width in pixels. projectionToX() normalizes
@@ -357,8 +365,8 @@ class MaidenheadGridOverlay : Overlay() {
                         canvas.drawRect(xLeft, yTop, xRight, yBottom, workedPaint)
                     }
                 }
-                for (grid in markedGrids.keys) {
-                    if (grid in workedGrids) continue
+                for (grid in if (drawMarkedFills) markedGrids.keys else emptySet()) {
+                    if (drawWorkedFills && grid in workedGrids) continue
                     val cell = gridCellBounds(grid) ?: continue
                     for (turn in -colRepeats..colRepeats) {
                         val dLon = turn * 360.0
