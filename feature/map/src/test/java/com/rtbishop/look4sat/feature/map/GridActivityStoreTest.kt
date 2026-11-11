@@ -72,22 +72,24 @@ class GridActivityStoreTest {
     }
 
     @Test
-    fun activityColourScaleUsesDatasetMaximumAndFilterUpperLimit() {
-        // The dataset only reaches 20%, so 10% maps to yellow instead of red.
-        assertEquals(0, gridActivityColorIndex(0, 20, 100))
-        assertEquals(25, gridActivityColorIndex(5, 20, 100))
-        assertEquals(50, gridActivityColorIndex(10, 20, 100))
-        assertEquals(100, gridActivityColorIndex(20, 20, 100))
-
-        // Narrowing the upper filter to 10% spreads the palette over 0..10%.
-        assertEquals(50, gridActivityColorIndex(5, 20, 10))
-        assertEquals(100, gridActivityColorIndex(10, 20, 10))
-        assertEquals(100, gridActivityColorIndex(20, 20, 10))
-
-        // Zero maxima and out-of-range values never divide by zero or overflow.
-        assertEquals(0, gridActivityColorIndex(0, 0, 0))
-        assertEquals(0, gridActivityColorIndex(5, 0, 0))
-        assertEquals(100, gridActivityColorIndex(200, 20, 20))
+    fun gridMasterStyleActivityColorsUseFixedSevenBands() {
+        // SAT and LEO use the same percentage thresholds. These colors should
+        // not be rescaled to the current award dataset or slider maximum.
+        val bins = listOf(
+            0 to 0xFFB41D2A.toInt(), 2 to 0xFFB41D2A.toInt(),
+            3 to 0xFFE64A2D.toInt(), 7 to 0xFFE64A2D.toInt(),
+            8 to 0xFFF09124.toInt(), 12 to 0xFFF09124.toInt(),
+            13 to 0xFFF2CE29.toInt(), 17 to 0xFFF2CE29.toInt(),
+            18 to 0xFFB5E133.toInt(), 22 to 0xFFB5E133.toInt(),
+            23 to 0xFF32E64D.toInt(), 32 to 0xFF32E64D.toInt(),
+            33 to 0xFF087C30.toInt(), 50 to 0xFF087C30.toInt(),
+            77 to 0xFF087C30.toInt(), 100 to 0xFF087C30.toInt()
+        )
+        bins.forEach { (percentage, color) ->
+            assertEquals("$percentage%", color, gridActivityPaletteColor(percentage))
+        }
+        assertEquals(gridActivityPaletteColor(0), gridActivityPaletteColor(-1))
+        assertEquals(gridActivityPaletteColor(100), gridActivityPaletteColor(101))
     }
 
     @Test(expected = IOException::class)

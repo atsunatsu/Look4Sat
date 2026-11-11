@@ -1106,9 +1106,6 @@ private fun MapScreen(
         WorkedGridQsoDialog(
             grid = grid,
             activityPercentage = if (showGridActivity) activitySnapshot?.percentages?.get(grid) else null,
-            activityColourScaleMax = minOf(
-                activitySnapshot?.percentages?.values?.maxOrNull() ?: 0, activityMax
-            ),
             // A multi-selection shows the union of QSO details without duplicates,
             // preserving each station's covering scope; empty selection means All.
             qsos = uiState.workedGridQsos[grid].orEmpty()
@@ -1266,24 +1263,14 @@ private fun ElevationSettingsDialog(
 
 // region Worked-grid QSO dialog
 
-// Use the same original red -> yellow -> green stops as MaidenheadGridOverlay.
-private fun gridActivityBadgeColor(percent: Int, scaleMax: Int): ComposeColor {
-    val value = gridActivityColorIndex(percent, scaleMax, scaleMax)
-    val rare = ComposeColor(255, 59, 48)
-    val middle = ComposeColor(255, 193, 7)
-    val common = ComposeColor(76, 217, 100)
-    return if (value <= 50) {
-        androidx.compose.ui.graphics.lerp(rare, middle, value / 50f)
-    } else {
-        androidx.compose.ui.graphics.lerp(middle, common, (value - 50) / 50f)
-    }
-}
+// Badges and slider labels use the same fixed palette as the map overlay.
+private fun gridActivityBadgeColor(percent: Int): ComposeColor =
+    ComposeColor(gridActivityPaletteColor(percent))
 
 @Composable
 private fun WorkedGridQsoDialog(
     grid: String,
     activityPercentage: Int?,
-    activityColourScaleMax: Int,
     qsos: List<com.rtbishop.look4sat.core.domain.model.GridQso>,
     marked: List<com.rtbishop.look4sat.core.domain.model.MarkedStation>,
     isUtc: Boolean,
@@ -1323,7 +1310,7 @@ private fun WorkedGridQsoDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         activityPercentage?.let { percent ->
-                            val activityColor = gridActivityBadgeColor(percent, activityColourScaleMax)
+                            val activityColor = gridActivityBadgeColor(percent)
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = activityColor.copy(alpha = 0.18f),
@@ -2710,7 +2697,7 @@ private fun GridActivitySettingsDialog(
                         Text(
                             text = "${minPercent}%",
                             fontSize = 18.sp,
-                            color = gridActivityBadgeColor(minPercent, 100)
+                            color = gridActivityBadgeColor(minPercent)
                         )
                         Text(
                             text = "...",
@@ -2720,7 +2707,7 @@ private fun GridActivitySettingsDialog(
                         Text(
                             text = "${maxPercent}%",
                             fontSize = 18.sp,
-                            color = gridActivityBadgeColor(maxPercent, 100)
+                            color = gridActivityBadgeColor(maxPercent)
                         )
                     }
                     RangeSlider(
@@ -2741,7 +2728,7 @@ private fun GridActivitySettingsDialog(
                         Text(
                             text = stringResource(R.string.map_grid_activity_show_worked),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = gridActivityBadgeColor(100, 100),
+                            color = ComposeColor(76, 217, 100),
                             modifier = Modifier.weight(1f).clickable {
                                 onShowWorkedChange(!showWorked)
                             }
@@ -2758,7 +2745,7 @@ private fun GridActivitySettingsDialog(
                         Text(
                             text = stringResource(R.string.map_grid_activity_show_marked),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = gridActivityBadgeColor(0, 100),
+                            color = ComposeColor(255, 59, 48),
                             modifier = Modifier.weight(1f).clickable {
                                 onShowMarkedChange(!showMarked)
                             }
