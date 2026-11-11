@@ -33,6 +33,25 @@ class GridActivityStoreTest {
         assertFalse(parsed.containsKey("AB14"))
     }
 
+    @Test
+    fun activityColourScaleUsesDatasetMaximumAndFilterUpperLimit() {
+        // The dataset only reaches 20%, so 10% maps to yellow instead of red.
+        assertEquals(0, gridActivityColorIndex(0, 20, 100))
+        assertEquals(25, gridActivityColorIndex(5, 20, 100))
+        assertEquals(50, gridActivityColorIndex(10, 20, 100))
+        assertEquals(100, gridActivityColorIndex(20, 20, 100))
+
+        // Narrowing the upper filter to 10% spreads the palette over 0..10%.
+        assertEquals(50, gridActivityColorIndex(5, 20, 10))
+        assertEquals(100, gridActivityColorIndex(10, 20, 10))
+        assertEquals(100, gridActivityColorIndex(20, 20, 10))
+
+        // Zero maxima and out-of-range values never divide by zero or overflow.
+        assertEquals(0, gridActivityColorIndex(0, 0, 0))
+        assertEquals(0, gridActivityColorIndex(5, 0, 0))
+        assertEquals(100, gridActivityColorIndex(200, 20, 20))
+    }
+
     @Test(expected = IOException::class)
     fun refusesIncompleteDataSoLastGoodCacheIsNotReplaced() {
         GridActivityStore.parse(JSONObject().put("OL62", 17).toString())
