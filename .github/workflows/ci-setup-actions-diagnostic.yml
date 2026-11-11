@@ -1,0 +1,22 @@
+name: CI setup actions diagnostic
+on:
+  push:
+    branches:
+      - diagnostics/ci-runner-smoke-20261111
+
+permissions:
+  contents: read
+
+jobs:
+  android-usb-cat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Confirm setup actions completed
+        run: echo "checkout, setup-java and setup-gradle succeeded"
