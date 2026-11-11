@@ -4,11 +4,12 @@ package com.rtbishop.look4sat.core.data.framework
  * PL2303 register initialization adapted from usb-serial-for-android's ProlificSerialDriver.
  * Original port: Felix Hädicke, based on Emmanuel Blot's pyprolific driver.
  * https://github.com/mik3y/usb-serial-for-android (MIT; license shipped in assets/licenses).
- * All modem outputs remain deasserted: CAT connection must never key modem-line PTT.
+ * Physical RTS/DTR levels follow the user's USB CAT line settings (default: deasserted).
  */
 internal fun configureProlificSerial(
     productId: Int, deviceClass: Int, descriptors: ByteArray,
     baudRate: Int, stopBits: Int,
+    rts: Boolean = false, dtr: Boolean = false,
     transfer: (type: Int, request: Int, value: Int, index: Int, data: ByteArray?) -> Int
 ): Boolean {
     if (descriptors.size < 14 || baudRate !in PROLIFIC_CAT_BAUD_RATES || stopBits !in 1..2) return false
@@ -29,7 +30,7 @@ internal fun configureProlificSerial(
             !read(0x8484) || !out(0x0404, 1) || !read(0x8484) || !read(0x8383) ||
             !out(0, 1) || !out(1, 0) || !out(2, if (legacy01) 0x24 else 0x44)) return false
     }
-    if (transfer(0x21, 0x22, 0, 0, null) != 0) return false
+    if (transfer(0x21, 0x22, cdcControlLineState(dtr, rts), 0, null) != 0) return false
     if (!out(if (hxn) 0x0A else 0, if (hxn) 0xFF else 0)) return false
     val line = byteArrayOf(baudRate.toByte(), (baudRate shr 8).toByte(),
         (baudRate shr 16).toByte(), (baudRate shr 24).toByte(),

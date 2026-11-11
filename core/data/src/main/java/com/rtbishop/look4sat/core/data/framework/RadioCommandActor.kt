@@ -198,6 +198,8 @@ class SerialRadioController(
         actor.execute(delegate.commandTimeoutMillis, operation)
     override val remoteState get() = delegate.remoteState
     override val supportsAtomicPair get() = delegate.supportsAtomicPair
+    override suspend fun prepareSatelliteBands(rxHz: Long, txHz: Long) =
+        execute { delegate.prepareSatelliteBands(rxHz, txHz) }
     override suspend fun setTrackingFrequencies(rxHz: Long, txHz: Long?) =
         execute { delegate.setTrackingFrequencies(rxHz, txHz) }
     override suspend fun startCw(text: String, wpm: Int) =

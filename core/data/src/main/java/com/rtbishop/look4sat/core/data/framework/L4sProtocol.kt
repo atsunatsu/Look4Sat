@@ -180,6 +180,10 @@ internal object L4sProtocol {
         else -> null
     }
     fun modeName(mode: Int): String = listOf("FM","AM","USB","CW")[mode]
+
+    /** L4S v1.0.3+ receives CW satellite traffic in USB, with CW reserved for TX.
+     *  No receive-frequency/BFO offset is introduced by this mode normalization. */
+    fun effectiveRxMode(rx: Int, tx: Int): Int = if (rx == 3 && tx == 3) 2 else rx
     fun error(code: Int): String = when(code) {
         2 -> "Invalid L4S command length"
         3 -> "L4S session closed or expired; reconnect"

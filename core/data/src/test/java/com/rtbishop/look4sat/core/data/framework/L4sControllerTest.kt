@@ -52,6 +52,39 @@ class L4sControllerTest {
         assertFalse(radio.isConnected)
     }
 
+    @Test fun firmwareCwReceiveDefaultsToUsbWithoutAlteringIndependentFrequencyPair()=runTest {
+        val transport=ScriptedL4sTransport()
+        val radio=L4sController(transport,backgroundScope,StandardTestDispatcher(testScheduler),
+            tuningStepHz={10}) {7}
+        assertTrue(radio.connect())
+        assertTrue(radio.setSplitModes("CW","CW"))
+        assertEquals("USB",radio.remoteState.value.rxMode)
+        assertEquals("CW",radio.remoteState.value.txMode)
+        val modeRequest=transport.requests.last {L4sProtocol.u16(it,0)==L4sProtocol.MODE}
+        assertEquals(2,modeRequest[12].toInt()) // USB RX, not legacy CW RX.
+        assertEquals(3,modeRequest[13].toInt()) // CW TX remains unchanged.
+
+        assertEquals(FrequencyPairResult.APPLIED,radio.setTrackingFrequencies(435_100_000,145_900_000))
+        val pairRequest=transport.requests.last {L4sProtocol.u16(it,0)==L4sProtocol.PAIR}
+        assertEquals(435_100_000L,L4sProtocol.u32(pairRequest,12))
+        assertEquals(145_900_000L,L4sProtocol.u32(pairRequest,16))
+        assertEquals(435_100_000L,radio.readWorkingFrequency())
+        assertEquals(145_900_000L,radio.readTxVfoFrequency())
+
+        assertTrue(radio.startCw("CQ TEST",20))
+        assertEquals(FrequencyPairResult.HELD,radio.setTrackingFrequencies(435_100_100,145_900_100))
+        assertTrue(radio.pttOff())
+        radio.disconnect()
+    }
+
+    @Test fun effectiveReceiveModeOnlyChangesCwCwCombination() {
+        assertEquals(2,L4sProtocol.effectiveRxMode(3,3))
+        assertEquals(2,L4sProtocol.effectiveRxMode(2,3))
+        assertEquals(0,L4sProtocol.effectiveRxMode(0,0))
+        assertEquals(0,L4sProtocol.effectiveRxMode(0,3))
+        assertEquals(3,L4sProtocol.effectiveRxMode(3,0))
+    }
+
     @Test fun writeAckWithoutActualFrequencyIsRejected()=runTest {
         val transport=ScriptedL4sTransport(ignorePair=true)
         val radio=L4sController(transport,backgroundScope,StandardTestDispatcher(testScheduler)) { 7 }
@@ -422,7 +455,11 @@ private class ScriptedL4sTransport(
                         baseRx=L4sProtocol.u32(p,13);baseTx=L4sProtocol.u32(p,17);step=L4sProtocol.u16(p,21);pairReady=false
                     }
                 }
-                L4sProtocol.MODE -> { rxMode=p[12].toInt();txMode=p[13].toInt();modeReady=true }
+                L4sProtocol.MODE -> {
+                    txMode=p[13].toInt()
+                    rxMode=L4sProtocol.effectiveRxMode(p[12].toInt(),txMode)
+                    modeReady=true
+                }
                 L4sProtocol.PAIR -> if(acceptPairOnly) result=L4sProtocol.ACCEPTED
                 else if(!ignorePair) {
                     rx=L4sProtocol.u32(p,12);tx=L4sProtocol.u32(p,16);revision=L4sProtocol.u32(p,21);pairReady=true

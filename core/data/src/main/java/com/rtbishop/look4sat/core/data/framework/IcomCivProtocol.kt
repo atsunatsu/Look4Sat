@@ -210,6 +210,10 @@ object IcomCivProtocol {
     fun buildIc820BandAccessCommand(main: Boolean): ByteArray =
         frame(CMD_SELECT_VFO, if (main) 0xD1.toByte() else 0xD0.toByte())
 
+    /** IC-820H operating manual p.15: 07 B0 exchanges MAIN and SUB. It does not copy a VFO. */
+    fun buildIc820MainSubExchangeCommand(): ByteArray =
+        frame(CMD_SELECT_VFO, 0xB0.toByte())
+
     fun buildIc820SplitModeCommand(enabled: Boolean): ByteArray =
         frame(CMD_DUPLEX_SPLIT, if (enabled) 0x00 else 0x01)
 
@@ -433,6 +437,31 @@ object IcomCivProtocol {
             if (cmd == ACK_OK) return true
             if (cmd == ACK_NG) return false
             i = fdIdx + 1
+        }
+        return null
+    }
+
+    /**
+     * Recover a one-FE-short ACK/NG only when it immediately follows the exact
+     * command echoed by a half-duplex IC-820 CI-V interface. This does not
+     * relax ordinary CI-V framing: a stray single-FE frame is never accepted.
+     * Keeping the echoed request tied to this operation prevents associating
+     * another transaction's FB/FA with the current request.
+     */
+    fun ackStatusAfterEcho(
+        buf: ByteArray, radioAddress: Byte, echoedCommand: ByteArray
+    ): Boolean? {
+        ackStatus(buf, radioAddress)?.let { return it }
+        if (echoedCommand.size < 6 || buf.size < echoedCommand.size + 5) return null
+        for (start in 0..buf.size - echoedCommand.size - 5) {
+            if (!echoedCommand.indices.all { buf[start + it] == echoedCommand[it] }) continue
+            val at = start + echoedCommand.size
+            if (buf[at] != PREAMBLE || buf[at + 1] != ADDR_CTRL ||
+                buf[at + 2] != radioAddress || buf[at + 4] != END_OF_MSG) continue
+            when (buf[at + 3]) {
+                ACK_OK -> return true
+                ACK_NG -> return false
+            }
         }
         return null
     }

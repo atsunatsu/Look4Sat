@@ -101,6 +101,8 @@ fun RadioControlDialog(
     val radioModel = rememberSaveable { mutableStateOf(initialSettings.radioModel) }
     val initialBaudRates = radioBaudRates(initialSettings.radioModel)
     val splitMode  = rememberSaveable { mutableStateOf(initialSettings.splitMode) }
+    val catRts = rememberSaveable { mutableStateOf(initialSettings.catRts) }
+    val catDtr = rememberSaveable { mutableStateOf(initialSettings.catDtr) }
     val duplexMode = rememberSaveable { mutableStateOf(initialSettings.duplexMode) }
     val catTransport = rememberSaveable { mutableStateOf(initialSettings.catTransport) }
     val tcpProtocol = rememberSaveable { mutableStateOf(initialSettings.tcpProtocol) }
@@ -431,6 +433,8 @@ fun RadioControlDialog(
                     isSingleRadio || catTransport.value == RadioControlSettings.TRANSPORT_TCP
                 ) "" else rxName.value,
                 baudRate       = baudRate.intValue,
+                catRts         = catRts.value,
+                catDtr         = catDtr.value,
                 splitMode      = splitMode.value,
                 catTransport   = catTransport.value,
                 duplexMode     = if (supportsSatelliteMode) {
@@ -930,6 +934,16 @@ fun RadioControlDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onExportDiagnostics, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.control_diagnostics_export)) }
                 OutlinedButton(onClick = onClearDiagnostics, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.control_diagnostics_clear)) }
+            }
+            if (catTransport.value == RadioControlSettings.TRANSPORT_USB && !isL4s && !isN76) {
+                Text("USB CAT RTS / DTR", fontWeight = FontWeight.Medium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = catRts.value, onClick = { catRts.value = !catRts.value },
+                        label = { Text("RTS") }, enabled = enabled.value)
+                    FilterChip(selected = catDtr.value, onClick = { catDtr.value = !catDtr.value },
+                        label = { Text("DTR") }, enabled = enabled.value)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
             }
             Text(stringResource(R.string.rc_dial_follow), fontWeight = FontWeight.Medium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

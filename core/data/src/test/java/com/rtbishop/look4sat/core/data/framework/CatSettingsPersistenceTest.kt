@@ -74,6 +74,52 @@ class CatSettingsPersistenceTest {
         service.disconnectRadios()
     }
 
+    @Test fun changingCatRtsDtrPersistsAndReopensTheAlreadyConnectedUsbSerialSession() = runTest {
+        val settings = settings(RadioControlSettings.MODEL_ICOM_IC820, true)
+        val tx = Radio()
+        val service = service(backgroundScope, settings, tx, Radio())
+        service.connectRadios()
+        assertTrue(tx.isConnected)
+        assertFalse(settings.value.catRts)
+        assertFalse(settings.value.catDtr)
+
+        assertTrue(service.applyRadioControlSettings(settings.value.copy(catRts = true, catDtr = true)))
+        assertTrue(settings.value.catRts)
+        assertTrue(settings.value.catDtr)
+        assertTrue(tx.isConnected)
+        assertEquals(2, tx.commands.count { it == "connect" })
+        assertTrue(tx.commands.contains("disconnect"))
+
+        assertTrue(service.applyRadioControlSettings(settings.value.copy(catRts = false, catDtr = false)))
+        assertTrue(tx.isConnected)
+        assertFalse(settings.value.catRts)
+        assertFalse(settings.value.catDtr)
+        assertEquals(3, tx.commands.count { it == "connect" })
+        assertFalse(tx.commands.contains("ptt:on"))
+        service.disconnectRadios()
+    }
+
+    @Test fun savingCatSettingsDoesNotReconnectAUsbRadioThatWasManuallyDisconnected() = runTest {
+        val settings = settings(RadioControlSettings.MODEL_ICOM_IC820, true)
+        val tx = Radio()
+        val service = service(backgroundScope, settings, tx, Radio())
+        assertTrue(service.applyRadioControlSettings(settings.value.copy(catRts = true)))
+        assertFalse(tx.isConnected)
+        assertEquals(0, tx.commands.count { it == "connect" })
+        service.disconnectRadios()
+    }
+
+    @Test fun changingNonConnectionSettingsDoesNotRestartAWorkingUsbCatLink() = runTest {
+        val settings = settings(RadioControlSettings.MODEL_ICOM_IC820, true)
+        val tx = Radio()
+        val service = service(backgroundScope, settings, tx, Radio())
+        service.connectRadios()
+        assertTrue(service.applyRadioControlSettings(settings.value.copy(dialSettleMillis = 900L)))
+        assertTrue(tx.isConnected)
+        assertEquals(1, tx.commands.count { it == "connect" })
+        service.disconnectRadios()
+    }
+
     @Test fun ic820SinglePresetUsesOnePhysicalConnectionAndDoesNotEnablePtt() = runTest {
         val tx = Radio(); val rx = Radio()
         val service = service(backgroundScope, settings(RadioControlSettings.MODEL_ICOM_IC820, true), tx, rx)

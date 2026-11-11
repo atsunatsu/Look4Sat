@@ -18,6 +18,16 @@
 package com.rtbishop.look4sat
 
 import android.app.Activity
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import com.rtbishop.look4sat.core.domain.repository.PttState
+import com.rtbishop.look4sat.core.data.framework.matchesConfiguredL4sUsbDevice
+import com.rtbishop.look4sat.core.domain.control.ControlDiagnosticSource
+import android.hardware.usb.UsbManager
+import android.hardware.usb.UsbDevice
+import android.content.IntentFilter
+import android.content.Context
+import android.content.BroadcastReceiver
 import android.app.Application
 import android.app.Application.ActivityLifecycleCallbacks
 import android.content.Intent
@@ -51,6 +61,7 @@ class MainApplication : Application(), IContainerProvider, ILoTWForegroundSyncLa
     }
 
     private lateinit var container: IMainContainer
+    private var usbReconnectJob: Job? = null
 
     override fun getMainContainer(): IMainContainer = container
 
@@ -84,6 +95,7 @@ class MainApplication : Application(), IContainerProvider, ILoTWForegroundSyncLa
     override fun onCreate() {
         super.onCreate()
         container = MainContainer(this)
+        observeL4sUsbAttachments()
         clearAmSatCacheOnAppBackground()
         // trigger automatic update every 48 hours
         container.appScope.launch { checkAutoUpdate() }
@@ -94,6 +106,56 @@ class MainApplication : Application(), IContainerProvider, ILoTWForegroundSyncLa
         container.appScope.launch { runCatching { container.qsoRepository.consolidateConfirmations() } }
         // load satellite data on every app start
         container.appScope.launch { container.satelliteRepo.initRepository() }
+    }
+
+    /** USB CAT reattachment is a device event, not an FT4 audio or CAT retry.
+     * Android must enumerate the device and grant permission before reconnecting.
+     * Only the configured L4S VID/PID is eligible; never open an unrelated USB
+     * serial device or start tracking/transmitting automatically. */
+    @Suppress("DEPRECATION")
+    private fun observeL4sUsbAttachments() {
+        val manager = getSystemService(UsbManager::class.java) ?: return
+        val filter = IntentFilter().apply {
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val device: UsbDevice? = if (android.os.Build.VERSION.SDK_INT >= 33)
+                    intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                else intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+                val event = if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) "attach" else "detach"
+                container.controlDiagnostics.record(ControlDiagnosticSource.RADIO, "usb/hotplug",
+                    "event=$event VID=${device?.vendorId} PID=${device?.productId} " +
+                        "devices=${manager.deviceList.values.joinToString { "%04X:%04X".format(it.vendorId, it.productId) }}")
+                usbReconnectJob?.cancel()
+                if (event != "attach" || device == null) return
+                usbReconnectJob = container.appScope.launch {
+                    delay(450) // Android permission and descriptor discovery settle after attach.
+                    val config = container.settingsRepo.radioControlSettings.value
+                    if (!matchesConfiguredL4sUsbDevice(config, device.vendorId, device.productId)) return@launch
+                    val matches = manager.deviceList.values.filter {
+                        it.vendorId == device.vendorId && it.productId == device.productId
+                    }
+                    if (matches.size != 1 || matches.single().deviceId != device.deviceId) return@launch
+                    if (!manager.hasPermission(device)) {
+                        container.controlDiagnostics.record(ControlDiagnosticSource.RADIO, "usb/reconnect",
+                            "permission required for %04X:%04X; select the radio in Settings".format(device.vendorId, device.productId))
+                        return@launch
+                    }
+                    val tracking = container.radioTrackingService
+                    val current = tracking.state.value
+                    if (current.txConnected || current.rxConnected || current.isActive ||
+                        current.pttState != PttState.OFF || current.catTransmitting) return@launch
+                    container.controlDiagnostics.record(ControlDiagnosticSource.RADIO, "usb/reconnect",
+                        "device rediscovered; reopening L4S CDC and HELLO/OPEN")
+                    tracking.connectRadios()
+                    container.controlDiagnostics.record(ControlDiagnosticSource.RADIO, "usb/reconnect",
+                        "connected=${tracking.state.value.txConnected}")
+                }
+            }
+        }
+        ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     private fun clearAmSatCacheOnAppBackground() {
