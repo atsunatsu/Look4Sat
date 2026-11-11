@@ -29,6 +29,7 @@ class IcomCivProtocolTest {
     fun ic820UsesItsOwnBandAccessAndSplitTableWithoutChangingModernCommands() {
         assertArrayEquals(civCommand(0x07, 0xD1), IcomCivProtocol.buildIc820BandAccessCommand(main = true))
         assertArrayEquals(civCommand(0x07, 0xD0), IcomCivProtocol.buildIc820BandAccessCommand(main = false))
+        assertArrayEquals(civCommand(0x07, 0xB0), IcomCivProtocol.buildIc820MainSubExchangeCommand())
         assertArrayEquals(civCommand(0x0F, 0x00), IcomCivProtocol.buildIc820SplitModeCommand(true))
         assertArrayEquals(civCommand(0x0F, 0x01), IcomCivProtocol.buildIc820SplitModeCommand(false))
         assertArrayEquals(civCommand(0x07, 0xD0), IcomCivProtocol.buildSelectMainCommand())

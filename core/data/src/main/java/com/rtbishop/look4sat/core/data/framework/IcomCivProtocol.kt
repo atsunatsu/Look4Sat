@@ -210,6 +210,10 @@ object IcomCivProtocol {
     fun buildIc820BandAccessCommand(main: Boolean): ByteArray =
         frame(CMD_SELECT_VFO, if (main) 0xD1.toByte() else 0xD0.toByte())
 
+    /** IC-820H operating manual p.15: 07 B0 exchanges MAIN and SUB. It does not copy a VFO. */
+    fun buildIc820MainSubExchangeCommand(): ByteArray =
+        frame(CMD_SELECT_VFO, 0xB0.toByte())
+
     fun buildIc820SplitModeCommand(enabled: Boolean): ByteArray =
         frame(CMD_DUPLEX_SPLIT, if (enabled) 0x00 else 0x01)
 
