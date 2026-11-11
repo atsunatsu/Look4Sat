@@ -2710,7 +2710,7 @@ private fun GridActivitySettingsDialog(
                         Text(
                             text = "${minPercent}%",
                             fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = gridActivityBadgeColor(minPercent, 100)
                         )
                         Text(
                             text = "...",
@@ -2720,7 +2720,7 @@ private fun GridActivitySettingsDialog(
                         Text(
                             text = "${maxPercent}%",
                             fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = gridActivityBadgeColor(maxPercent, 100)
                         )
                     }
                     RangeSlider(
