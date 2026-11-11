@@ -547,6 +547,7 @@ private fun MapScreen(
     val setActivityAward: (GridActivityAward) -> Unit = { award ->
         activityAward = award
         activitySnapshot = null
+        activityLoading = showGridActivity
         activityPreferences.edit().putString("award", award.apiCode).apply()
     }
 
