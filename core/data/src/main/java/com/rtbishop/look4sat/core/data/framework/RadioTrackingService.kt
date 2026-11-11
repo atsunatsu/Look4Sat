@@ -1286,7 +1286,7 @@ class RadioTrackingService(
                             result.txHz?.let { lastSetTx = it; observedTx = it }
                             if (!result.success) failTrackingCommand(if (
                                 controlSettings.radioModel == RadioControlSettings.MODEL_ICOM_IC820
-                            ) "IC-820 MAIN TX / SUB RX frequency pair failed readback; check SATL tracking coupling"
+                            ) "IC-820 CAT frequency pair not applied; see civ/pair/failed diagnostics"
                             else "Preset RX/TX VFO could not be identified or tuned; check the radio preset")
                         } else if (split && tx?.supportsAtomicPair == true && desiredRx != null) {
                             when (tx.setTrackingFrequencies(desiredRx, desiredTx)) {

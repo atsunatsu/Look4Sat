@@ -253,6 +253,24 @@ class IcomCivProtocolTest {
     }
 
     @Test
+    fun ic820RecoversEchoAssociatedShortPreambleButNeverUnrelatedOrMissingFrames() {
+        val sent = byteArrayOf(0xFE.toByte(), 0xFE.toByte(), 0x42, 0xE0.toByte(),
+            0x07, 0xD0.toByte(), 0xFD.toByte())
+        val ackSuffix = byteArrayOf(0xFE.toByte(), 0xE0.toByte(), 0x42, 0xFB.toByte(), 0xFD.toByte())
+        val exactLog = sent + ackSuffix
+        assertNull(IcomCivProtocol.ackStatus(exactLog, 0x42))
+        assertEquals(true, IcomCivProtocol.ackStatusAfterEcho(exactLog, 0x42, sent))
+        assertEquals(false, IcomCivProtocol.ackStatusAfterEcho(sent +
+            ackSuffix.copyOf().also { it[3] = 0xFA.toByte() }, 0x42, sent))
+        assertNull(IcomCivProtocol.ackStatusAfterEcho(ackSuffix, 0x42, sent))
+        assertNull(IcomCivProtocol.ackStatusAfterEcho(exactLog, 0x43, sent))
+        assertNull(IcomCivProtocol.ackStatusAfterEcho(exactLog, 0x42,
+            sent.copyOf().also { it[5] = 0xD1.toByte() }))
+        assertNull(IcomCivProtocol.ackStatusAfterEcho(sent +
+            ackSuffix.copyOf().also { it[2] = 0x43 }, 0x42, sent))
+    }
+
+    @Test
     fun ic9700SatelliteModeAndMainSubCommandsMatchHamlib() {
         assertArrayEquals(civCommand(0x07), IcomCivProtocol.buildEnterVfoModeCommand())
         assertArrayEquals(civCommand(0x16, 0x5A, 0x01), IcomCivProtocol.buildSatelliteModeCommand(true))

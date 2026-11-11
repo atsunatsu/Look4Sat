@@ -335,28 +335,45 @@ class Ic705Controller(
             if (ic820Band(rxHz) == null || (txHz != null && ic820Band(txHz) == null))
                 return@withContext FrequencyPairResult.FAILED
             ioMutex.withLock {
-                var verified = true
+                var failedStage: String? = null
+                var observedTx: Long? = null
+                var observedRx: Long? = null
                 var rxRestored = false
                 try {
                     if (txHz != null) {
-                        verified = sendAndWaitAck(IcomCivProtocol.buildIc820BandAccessCommand(main = true)) &&
-                            sendAndWaitAck(IcomCivProtocol.buildSetFreqCommand(txHz))
+                        if (!sendAndWaitAck(IcomCivProtocol.buildIc820BandAccessCommand(main = true)))
+                            failedStage = "select-main"
+                        else if (!sendAndWaitAck(IcomCivProtocol.buildSetFreqCommand(txHz)))
+                            failedStage = "write-main-frequency"
                     }
-                    if (verified) {
-                        verified = sendAndWaitAck(IcomCivProtocol.buildIc820BandAccessCommand(main = false)) &&
-                            sendAndWaitAck(IcomCivProtocol.buildSetFreqCommand(rxHz)) &&
-                            readFrequencyLocked() == rxHz
+                    if (failedStage == null) {
+                        if (!sendAndWaitAck(IcomCivProtocol.buildIc820BandAccessCommand(main = false)))
+                            failedStage = "select-sub"
+                        else if (!sendAndWaitAck(IcomCivProtocol.buildSetFreqCommand(rxHz)))
+                            failedStage = "write-sub-frequency"
+                        else {
+                            observedRx = readFrequencyLocked()
+                            if (observedRx != rxHz) failedStage = "read-sub-frequency"
+                        }
                     }
-                    if (verified && txHz != null) {
-                        verified = sendAndWaitAck(IcomCivProtocol.buildIc820BandAccessCommand(main = true)) &&
-                            readFrequencyLocked() == txHz
+                    if (failedStage == null && txHz != null) {
+                        if (!sendAndWaitAck(IcomCivProtocol.buildIc820BandAccessCommand(main = true)))
+                            failedStage = "reselect-main"
+                        else {
+                            observedTx = readFrequencyLocked()
+                            if (observedTx != txHz) failedStage = "read-main-frequency"
+                        }
                     }
                 } finally {
-                    rxRestored = withContext(NonCancellable) {
-                        restoreRxVfo()
-                    }
+                    rxRestored = withContext(NonCancellable) { restoreRxVfo() }
                 }
-                if (verified && rxRestored) FrequencyPairResult.APPLIED else FrequencyPairResult.FAILED
+                if (failedStage != null || !rxRestored) {
+                    diagnose("pair/failed", "stage=${failedStage ?: "restore-sub"} " +
+                        "targetMainTx=$txHz targetSubRx=$rxHz " +
+                        "readMainTx=$observedTx readSubRx=$observedRx restoredSub=$rxRestored",
+                        ControlDiagnosticSeverity.ERROR)
+                    FrequencyPairResult.FAILED
+                } else FrequencyPairResult.APPLIED
             }
         }
 
@@ -588,12 +605,18 @@ class Ic705Controller(
         }
         if (!write(cmd)) return false
         delay(WRITE_SETTLE_MS)
-        val buf = drainWithTimeout(responseTimeoutMs) {
-            IcomCivProtocol.ackStatus(it, civAddress) != null
-        }
-        val ok = IcomCivProtocol.ackStatus(buf, civAddress) == true
-        if (!ok) reportReplyFailure(cmd, buf)
-        return ok
+        val echoed = addressCommand(cmd)
+        fun ackStatus(buf: ByteArray): Boolean? =
+            if (variant == IcomCivVariant.IC820)
+                IcomCivProtocol.ackStatusAfterEcho(buf, civAddress, echoed)
+            else IcomCivProtocol.ackStatus(buf, civAddress)
+        val buf = drainWithTimeout(responseTimeoutMs) { ackStatus(it) != null }
+        val standardAck = IcomCivProtocol.ackStatus(buf, civAddress)
+        val status = ackStatus(buf)
+        if (standardAck == null && status != null)
+            diagnose("reply/echo-recovered", "command=${commandHex(cmd)} status=${if (status) "FB" else "FA"} one-FE preamble after exact echo", ControlDiagnosticSeverity.WARNING)
+        if (status != true) reportReplyFailure(cmd, buf, status)
+        return status == true
     }
 
     /**
@@ -633,9 +656,11 @@ class Ic705Controller(
         return response?.payload
     }
 
-    private fun reportReplyFailure(cmd: ByteArray, buf: ByteArray) {
+    private fun reportReplyFailure(
+        cmd: ByteArray, buf: ByteArray, ackResult: Boolean? = IcomCivProtocol.ackStatus(buf, civAddress)
+    ) {
         val stage = when {
-            IcomCivProtocol.ackStatus(buf, civAddress) == false -> "reply/rejected"
+            ackResult == false -> "reply/rejected"
             !isConnected || !transport.isConnected -> "reply/disconnected"
             else -> "reply/timeout"
         }
