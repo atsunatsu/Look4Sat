@@ -52,9 +52,12 @@ private const val MAX_GRID_LABEL_SCALE = 1.5f
 /**
  * Maidenhead locator grid overlay, drawn directly on the map canvas.
  *
- * Zoom levels (map maxZoom = 7):
+ * Zoom levels:
  *  - zoom < GRID_ZOOM_SUB: 10° x 20° fields with 2-character labels (e.g. "PM")
  *  - zoom >= GRID_ZOOM_SUB: 1° x 2° squares with 4-character labels (e.g. "PM95")
+ * Four-character labels stay at 20px through the midpoint of the active map
+ * source's zoom range, then grow smoothly to 30px at its maximum zoom.
+ * (Offline: zoom 6–7; Tianditu: zoom 6–18.)
  *
  * All geometry is computed per-frame from the projection, so the overlay
  * stays correct while panning/zooming. Grid lines that cross the antimeridian
