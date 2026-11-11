@@ -27,6 +27,14 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
+
+/** Wavelog's palette normalization: 0 is red; the lower of data maximum and filter maximum is green. */
+internal fun gridActivityColorIndex(percentage: Int, dataMax: Int, filterMax: Int): Int {
+    val scaleMax = min(dataMax.coerceIn(0, 100), filterMax.coerceIn(0, 100))
+    if (scaleMax == 0) return 0
+    return (percentage.coerceIn(0, 100) * 100f / scaleMax).roundToInt().coerceIn(0, 100)
+}
 
 /**
  * Maidenhead locator grid overlay, drawn directly on the map canvas.
@@ -94,12 +102,14 @@ class MaidenheadGridOverlay : Overlay() {
     }
     private data class ActivityCell(val grid: String, val bounds: CellBounds, val percentage: Int)
     private var activityCells: List<ActivityCell> = emptyList()
+    private var activityMaxPercentage = 0
 
     /** GridMaster share of participating SAT logs containing a given 4-character grid. */
     var activityPercentages: Map<String, Int> = emptyMap()
         set(value) {
             if (field === value) return
             field = value
+            activityMaxPercentage = value.values.maxOrNull()?.coerceIn(0, 100) ?: 0
             activityCells = value.mapNotNull { (grid, percentage) ->
                 gridCellBounds(grid)?.let { ActivityCell(grid, it, percentage.coerceIn(0, 100)) }
             }
@@ -107,6 +117,8 @@ class MaidenheadGridOverlay : Overlay() {
     var showActivityOverlay: Boolean = false
     var activityFilterMin: Int = 0
     var activityFilterMax: Int = 100
+    /** When false, hide personal green/red fills and include those squares in the activity map. */
+    var showWorkedAndMarkedWithActivity: Boolean = true
 
     private val roamStripePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -231,20 +243,25 @@ class MaidenheadGridOverlay : Overlay() {
         // The tapped worked grid gets a distinct outline (sub-square zoom only).
         val selectedCell = selectedGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
 
-        // GridMaster activity heatmap is drawn UNDER existing worked/marked/roamed cells.
-        // Always use 4-character grid geometry, even at 2-character field zoom. This
-        // keeps all operator-specific green/red markings unchanged and readable.
+        // Two modes: preserve personal green/red fills, or show the full GridMaster
+        // heatmap (including worked/marked grids) when that preference is off.
+        // At either zoom level, heatmap geometry always uses four-character squares.
+        val drawPersonalGridFills = !showActivityOverlay || showWorkedAndMarkedWithActivity
         if (showActivityOverlay && activityCells.isNotEmpty()) {
             val pixelsPerDegreeLon = worldWidthPx / 360.0
             for (entry in activityCells) {
-                if (entry.grid in workedGrids || entry.grid in markedGrids) continue
+                if (drawPersonalGridFills && (entry.grid in workedGrids || entry.grid in markedGrids)) continue
                 if (entry.percentage !in activityFilterMin..activityFilterMax) continue
                 val cell = entry.bounds
                 if (cell.latTop < bottomLat || cell.latBottom > topLat) continue
                 val yTop = projectionToY(projection, cell.latTop) ?: continue
                 val yBottom = projectionToY(projection, cell.latBottom) ?: continue
                 if (yBottom < 0f || yTop > canvas.height) continue
-                activityPaint.color = activityColors[entry.percentage]
+                // Match Wavelog: normalize against min(dataset maximum, filter maximum),
+                // leaving the slider's minimum as an inclusion filter only.
+                activityPaint.color = activityColors[
+                    gridActivityColorIndex(entry.percentage, activityMaxPercentage, activityFilterMax)
+                ]
                 for (turn in -colRepeats..colRepeats) {
                     val lonLeft = cell.lonLeft + turn * 360.0
                     val lonRight = cell.lonRight + turn * 360.0
@@ -266,7 +283,7 @@ class MaidenheadGridOverlay : Overlay() {
         //  - Field zoom (two-char labels): do NOT fill whole fields; instead fill
         //    the individual 2°x1° squares that were worked, without drawing the
         //    square grid lines — so you see green patches inside the field.
-        if (workedGrids.isNotEmpty() || markedGrids.isNotEmpty()) {
+        if (drawPersonalGridFills && (workedGrids.isNotEmpty() || markedGrids.isNotEmpty())) {
             if (zoom >= GRID_ZOOM_SUB) {
                 for (row in firstRow..lastRow) {
                     val lat = row * cellLat
