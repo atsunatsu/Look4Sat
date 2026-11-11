@@ -497,9 +497,9 @@ private fun MapScreen(
     var activityMax by remember(activityPreferences) {
         mutableStateOf(activityPreferences.getInt("max_percent", 100).coerceIn(activityMin, 100))
     }
-    // Preserve the v21 worked/marked colours until the user opts to view all activity.
+    // Default to a complete activity heatmap; personal green/red fills are opt-in.
     var showWorkedAndMarkedWithActivity by remember(activityPreferences) {
-        mutableStateOf(activityPreferences.getBoolean("show_worked_marked", true))
+        mutableStateOf(activityPreferences.getBoolean("show_worked_marked", false))
     }
     var showActivitySettings by remember { mutableStateOf(false) }
     var activitySnapshot by remember { mutableStateOf<GridActivitySnapshot?>(null) }
@@ -2602,10 +2602,6 @@ private fun GridActivitySettingsDialog(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        stringResource(R.string.map_grid_activity_description),
-                        style = MaterialTheme.typography.bodySmall
-                    )
                     Text(stringResource(R.string.map_grid_activity_min, minPercent))
                     Slider(
                         value = minPercent.toFloat(),
@@ -2634,11 +2630,6 @@ private fun GridActivitySettingsDialog(
                             onCheckedChange = onShowWorkedAndMarkedChange
                         )
                     }
-                    Text(
-                        stringResource(R.string.map_grid_activity_source),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     when {
                         loading -> Text(stringResource(R.string.map_grid_activity_loading))
                         unavailable -> Text(
