@@ -10,6 +10,38 @@ import java.io.IOException
 class GridActivityStoreTest {
 
     @Test
+    fun exposesFiveCoreSatelliteAwardsWithIndependentCachesAndApiCodes() {
+        assertEquals("sat", GridActivityAward.SATELLITE.apiCode)
+        assertEquals("sat/leo", GridActivityAward.LEO.apiCode)
+        assertEquals("sat/meo", GridActivityAward.MEO.apiCode)
+        assertEquals("sat/geo", GridActivityAward.GEO.apiCode)
+        assertEquals("sat/ngs", GridActivityAward.NON_GEOSTATIONARY.apiCode)
+
+        val cacheFiles = GridActivityAward.values().map { it.cacheFileName }
+        assertEquals(5, cacheFiles.distinct().size)
+        assertEquals(
+            GridActivityAward.SATELLITE,
+            GridActivityAward.fromApiCode("unknown")
+        )
+        assertEquals(
+            GridActivityAward.LEO,
+            GridActivityAward.fromApiCode("sat/leo")
+        )
+    }
+
+    @Test
+    fun buildsGridMasterMapUrlForSelectedAward() {
+        assertEquals(
+            "https://gridmaster.fr/api/grids.json?award=sat/leo&format=map",
+            GridActivityStore.endpointFor(GridActivityAward.LEO)
+        )
+        assertEquals(
+            "https://gridmaster.fr/api/grids.json?award=sat&format=map",
+            GridActivityStore.endpointFor(GridActivityAward.SATELLITE)
+        )
+    }
+
+    @Test
     fun parsesFourCharacterGridPercentagesAndIgnoresBadEntries() {
         val raw = JSONObject()
         for (i in 0 until 60) {
