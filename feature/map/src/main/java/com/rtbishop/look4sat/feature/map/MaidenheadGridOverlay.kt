@@ -60,6 +60,14 @@ class MaidenheadGridOverlay : Overlay() {
         color = Color.argb(230, 255, 224, 130)
         setShadowLayer(3f, 2f, 2f, Color.BLACK)
     }
+    // Smaller second line when GridMaster activity values are shown inside squares.
+    private val activityLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = LABEL_TEXT_SIZE * 0.72f
+        style = Paint.Style.FILL
+        textAlign = Paint.Align.CENTER
+        color = Color.argb(220, 255, 224, 130)
+        setShadowLayer(3f, 2f, 2f, Color.BLACK)
+    }
     private val workedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = android.graphics.Paint.Style.FILL
         color = Color.argb(90, 76, 217, 100)
@@ -136,6 +144,8 @@ class MaidenheadGridOverlay : Overlay() {
         labelPaint.setShadowLayer(3f, 2f, 2f, halo)
         firstCallPaint.color = label
         firstCallPaint.setShadowLayer(3f, 2f, 2f, halo)
+        activityLabelPaint.color = label
+        activityLabelPaint.setShadowLayer(3f, 2f, 2f, halo)
     }
 
     /** Worked gridsquares (4-char, uppercase) to highlight, e.g. {"OL62", "PM95"}. */
@@ -536,7 +546,19 @@ class MaidenheadGridOverlay : Overlay() {
                         }
                     }
                 } else {
-                    canvas.drawText(label, (xLeft + xRight) / 2f, yCenter, labelPaint)
+                    // Two-line grid label: OL62 on top, 2% below, as in Wavelog.
+                    // Percentages follow the heatmap's selected range; first-call
+                    // mode remains untouched so existing callsign labels take priority.
+                    val percent = if (showActivityOverlay && zoom >= GRID_ZOOM_SUB) {
+                        activityPercentages[label]?.takeIf { it in activityFilterMin..activityFilterMax }
+                    } else null
+                    val xCenter = (xLeft + xRight) / 2f
+                    if (percent != null) {
+                        canvas.drawText(label, xCenter, yCenter - 9f, labelPaint)
+                        canvas.drawText("${percent}%", xCenter, yCenter + 12f, activityLabelPaint)
+                    } else {
+                        canvas.drawText(label, xCenter, yCenter, labelPaint)
+                    }
                 }
             }
         }
