@@ -19,6 +19,23 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 
+/** GridMaster award codes exposed by its public API for the satellite activity map. */
+internal enum class GridActivityAward(
+    val apiCode: String,
+    val cacheFileName: String
+) {
+    SATELLITE("sat", "gridmaster_sat_activity.json"),
+    LEO("sat/leo", "gridmaster_sat_leo_activity.json"),
+    MEO("sat/meo", "gridmaster_sat_meo_activity.json"),
+    GEO("sat/geo", "gridmaster_sat_geo_activity.json"),
+    NON_GEOSTATIONARY("sat/ngs", "gridmaster_sat_ngs_activity.json");
+
+    companion object {
+        fun fromApiCode(code: String?): GridActivityAward =
+            values().firstOrNull { it.apiCode == code } ?: SATELLITE
+    }
+}
+
 /** GridMaster.fr's percentage of submitted SAT logs containing each 4-character grid. */
 internal data class GridActivitySnapshot(
     val percentages: Map<String, Int>,
@@ -32,14 +49,21 @@ internal data class GridActivitySnapshot(
  * successfully validated response so the overlay continues to work offline.
  */
 internal object GridActivityStore {
-    private const val ENDPOINT = "https://gridmaster.fr/api/grids.json?format=map"
-    private const val CACHE_FILE = "gridmaster_sat_activity.json"
+    private const val ENDPOINT = "https://gridmaster.fr/api/grids.json"
+
+    internal fun endpointFor(award: GridActivityAward): String =
+        "$ENDPOINT?award=${award.apiCode}&format=map"
     private const val CACHE_VALID_MS = 30L * 24 * 60 * 60 * 1000
     private const val MAX_BYTES = 2_000_000
 
-    suspend fun load(context: Context, forceRefresh: Boolean = false): GridActivitySnapshot? =
-        withContext(Dispatchers.IO) {
-            val file = File(context.applicationContext.filesDir, CACHE_FILE)
+    suspend fun load(
+        context: Context,
+        award: GridActivityAward = GridActivityAward.SATELLITE,
+        forceRefresh: Boolean = false
+    ): GridActivitySnapshot? = withContext(Dispatchers.IO) {
+            // Keep the original Satellite cache filename for seamless v21.1 upgrades;
+            // each additional award receives its own independent cache and timestamp.
+            val file = File(context.applicationContext.filesDir, award.cacheFileName)
             val cached = try {
                 if (file.isFile) {
                     GridActivitySnapshot(parse(file.readText()), file.lastModified(), fromCache = true)
@@ -52,7 +76,7 @@ internal object GridActivityStore {
                 return@withContext cached
             }
             try {
-                val connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
+                val connection = (URL(endpointFor(award)).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 12_000
                     readTimeout = 20_000
                     instanceFollowRedirects = true
