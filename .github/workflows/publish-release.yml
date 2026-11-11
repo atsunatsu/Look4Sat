@@ -246,21 +246,19 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21.1 — Refine Most Wanted grid activity map
-          - Normalize GridMaster heatmap colours using Wavelog's adaptive scale: 0% is red, and min(dataset maximum, filter upper limit) maps to green.
-          - Rename the grid activity toggle and settings to "Most Wanted" (Chinese: 网格活跃度); remove explanatory paragraphs from the settings dialog.
-          - Default the "Show worked/marked grids (green/red)" option to off, so activity data also colours worked and marked cells; the original fills remain available when enabled.
-          - At two-character zoom, show field letters even with First-call labels enabled. At four-character zoom, show activity percentages beneath first-call/marked callsigns when Most Wanted is enabled.
-          - Preserve original QSO data, marked stations, grid selection and roamed stripes, and persist the visibility setting.
-          - Verification: unit tests (excluding known unrelated RadioConfigurationSaveTest timeouts), release-signature check, APK version check and both ARM ABIs before publication.
+          ## v21.2 — GridMaster award selector and zoom-scaled grid labels
+          - Add a GridMaster Award selector to Most Wanted settings: Satellite, LEO, MEO, GEO and Non-Geostationary (NGS).
+          - Persist the selected Award and keep independent cached datasets and download timestamps for each category; preserve the existing Satellite cache for upgrades.
+          - Scale four-character grid labels, First-call labels and Most Wanted percentages with the map's exact zoom factor from zoom 6.5 to 7.0 (1.0x to 1.414x), then cap the scale above zoom 7.0. Two-character field labels remain unchanged.
+          - Keep the original GridMaster percentages; no second percentage normalization is applied.
+          - Verification: release unit tests (excluding the known unrelated RadioConfigurationSaveTest timeout), APK signing-certificate check, version check and both ARM ABIs.
 
-          ## v21.1 — Most Wanted 网格活跃度优化
-          - 热力图按 Wavelog 的动态色阶归一化：红色对应 0%，绿色对应数据最大值与筛选上限的较小值。
-          - 地图开关及设置标题改为「网格活跃度」（英文 Most Wanted），删除设置中的长篇解释文字。
-          - 「显示已通联与已标记网格（绿/红）」默认关闭，所有有数据且符合筛选的网格按活跃度填色；需要时可恢复原来的绿/红网格。
-          - 首通呼号开启时，两位网格缩放仍显示两位字母；四位网格缩放且开启网格活跃度时，在首通或标记呼号下显示百分比。
-          - 保留通联数据、标记、网格选择、漫游斜纹，记住显示设置。
-          - 发布前验证：单元测试（排除已知无关的 RadioConfigurationSaveTest 超时）、签名、APK 版本与双 ARM 架构。
+          ## v21.2 — GridMaster Award 选择器与网格文字缩放
+          - 在「网格活跃度 / Most Wanted」设置中增加五种 GridMaster Award：Satellite、LEO、MEO、GEO、Non-Geostationary（NGS）。
+          - 记住所选类别；各类别独立缓存和下载时间；保留升级前 Satellite 缓存，避免重复下载。
+          - 四位网格编号、首通呼号及 Most Wanted 百分比从 Zoom 6.5 到 7.0 严格跟随地图实际缩放倍率（1.0 倍至 1.414 倍），Zoom 7.0 以上封顶；二位网格字母保持原字号。
+          - 直接使用 GridMaster 返回的百分比，不进行二次归一化。
+          - 发布验证：单元测试（排除已知无关的 RadioConfigurationSaveTest 超时）、APK 签名证书、版本号及双 ARM 架构检查。
           RELEASE_NOTES
           )"
           fi
