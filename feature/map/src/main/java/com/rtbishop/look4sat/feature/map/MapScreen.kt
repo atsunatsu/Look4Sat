@@ -497,6 +497,10 @@ private fun MapScreen(
     var activityMax by remember(activityPreferences) {
         mutableStateOf(activityPreferences.getInt("max_percent", 100).coerceIn(activityMin, 100))
     }
+    // Preserve the v21 worked/marked colours until the user opts to view all activity.
+    var showWorkedAndMarkedWithActivity by remember(activityPreferences) {
+        mutableStateOf(activityPreferences.getBoolean("show_worked_marked", true))
+    }
     var showActivitySettings by remember { mutableStateOf(false) }
     var activitySnapshot by remember { mutableStateOf<GridActivitySnapshot?>(null) }
     var activityLoading by remember { mutableStateOf(false) }
@@ -523,6 +527,10 @@ private fun MapScreen(
     val setActivityMax: (Int) -> Unit = { value ->
         activityMax = value.coerceIn(activityMin, 100)
         activityPreferences.edit().putInt("max_percent", activityMax).apply()
+    }
+    val setShowWorkedAndMarkedWithActivity: (Boolean) -> Unit = { enabled ->
+        showWorkedAndMarkedWithActivity = enabled
+        activityPreferences.edit().putBoolean("show_worked_marked", enabled).apply()
     }
 
     val contourOverlay = remember(mapView) { ElevationContourOverlay() }
@@ -858,7 +866,8 @@ private fun MapScreen(
                             activityPercentages = activitySnapshot?.percentages.orEmpty(),
                             showActivityOverlay = showGridActivity && activeAward == AwardType.VUCC,
                             activityFilterMin = activityMin,
-                            activityFilterMax = activityMax
+                            activityFilterMax = activityMax,
+                            showWorkedAndMarkedWithActivity = showWorkedAndMarkedWithActivity
                         )
                         if (!shouldCenter || uiState.stationPosition != null) {
                             prevGridMode = uiState.isGridMode
@@ -1029,11 +1038,13 @@ private fun MapScreen(
         GridActivitySettingsDialog(
             minPercent = activityMin,
             maxPercent = activityMax,
+            showWorkedAndMarked = showWorkedAndMarkedWithActivity,
             downloadedAt = activitySnapshot?.downloadedAt,
             loading = activityLoading,
             unavailable = showGridActivity && !activityLoading && activitySnapshot == null,
             onMinChange = setActivityMin,
             onMaxChange = setActivityMax,
+            onShowWorkedAndMarkedChange = setShowWorkedAndMarkedWithActivity,
             onRefresh = {
                 activityRefreshSerial += 1
                 setActivityEnabled(true)
@@ -2550,11 +2561,13 @@ private fun GridActivityToggle(
 private fun GridActivitySettingsDialog(
     minPercent: Int,
     maxPercent: Int,
+    showWorkedAndMarked: Boolean,
     downloadedAt: Long?,
     loading: Boolean,
     unavailable: Boolean,
     onMinChange: (Int) -> Unit,
     onMaxChange: (Int) -> Unit,
+    onShowWorkedAndMarkedChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -2601,6 +2614,22 @@ private fun GridActivitySettingsDialog(
                         onValueChange = { onMaxChange(it.toInt()) },
                         valueRange = 0f..100f
                     )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_show_worked_marked),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f).clickable {
+                                onShowWorkedAndMarkedChange(!showWorkedAndMarked)
+                            }
+                        )
+                        Switch(
+                            checked = showWorkedAndMarked,
+                            onCheckedChange = onShowWorkedAndMarkedChange
+                        )
+                    }
                     Text(
                         stringResource(R.string.map_grid_activity_source),
                         style = MaterialTheme.typography.bodySmall,
@@ -2788,7 +2817,8 @@ private fun setGridMode(
     activityPercentages: Map<String, Int> = emptyMap(),
     showActivityOverlay: Boolean = false,
     activityFilterMin: Int = 0,
-    activityFilterMax: Int = 100
+    activityFilterMax: Int = 100,
+    showWorkedAndMarkedWithActivity: Boolean = true
 ) {
     try {
         val gridOverlay = mapView.overlays[OVERLAY_GRID]
@@ -2804,6 +2834,7 @@ private fun setGridMode(
             gridOverlay.showActivityOverlay = gridMode && showActivityOverlay
             gridOverlay.activityFilterMin = activityFilterMin
             gridOverlay.activityFilterMax = activityFilterMax
+            gridOverlay.showWorkedAndMarkedWithActivity = showWorkedAndMarkedWithActivity
             // ownGrid must be set on EVERY update — the position is available
             // regardless of whether this frame centers (centering happens only
             // on entry, but passing null here would wipe the bold outline).
@@ -2820,6 +2851,7 @@ private fun setGridMode(
                 this.showActivityOverlay = gridMode && showActivityOverlay
                 this.activityFilterMin = activityFilterMin
                 this.activityFilterMax = activityFilterMax
+                this.showWorkedAndMarkedWithActivity = showWorkedAndMarkedWithActivity
                 this.ownGrid = ownGridOf(stationPosition)
                 applyTheme(mapIsLightUi == true)
             }
