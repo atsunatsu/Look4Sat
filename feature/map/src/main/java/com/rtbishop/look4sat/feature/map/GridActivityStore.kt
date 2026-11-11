@@ -1,0 +1,117 @@
+/*
+ * Look4Sat. Amateur radio satellite tracker and pass predictor.
+ * Copyright (C) 2026 Look4Sat contributors.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+package com.rtbishop.look4sat.feature.map
+
+import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.Locale
+
+/** GridMaster.fr's percentage of submitted SAT logs containing each 4-character grid. */
+internal data class GridActivitySnapshot(
+    val percentages: Map<String, Int>,
+    val downloadedAt: Long,
+    val fromCache: Boolean
+)
+
+/**
+ * Public, aggregate GridMaster satellite data; no callsigns or local QSOs are uploaded.
+ * Updates are infrequent (Wavelog refreshes this dataset monthly). Retain the last
+ * successfully validated response so the overlay continues to work offline.
+ */
+internal object GridActivityStore {
+    private const val ENDPOINT = "https://gridmaster.fr/api/grids.json?format=map"
+    private const val CACHE_FILE = "gridmaster_sat_activity.json"
+    private const val CACHE_VALID_MS = 30L * 24 * 60 * 60 * 1000
+    private const val MAX_BYTES = 2_000_000
+
+    suspend fun load(context: Context, forceRefresh: Boolean = false): GridActivitySnapshot? =
+        withContext(Dispatchers.IO) {
+            val file = File(context.applicationContext.filesDir, CACHE_FILE)
+            val cached = try {
+                if (file.isFile) {
+                    GridActivitySnapshot(parse(file.readText()), file.lastModified(), fromCache = true)
+                } else null
+            } catch (_: Exception) {
+                null
+            }
+            val now = System.currentTimeMillis()
+            if (!forceRefresh && cached != null && now - cached.downloadedAt in 0 until CACHE_VALID_MS) {
+                return@withContext cached
+            }
+            try {
+                val connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 12_000
+                    readTimeout = 20_000
+                    instanceFollowRedirects = true
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty("User-Agent", "Look4Sat/1.0 (satellite grid activity)")
+                }
+                val response = try {
+                    if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                        throw IOException("GridMaster HTTP " + connection.responseCode)
+                    }
+                    connection.inputStream.use { stream ->
+                        // Reject oversized/untrusted responses before parsing or overwriting cache.
+                        val bytes = ByteArray(MAX_BYTES + 1)
+                        var count = 0
+                        while (count < bytes.size) {
+                            val n = stream.read(bytes, count, bytes.size - count)
+                            if (n < 0) break
+                            count += n
+                        }
+                        if (count > MAX_BYTES) throw IOException("GridMaster data too large")
+                        String(bytes, 0, count, Charsets.UTF_8)
+                    }
+                } finally {
+                    connection.disconnect()
+                }
+                val parsed = parse(response)
+                // Only a fully validated download replaces the previous good cache.
+                val tmp = File(file.parentFile, file.name + ".tmp")
+                tmp.writeText(response)
+                if (!tmp.renameTo(file)) {
+                    file.writeText(response)
+                    tmp.delete()
+                }
+                GridActivitySnapshot(parsed, file.lastModified(), fromCache = false)
+            } catch (_: Exception) {
+                cached
+            }
+        }
+
+    /** Parse the Wavelog-compatible format: { "OL62": 12, ... } (values in 0..100). */
+    internal fun parse(json: String): Map<String, Int> {
+        val obj = JSONObject(json)
+        val result = LinkedHashMap<String, Int>()
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            val raw = keys.next()
+            if (raw.length < 4) continue
+            val grid = raw.take(4).uppercase(Locale.ROOT)
+            if (grid.length != 4 || grid[0] !in 'A'..'R' || grid[1] !in 'A'..'R' ||
+                grid[2] !in '0'..'9' || grid[3] !in '0'..'9') continue
+            val value = obj.opt(raw)
+            if (value !is Number) continue
+            val percentage = value.toDouble()
+            if (percentage.isFinite() && percentage in 0.0..100.0) {
+                result[grid] = percentage.toInt()
+            }
+        }
+        // Prevent empty/error documents from masquerading as a successful refresh.
+        if (result.size < 50) throw IOException("GridMaster dataset is empty or incomplete")
+        return result
+    }
+}

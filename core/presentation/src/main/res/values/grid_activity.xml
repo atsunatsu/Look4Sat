@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="map_grid_activity_toggle">Grid activity</string>
+    <string name="map_grid_activity_title">Satellite grid activity</string>
+    <string name="map_grid_activity_description">Percentage of submitted GridMaster satellite logs containing each grid. Lower percentages mean rarer grids in this sample, not real-time activity.</string>
+    <string name="map_grid_activity_min">Minimum: %1$d%%</string>
+    <string name="map_grid_activity_max">Maximum: %1$d%%</string>
+    <string name="map_grid_activity_loading">Loading GridMaster data…</string>
+    <string name="map_grid_activity_unavailable">No grid activity data available. Connect to the internet and retry.</string>
+    <string name="map_grid_activity_source">Source: GridMaster.fr (FG8OJ). Red = rare, yellow = intermediate, green = common. Your confirmed and marked grids retain their existing colours.</string>
+    <string name="map_grid_activity_last_updated">Last downloaded: %1$s</string>
+    <string name="map_grid_activity_refresh">Refresh data</string>
+    <string name="map_grid_activity_percent">Activity: %1$d%%</string>
+</resources>
