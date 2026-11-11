@@ -118,7 +118,7 @@ class MaidenheadGridOverlay : Overlay() {
     var activityFilterMin: Int = 0
     var activityFilterMax: Int = 100
     /** When false, hide personal green/red fills and include those squares in the activity map. */
-    var showWorkedAndMarkedWithActivity: Boolean = true
+    var showWorkedAndMarkedWithActivity: Boolean = false
 
     private val roamStripePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
