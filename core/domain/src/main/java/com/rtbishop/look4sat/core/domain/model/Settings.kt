@@ -77,7 +77,9 @@ data class OtherSettings(
     /** 指南针手动航向偏置(度, -180..180): 雷达方位 = 传感器方位 + 磁偏角 + 该偏置. */
     val compassOffsetDegrees: Float = 0f,
     val mapSource: String = MapSource.OSM,
-    val tiandituKey: String = ""
+    val tiandituKey: String = "",
+    /** Persisted APK update source, independent from ephemeris data sources. */
+    val updateSource: UpdateSource = UpdateSource.AUTO
 )
 
 object MapSource {

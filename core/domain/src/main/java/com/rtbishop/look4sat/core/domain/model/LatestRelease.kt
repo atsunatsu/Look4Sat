@@ -25,3 +25,13 @@ data class LatestRelease(
     val body: String,       // release notes / update description
     val apkUrl: String?     // first .apk asset download URL, null if absent
 )
+
+/** Which update endpoint to use. AUTO retries other endpoints when one fails. */
+enum class UpdateSource {
+    AUTO, GITHUB, GHFAST, LLKK, MOEYY;
+
+    companion object {
+        fun fromStored(value: String?): UpdateSource =
+            entries.firstOrNull { it.name == value } ?: AUTO
+    }
+}

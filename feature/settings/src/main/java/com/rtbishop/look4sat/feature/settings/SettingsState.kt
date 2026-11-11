@@ -20,6 +20,7 @@ package com.rtbishop.look4sat.feature.settings
 import com.rtbishop.look4sat.core.domain.model.DataSourcesSettings
 import com.rtbishop.look4sat.core.domain.model.LatestRelease
 import com.rtbishop.look4sat.core.domain.model.OtherSettings
+import com.rtbishop.look4sat.core.domain.model.UpdateSource
 import com.rtbishop.look4sat.core.domain.model.RCSettings
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 import com.rtbishop.look4sat.core.domain.model.WavelogUploadSettings
@@ -41,6 +42,9 @@ data class DataSettings(
 
 data class UpdateCheckerState(
     val isChecking: Boolean = false,
+    val selectedSource: UpdateSource = UpdateSource.AUTO,
+    val activeSource: UpdateSource? = null,
+    val releaseSource: UpdateSource? = null,
     val release: LatestRelease? = null,
     val hasUpdate: Boolean = false,
     val isDownloading: Boolean = false,
@@ -206,6 +210,7 @@ sealed interface SettingsAction {
     data class SaveLoTWStation(val station: com.rtbishop.look4sat.core.domain.repository.LoTWStation) : SettingsAction
 
     // Update checker
+    data class SetUpdateSource(val source: UpdateSource) : SettingsAction
     data object CheckForUpdate : SettingsAction
     data object DownloadUpdate : SettingsAction
     data object ConsumeDownloadedApk : SettingsAction

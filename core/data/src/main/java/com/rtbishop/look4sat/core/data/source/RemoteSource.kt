@@ -28,6 +28,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.InputStream
+import java.util.concurrent.TimeUnit
 
 class RemoteSource(
     private val dispatcher: CoroutineDispatcher,
@@ -45,10 +46,14 @@ class RemoteSource(
         }
     }
 
-    override suspend fun getNetworkStream(url: String): NetworkResult = withContext(dispatcher) {
+    override suspend fun getNetworkStream(url: String): NetworkResult = getNetworkStream(url, 0L)
+
+    override suspend fun getNetworkStream(url: String, timeoutMs: Long): NetworkResult = withContext(dispatcher) {
         try {
             val networkRequest = Request.Builder().url(url).build()
-            val response = httpClient.newCall(networkRequest).execute()
+            val call = httpClient.newCall(networkRequest)
+            if (timeoutMs > 0) call.timeout().timeout(timeoutMs, TimeUnit.MILLISECONDS)
+            val response = call.execute()
             if (!response.isSuccessful) {
                 val code = response.code
                 response.close()
