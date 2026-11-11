@@ -501,16 +501,28 @@ private fun MapScreen(
     var showWorkedAndMarkedWithActivity by remember(activityPreferences) {
         mutableStateOf(activityPreferences.getBoolean("show_worked_marked", false))
     }
+    var activityAward by remember(activityPreferences) {
+        mutableStateOf(
+            GridActivityAward.fromApiCode(activityPreferences.getString("award", "sat"))
+        )
+    }
     var showActivitySettings by remember { mutableStateOf(false) }
     var activitySnapshot by remember { mutableStateOf<GridActivitySnapshot?>(null) }
     var activityLoading by remember { mutableStateOf(false) }
     var activityRefreshSerial by remember { mutableStateOf(0) }
-    LaunchedEffect(showGridActivity, activityRefreshSerial) {
+    var handledActivityRefreshSerial by remember { mutableStateOf(0) }
+    LaunchedEffect(showGridActivity, activityAward, activityRefreshSerial) {
         if (!showGridActivity) return@LaunchedEffect
+        val forceRefresh = activityRefreshSerial != handledActivityRefreshSerial
+        handledActivityRefreshSerial = activityRefreshSerial
+        // Never leave the previous award's percentages visible while another award loads.
+        activitySnapshot = null
         activityLoading = true
         try {
             activitySnapshot = GridActivityStore.load(
-                mapView.context.applicationContext, forceRefresh = activityRefreshSerial > 0
+                mapView.context.applicationContext,
+                award = activityAward,
+                forceRefresh = forceRefresh
             )
         } finally {
             activityLoading = false
@@ -531,6 +543,11 @@ private fun MapScreen(
     val setShowWorkedAndMarkedWithActivity: (Boolean) -> Unit = { enabled ->
         showWorkedAndMarkedWithActivity = enabled
         activityPreferences.edit().putBoolean("show_worked_marked", enabled).apply()
+    }
+    val setActivityAward: (GridActivityAward) -> Unit = { award ->
+        activityAward = award
+        activitySnapshot = null
+        activityPreferences.edit().putString("award", award.apiCode).apply()
     }
 
     val contourOverlay = remember(mapView) { ElevationContourOverlay() }
@@ -1038,12 +1055,14 @@ private fun MapScreen(
         GridActivitySettingsDialog(
             minPercent = activityMin,
             maxPercent = activityMax,
+            award = activityAward,
             showWorkedAndMarked = showWorkedAndMarkedWithActivity,
             downloadedAt = activitySnapshot?.downloadedAt,
             loading = activityLoading,
             unavailable = showGridActivity && !activityLoading && activitySnapshot == null,
             onMinChange = setActivityMin,
             onMaxChange = setActivityMax,
+            onAwardChange = setActivityAward,
             onShowWorkedAndMarkedChange = setShowWorkedAndMarkedWithActivity,
             onRefresh = {
                 activityRefreshSerial += 1
@@ -2565,16 +2584,27 @@ private fun GridActivityToggle(
 private fun GridActivitySettingsDialog(
     minPercent: Int,
     maxPercent: Int,
+    award: GridActivityAward,
     showWorkedAndMarked: Boolean,
     downloadedAt: Long?,
     loading: Boolean,
     unavailable: Boolean,
     onMinChange: (Int) -> Unit,
     onMaxChange: (Int) -> Unit,
+    onAwardChange: (GridActivityAward) -> Unit,
     onShowWorkedAndMarkedChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var awardMenuExpanded by remember { mutableStateOf(false) }
+    val awardOptions = listOf(
+        GridActivityAward.SATELLITE to R.string.map_grid_activity_award_satellite,
+        GridActivityAward.LEO to R.string.map_grid_activity_award_leo,
+        GridActivityAward.MEO to R.string.map_grid_activity_award_meo,
+        GridActivityAward.GEO to R.string.map_grid_activity_award_geo,
+        GridActivityAward.NON_GEOSTATIONARY to R.string.map_grid_activity_award_ngs
+    )
+    val selectedAwardLabel = stringResource(awardOptions.first { it.first == award }.second)
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -2602,6 +2632,41 @@ private fun GridActivitySettingsDialog(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    Text(stringResource(R.string.map_grid_activity_award))
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { awardMenuExpanded = true }
+                                .padding(horizontal = 12.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                text = selectedAwardLabel,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(Modifier.weight(1f))
+                            Text("▾", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        DropdownMenu(
+                            expanded = awardMenuExpanded,
+                            onDismissRequest = { awardMenuExpanded = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            awardOptions.forEach { (option, labelRes) ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(labelRes)) },
+                                    onClick = {
+                                        awardMenuExpanded = false
+                                        onAwardChange(option)
+                                    }
+                                )
+                            }
+                        }
+                    }
                     Text(stringResource(R.string.map_grid_activity_min, minPercent))
                     Slider(
                         value = minPercent.toFloat(),
