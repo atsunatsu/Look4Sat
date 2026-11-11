@@ -575,7 +575,7 @@ class RadioTrackingService(
         if(settingsRepo.radioControlSettings.value.radioModel == RadioControlSettings.MODEL_VERO_N76) "FM"
         else if(nativeProfileMode(transponder)==3) "NFM"
         else if(nativeProfileMode(transponder)==2) "USB"
-        else if (radioProfile(settingsRepo.radioControlSettings.value.radioModel).isL4s && txMode == "CW") "CW"
+        else if (radioProfile(settingsRepo.radioControlSettings.value.radioModel).isL4s && txMode == "CW") "USB"
         else normalizeFmMode(transponder.downlinkMode?.uppercase()) ?: txMode?.let {
             TransponderMapper.mapUplinkModeToDownlinkMode(it, transponder.isInverted)
         }
@@ -1628,7 +1628,10 @@ class RadioTrackingService(
         changeRadioSettings {
             val forceFm = settingsRepo.radioControlSettings.value.radioModel == RadioControlSettings.MODEL_VERO_N76
             val appliedTxMode = if (forceFm) "FM" else txMode
-            val appliedRxMode = if (forceFm) "FM" else rxMode
+            val appliedRxMode = if (forceFm) "FM" else if (
+                radioProfile(settingsRepo.radioControlSettings.value.radioModel).isL4s &&
+                txMode.equals("CW", ignoreCase = true) && rxMode.equals("CW", ignoreCase = true)
+            ) "USB" else rxMode
             val split = _state.value.splitMode
             val txOk = if (split) {
                 txController?.setSplitModes(appliedRxMode, appliedTxMode) ?: false

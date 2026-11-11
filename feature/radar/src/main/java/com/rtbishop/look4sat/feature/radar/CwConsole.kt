@@ -223,6 +223,14 @@ internal fun CwConsole(
                                 Text(stringResource(R.string.rc_cw_options))
                             }
                         }
+                        if (myCallsign.isNotBlank()) {
+                            val ownGrid = log.stationGrid.trim()
+                            Text(
+                                text = if (ownGrid.isNotBlank()) "$myCallsign · $ownGrid" else myCallsign,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         val message = error ?: remote?.error ?: control.errorMessage
                         message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                         if (message == null && available && !control.canSendL4sCw()) {
