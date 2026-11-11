@@ -69,6 +69,37 @@ class MaidenheadGridOverlay : Overlay() {
         style = android.graphics.Paint.Style.FILL
         color = Color.argb(90, 255, 59, 48)
     }
+    private val activityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val activityColors = IntArray(101) { p ->
+        // Soft red -> amber -> green; subtle enough to preserve the existing grid lines.
+        val first = if (p <= 50) intArrayOf(242, 96, 99) else intArrayOf(248, 205, 105)
+        val second = if (p <= 50) intArrayOf(248, 205, 105) else intArrayOf(100, 200, 142)
+        val fraction = if (p <= 50) p / 50f else (p - 50) / 50f
+        Color.argb(
+            110,
+            (first[0] + (second[0] - first[0]) * fraction).toInt(),
+            (first[1] + (second[1] - first[1]) * fraction).toInt(),
+            (first[2] + (second[2] - first[2]) * fraction).toInt()
+        )
+    }
+    private data class ActivityCell(val grid: String, val bounds: CellBounds, val percentage: Int)
+    private var activityCells: List<ActivityCell> = emptyList()
+
+    /** GridMaster share of participating SAT logs containing a given 4-character grid. */
+    var activityPercentages: Map<String, Int> = emptyMap()
+        set(value) {
+            if (field === value) return
+            field = value
+            activityCells = value.mapNotNull { (grid, percentage) ->
+                gridCellBounds(grid)?.let { ActivityCell(grid, it, percentage.coerceIn(0, 100)) }
+            }
+        }
+    var showActivityOverlay: Boolean = false
+    var activityFilterMin: Int = 0
+    var activityFilterMax: Int = 100
+
     private val roamStripePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 14f
@@ -189,6 +220,36 @@ class MaidenheadGridOverlay : Overlay() {
         val ownCell = ownGrid
         // The tapped worked grid gets a distinct outline (sub-square zoom only).
         val selectedCell = selectedGrid?.takeIf { zoom >= GRID_ZOOM_SUB }
+
+        // GridMaster activity heatmap is drawn UNDER existing worked/marked/roamed cells.
+        // Always use 4-character grid geometry, even at 2-character field zoom. This
+        // keeps all operator-specific green/red markings unchanged and readable.
+        if (showActivityOverlay && activityCells.isNotEmpty()) {
+            val pixelsPerDegreeLon = worldWidthPx / 360.0
+            for (entry in activityCells) {
+                if (entry.grid in workedGrids || entry.grid in markedGrids) continue
+                if (entry.percentage !in activityFilterMin..activityFilterMax) continue
+                val cell = entry.bounds
+                if (cell.latTop < bottomLat || cell.latBottom > topLat) continue
+                val yTop = projectionToY(projection, cell.latTop) ?: continue
+                val yBottom = projectionToY(projection, cell.latBottom) ?: continue
+                if (yBottom < 0f || yTop > canvas.height) continue
+                activityPaint.color = activityColors[entry.percentage]
+                for (turn in -colRepeats..colRepeats) {
+                    val lonLeft = cell.lonLeft + turn * 360.0
+                    val lonRight = cell.lonRight + turn * 360.0
+                    if (lonRight < leftLon || lonLeft > rightLon) continue
+                    // Linear unwrapped longitude projection avoids the +/-180-degree
+                    // clipping that occurs when osmdroid wraps normalized tile X.
+                    val xLeft = (canvas.width / 2.0 +
+                        (lonLeft - centerLon) * pixelsPerDegreeLon).toFloat()
+                    val xRight = (canvas.width / 2.0 +
+                        (lonRight - centerLon) * pixelsPerDegreeLon).toFloat()
+                    if (xRight < 0f || xLeft > canvas.width) continue
+                    canvas.drawRect(xLeft, yTop, xRight, yBottom, activityPaint)
+                }
+            }
+        }
 
         // Worked-grid highlight fills.
         //  - Sub-square zoom: fill each worked 4-char cell directly.
