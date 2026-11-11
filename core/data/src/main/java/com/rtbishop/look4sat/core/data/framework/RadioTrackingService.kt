@@ -1112,8 +1112,13 @@ class RadioTrackingService(
             val ic820 = settingsRepo.radioControlSettings.value.radioModel == RadioControlSettings.MODEL_ICOM_IC820
             val txMode = controlUplinkMode(transponder)
             val rxMode = controlDownlinkMode(transponder, txMode)
-            // The IC-820H controls TX on MAIN and RX on SUB through CI-V band access.
-            // Do not change ordinary split or the operator's SATL-N/REV front-panel mode.
+            // IC-820 MAIN can initially be VHF or UHF. Align physical roles
+            // before assigning modes: SATL MAIN transmits, SUB receives.
+            // Leave SATL-N/REV choice under the operator's control.
+            if (ic820 && rxBase != null && txBase != null &&
+                !radio.prepareSatelliteBands(rxBase, txBase)) {
+                return failTrackingInitialization("IC-820 MAIN/SUB band alignment failed; see civ/band-align diagnostics")
+            }
             if (ic820 && !radio.setSplitModes(rxMode, txMode)) {
                 return failTrackingInitialization("IC-820 MAIN/SUB modes were not acknowledged")
             }
