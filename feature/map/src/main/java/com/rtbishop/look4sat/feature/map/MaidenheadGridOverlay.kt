@@ -29,13 +29,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Wavelog's palette normalization: 0 is red; the lower of data maximum and filter maximum is green. */
-internal fun gridActivityColorIndex(percentage: Int, dataMax: Int, filterMax: Int): Int {
-    val scaleMax = min(dataMax.coerceIn(0, 100), filterMax.coerceIn(0, 100))
-    if (scaleMax == 0) return 0
-    return (percentage.coerceIn(0, 100) * 100f / scaleMax).roundToInt().coerceIn(0, 100)
-}
-
 /**
  * Match the map's linear zoom scale from zoom 6.5 to 7.0.
  * Above zoom 7.0, keep the label scale capped to avoid oversized labels
@@ -103,28 +96,14 @@ class MaidenheadGridOverlay : Overlay() {
     private val activityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
-    private val activityColors = IntArray(101) { p ->
-        // Reuse the map's original marked red, WAIPA pending yellow and worked green.
-        val first = if (p <= 50) intArrayOf(255, 59, 48) else intArrayOf(255, 193, 7)
-        val second = if (p <= 50) intArrayOf(255, 193, 7) else intArrayOf(76, 217, 100)
-        val fraction = if (p <= 50) p / 50f else (p - 50) / 50f
-        Color.argb(
-            110,
-            (first[0] + (second[0] - first[0]) * fraction).toInt(),
-            (first[1] + (second[1] - first[1]) * fraction).toInt(),
-            (first[2] + (second[2] - first[2]) * fraction).toInt()
-        )
-    }
     private data class ActivityCell(val grid: String, val bounds: CellBounds, val percentage: Int)
     private var activityCells: List<ActivityCell> = emptyList()
-    private var activityMaxPercentage = 0
 
     /** GridMaster share of participating SAT logs containing a given 4-character grid. */
     var activityPercentages: Map<String, Int> = emptyMap()
         set(value) {
             if (field === value) return
             field = value
-            activityMaxPercentage = value.values.maxOrNull()?.coerceIn(0, 100) ?: 0
             activityCells = value.mapNotNull { (grid, percentage) ->
                 gridCellBounds(grid)?.let { ActivityCell(grid, it, percentage.coerceIn(0, 100)) }
             }
@@ -284,11 +263,12 @@ class MaidenheadGridOverlay : Overlay() {
                 val yTop = projectionToY(projection, cell.latTop) ?: continue
                 val yBottom = projectionToY(projection, cell.latBottom) ?: continue
                 if (yBottom < 0f || yTop > canvas.height) continue
-                // Match Wavelog: normalize against min(dataset maximum, filter maximum),
-                // leaving the slider's minimum as an inclusion filter only.
-                activityPaint.color = activityColors[
-                    gridActivityColorIndex(entry.percentage, activityMaxPercentage, activityFilterMax)
-                ]
+                // Keep the SAT/LEO GridMaster bands fixed regardless of source data
+                // or range filter; only the visible cells change when filtering.
+                val paletteColor = gridActivityPaletteColor(entry.percentage)
+                activityPaint.color = Color.argb(
+                    110, Color.red(paletteColor), Color.green(paletteColor), Color.blue(paletteColor)
+                )
                 for (turn in -colRepeats..colRepeats) {
                     val lonLeft = cell.lonLeft + turn * 360.0
                     val lonRight = cell.lonRight + turn * 360.0
