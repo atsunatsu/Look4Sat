@@ -34,6 +34,23 @@ class RadioTransportTest {
     }
 
     @Test
+    fun catRtsDtrControlWordsMatchEachUsbSerialDriver() {
+        data class Lines(val rts: Boolean, val dtr: Boolean, val cdc: Int, val ch34x: Int)
+        val variants = listOf(
+            Lines(false, false, 0x00, 0xFFFF),
+            Lines(true, false, 0x02, 0xFFBF),
+            Lines(false, true, 0x01, 0xFFDF),
+            Lines(true, true, 0x03, 0xFF9F)
+        )
+        for ((rts, dtr, cdc, ch34x) in variants) {
+            assertEquals(cdc, cdcControlLineState(dtr, rts))
+            assertEquals(0x0300 or cdc, cp210xModemControl(rts, dtr))
+            assertEquals(0x0300 or cdc, ftdiModemControl(rts, dtr))
+            assertEquals(ch34x, ch34xModemControl(rts, dtr))
+        }
+    }
+
+    @Test
     fun tcpEndpointParsesDnsIpv4AndBracketedIpv6() {
         assertEquals(RadioTcpEndpoint("radio.local", 4_532), parseTcpEndpoint("radio.local:4532"))
         assertEquals(RadioTcpEndpoint("192.0.2.10", 12_345), parseTcpEndpoint("192.0.2.10:12345"))

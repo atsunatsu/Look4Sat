@@ -74,6 +74,30 @@ class CatSettingsPersistenceTest {
         service.disconnectRadios()
     }
 
+    @Test fun changingCatRtsDtrPersistsAndReopensUsbSerialSession() = runTest {
+        val settings = settings(RadioControlSettings.MODEL_ICOM_IC820, true)
+        val tx = Radio()
+        val service = service(backgroundScope, settings, tx, Radio())
+        service.connectRadios()
+        assertTrue(tx.isConnected)
+        assertFalse(settings.value.catRts)
+        assertFalse(settings.value.catDtr)
+
+        assertTrue(service.applyRadioControlSettings(settings.value.copy(catRts = true, catDtr = true)))
+        assertTrue(settings.value.catRts)
+        assertTrue(settings.value.catDtr)
+        assertFalse(tx.isConnected)
+        assertTrue(tx.commands.contains("disconnect"))
+
+        service.connectRadios()
+        assertTrue(tx.isConnected)
+        assertTrue(service.applyRadioControlSettings(settings.value.copy(catRts = false)))
+        assertFalse(tx.isConnected)
+        assertFalse(settings.value.catRts)
+        assertTrue(settings.value.catDtr)
+        service.disconnectRadios()
+    }
+
     @Test fun ic820SinglePresetUsesOnePhysicalConnectionAndDoesNotEnablePtt() = runTest {
         val tx = Radio(); val rx = Radio()
         val service = service(backgroundScope, settings(RadioControlSettings.MODEL_ICOM_IC820, true), tx, rx)
