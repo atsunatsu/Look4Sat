@@ -37,6 +37,19 @@ internal fun gridActivityColorIndex(percentage: Int, dataMax: Int, filterMax: In
 }
 
 /**
+ * Keep four-character grid labels at their base size through the midpoint of the
+ * available grid zoom range, then grow them smoothly to 1.5x at the map's max zoom.
+ */
+internal fun gridLabelScale(zoom: Double, gridZoomStart: Double, mapMaxZoom: Double): Float {
+    if (mapMaxZoom <= gridZoomStart) return 1f
+    val midpoint = (gridZoomStart + mapMaxZoom) / 2.0
+    val progress = ((zoom - midpoint) / (mapMaxZoom - midpoint)).coerceIn(0.0, 1.0)
+    return 1f + (MAX_GRID_LABEL_SCALE - 1f) * progress.toFloat()
+}
+
+private const val MAX_GRID_LABEL_SCALE = 1.5f
+
+/**
  * Maidenhead locator grid overlay, drawn directly on the map canvas.
  *
  * Zoom levels (map maxZoom = 7):
@@ -197,6 +210,13 @@ class MaidenheadGridOverlay : Overlay() {
         if (shadow || !isEnabled) return
         val projection = mapView.projection
         val zoom = mapView.zoomLevelDouble
+        // Four-character labels start growing only after the midpoint of the
+        // current map source's available zoom range. Two-character field labels
+        // stay at their original size.
+        val labelScale = gridLabelScale(zoom, GRID_ZOOM_SUB, mapView.maxZoomLevel)
+        labelPaint.textSize = LABEL_TEXT_SIZE * labelScale
+        firstCallPaint.textSize = LABEL_TEXT_SIZE * labelScale
+        activityLabelPaint.textSize = LABEL_TEXT_SIZE * 0.72f * labelScale
         canvasWidthPx = canvas.width.toFloat()
         val cellLat = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LAT else FIELD_LAT
         val cellLon = if (zoom >= GRID_ZOOM_SUB) SUB_SQUARE_LON else FIELD_LON
@@ -571,14 +591,15 @@ class MaidenheadGridOverlay : Overlay() {
                     // layouts, including activity-only squares in first-call mode.
                     if (mainLabel != null) {
                         canvas.drawText(
-                            mainLabel, xCenter, if (percent != null) yCenter - 9f else yCenter,
+                            mainLabel, xCenter,
+                            if (percent != null) yCenter - 9f * labelScale else yCenter,
                             if (showFirstCallLabels) firstCallPaint else labelPaint
                         )
                     }
                     if (percent != null) {
                         canvas.drawText(
                             "${percent}%", xCenter,
-                            if (mainLabel != null) yCenter + 12f else yCenter,
+                            if (mainLabel != null) yCenter + 12f * labelScale else yCenter,
                             activityLabelPaint
                         )
                     }
