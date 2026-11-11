@@ -2708,7 +2708,7 @@ private fun GridActivitySettingsDialog(
                             modifier = Modifier.weight(1f)
                         )
                         Text(
-                            text = "$"+"{minPercent}%",
+                            text = "${minPercent}%",
                             fontSize = 18.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -2718,7 +2718,7 @@ private fun GridActivitySettingsDialog(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "$"+"{maxPercent}%",
+                            text = "${maxPercent}%",
                             fontSize = 18.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
