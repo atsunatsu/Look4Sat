@@ -503,10 +503,10 @@ class MaidenheadGridOverlay : Overlay() {
         // Field (2-char) labels show at every zoom, subject only to the pixel-
         // size check below; sub-square (4-char) labels appear together with the
         // grid LINES at GRID_ZOOM_SUB (user req 2026-09-21: 与首通呼号同一显示缩放).
-        // First-call labels replace the 4-char grid codes and only exist at
-        // sub-square zoom; at field zoom NO labels are drawn at all (the user
-        // requirement is that non-worked cells carry no grid characters).
-        if (showFirstCallLabels && zoom < GRID_ZOOM_SUB) return
+        // In first-call mode, 2-char field zoom still uses the normal field
+        // letters. At 4-char zoom, callsigns replace grid codes; if GridMaster
+        // activity is enabled, percentages are shown beneath the callsigns
+        // (or alone in unworked cells).
         // 网格标签与首通呼号同一显示缩放 (用户要求 2026-09-21): 子方块(4字符)
         // 标签与首通呼号都在网格线出现的 GRID_ZOOM_SUB 同时显示, 不再晚一档.
         val showLabels = zoom >= GRID_ZOOM_SUB || cellLat == FIELD_LAT
@@ -522,7 +522,7 @@ class MaidenheadGridOverlay : Overlay() {
         val minCellPx = MIN_LABEL_CELL_PX * 0.6f
         if (pixelsPerDegree * cellLat < minCellPx) return
 
-        val activePaint = if (showFirstCallLabels) firstCallPaint else labelPaint
+        val activePaint = if (showFirstCallLabels && zoom >= GRID_ZOOM_SUB) firstCallPaint else labelPaint
         activePaint.textAlign = Paint.Align.CENTER
         val fontMetrics = activePaint.fontMetrics
         val textHalfHeight = (fontMetrics.descent + fontMetrics.ascent) / 2f
@@ -551,30 +551,36 @@ class MaidenheadGridOverlay : Overlay() {
                 val xRight = xRightBase + turn * worldWidthPx.toFloat()
                 if (xRight < 0f || xLeft > canvas.width) continue
                 val label = cellLabel(lat, lon, zoom)
-                if (showFirstCallLabels) {
-                    // 首通呼号模式: 绿格(worked)标注该格第一个通联的呼号, 红格(marked)
-                    // 标注用户标记想通联的呼号, 均淡黄文字; 其它格空着不写网格字符.
-                    when {
-                        label in workedGrids -> firstCallsByGrid[label]?.let { call ->
-                            canvas.drawText(call, (xLeft + xRight) / 2f, yCenter, firstCallPaint)
-                        }
-                        label in markedGrids -> markedGrids[label]?.firstOrNull()?.let { station ->
-                            canvas.drawText(station.call, (xLeft + xRight) / 2f, yCenter, firstCallPaint)
-                        }
-                    }
+                val xCenter = (xLeft + xRight) / 2f
+                if (zoom < GRID_ZOOM_SUB) {
+                    // Field zoom is independent of first-call mode: always label
+                    // the two-letter Maidenhead fields, with no percentages.
+                    canvas.drawText(label, xCenter, yCenter, labelPaint)
                 } else {
-                    // Two-line grid label: OL62 on top, 2% below, as in Wavelog.
-                    // Percentages follow the heatmap's selected range; first-call
-                    // mode remains untouched so existing callsign labels take priority.
-                    val percent = if (showActivityOverlay && zoom >= GRID_ZOOM_SUB) {
+                    val percent = if (showActivityOverlay) {
                         activityPercentages[label]?.takeIf { it in activityFilterMin..activityFilterMax }
                     } else null
-                    val xCenter = (xLeft + xRight) / 2f
+                    val mainLabel = if (showFirstCallLabels) {
+                        when {
+                            label in workedGrids -> firstCallsByGrid[label]
+                            label in markedGrids -> markedGrids[label]?.firstOrNull()?.call
+                            else -> null
+                        }
+                    } else label
+                    // Keep the text centred for both single- and double-line
+                    // layouts, including activity-only squares in first-call mode.
+                    if (mainLabel != null) {
+                        canvas.drawText(
+                            mainLabel, xCenter, if (percent != null) yCenter - 9f else yCenter,
+                            if (showFirstCallLabels) firstCallPaint else labelPaint
+                        )
+                    }
                     if (percent != null) {
-                        canvas.drawText(label, xCenter, yCenter - 9f, labelPaint)
-                        canvas.drawText("${percent}%", xCenter, yCenter + 12f, activityLabelPaint)
-                    } else {
-                        canvas.drawText(label, xCenter, yCenter, labelPaint)
+                        canvas.drawText(
+                            "${percent}%", xCenter,
+                            if (mainLabel != null) yCenter + 12f else yCenter,
+                            activityLabelPaint
+                        )
                     }
                 }
             }
