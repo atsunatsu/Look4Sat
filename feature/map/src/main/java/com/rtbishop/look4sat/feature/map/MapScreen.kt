@@ -497,6 +497,10 @@ private fun MapScreen(
     var activityMax by remember(activityPreferences) {
         mutableStateOf(activityPreferences.getInt("max_percent", 100).coerceIn(activityMin, 100))
     }
+    // Default to a complete activity heatmap; personal green/red fills are opt-in.
+    var showWorkedAndMarkedWithActivity by remember(activityPreferences) {
+        mutableStateOf(activityPreferences.getBoolean("show_worked_marked", false))
+    }
     var showActivitySettings by remember { mutableStateOf(false) }
     var activitySnapshot by remember { mutableStateOf<GridActivitySnapshot?>(null) }
     var activityLoading by remember { mutableStateOf(false) }
@@ -523,6 +527,10 @@ private fun MapScreen(
     val setActivityMax: (Int) -> Unit = { value ->
         activityMax = value.coerceIn(activityMin, 100)
         activityPreferences.edit().putInt("max_percent", activityMax).apply()
+    }
+    val setShowWorkedAndMarkedWithActivity: (Boolean) -> Unit = { enabled ->
+        showWorkedAndMarkedWithActivity = enabled
+        activityPreferences.edit().putBoolean("show_worked_marked", enabled).apply()
     }
 
     val contourOverlay = remember(mapView) { ElevationContourOverlay() }
@@ -858,7 +866,8 @@ private fun MapScreen(
                             activityPercentages = activitySnapshot?.percentages.orEmpty(),
                             showActivityOverlay = showGridActivity && activeAward == AwardType.VUCC,
                             activityFilterMin = activityMin,
-                            activityFilterMax = activityMax
+                            activityFilterMax = activityMax,
+                            showWorkedAndMarkedWithActivity = showWorkedAndMarkedWithActivity
                         )
                         if (!shouldCenter || uiState.stationPosition != null) {
                             prevGridMode = uiState.isGridMode
@@ -1029,11 +1038,13 @@ private fun MapScreen(
         GridActivitySettingsDialog(
             minPercent = activityMin,
             maxPercent = activityMax,
+            showWorkedAndMarked = showWorkedAndMarkedWithActivity,
             downloadedAt = activitySnapshot?.downloadedAt,
             loading = activityLoading,
             unavailable = showGridActivity && !activityLoading && activitySnapshot == null,
             onMinChange = setActivityMin,
             onMaxChange = setActivityMax,
+            onShowWorkedAndMarkedChange = setShowWorkedAndMarkedWithActivity,
             onRefresh = {
                 activityRefreshSerial += 1
                 setActivityEnabled(true)
@@ -1048,6 +1059,9 @@ private fun MapScreen(
         WorkedGridQsoDialog(
             grid = grid,
             activityPercentage = if (showGridActivity) activitySnapshot?.percentages?.get(grid) else null,
+            activityColourScaleMax = minOf(
+                activitySnapshot?.percentages?.values?.maxOrNull() ?: 0, activityMax
+            ),
             // A multi-selection shows the union of QSO details without duplicates,
             // preserving each station's covering scope; empty selection means All.
             qsos = uiState.workedGridQsos[grid].orEmpty()
@@ -1206,8 +1220,8 @@ private fun ElevationSettingsDialog(
 // region Worked-grid QSO dialog
 
 // Use exactly the same red -> amber -> green stops as MaidenheadGridOverlay.
-private fun gridActivityBadgeColor(percent: Int): ComposeColor {
-    val value = percent.coerceIn(0, 100)
+private fun gridActivityBadgeColor(percent: Int, scaleMax: Int): ComposeColor {
+    val value = gridActivityColorIndex(percent, scaleMax, scaleMax)
     val rare = ComposeColor(242, 96, 99)
     val middle = ComposeColor(248, 205, 105)
     val common = ComposeColor(100, 200, 142)
@@ -1222,6 +1236,7 @@ private fun gridActivityBadgeColor(percent: Int): ComposeColor {
 private fun WorkedGridQsoDialog(
     grid: String,
     activityPercentage: Int?,
+    activityColourScaleMax: Int,
     qsos: List<com.rtbishop.look4sat.core.domain.model.GridQso>,
     marked: List<com.rtbishop.look4sat.core.domain.model.MarkedStation>,
     isUtc: Boolean,
@@ -1261,10 +1276,10 @@ private fun WorkedGridQsoDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         activityPercentage?.let { percent ->
-                            val rarityColor = gridActivityBadgeColor(percent)
+                            val activityColor = gridActivityBadgeColor(percent, activityColourScaleMax)
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = rarityColor.copy(alpha = 0.18f),
+                                color = activityColor.copy(alpha = 0.18f),
                                 modifier = Modifier.padding(top = 4.dp)
                             ) {
                                 Row(
@@ -1273,7 +1288,7 @@ private fun WorkedGridQsoDialog(
                                 ) {
                                     Box(
                                         modifier = Modifier.size(8.dp).background(
-                                            rarityColor, RoundedCornerShape(percent = 50)
+                                            activityColor, RoundedCornerShape(percent = 50)
                                         )
                                     )
                                     Spacer(Modifier.width(6.dp))
@@ -2550,11 +2565,13 @@ private fun GridActivityToggle(
 private fun GridActivitySettingsDialog(
     minPercent: Int,
     maxPercent: Int,
+    showWorkedAndMarked: Boolean,
     downloadedAt: Long?,
     loading: Boolean,
     unavailable: Boolean,
     onMinChange: (Int) -> Unit,
     onMaxChange: (Int) -> Unit,
+    onShowWorkedAndMarkedChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -2585,10 +2602,6 @@ private fun GridActivitySettingsDialog(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        stringResource(R.string.map_grid_activity_description),
-                        style = MaterialTheme.typography.bodySmall
-                    )
                     Text(stringResource(R.string.map_grid_activity_min, minPercent))
                     Slider(
                         value = minPercent.toFloat(),
@@ -2601,11 +2614,22 @@ private fun GridActivitySettingsDialog(
                         onValueChange = { onMaxChange(it.toInt()) },
                         valueRange = 0f..100f
                     )
-                    Text(
-                        stringResource(R.string.map_grid_activity_source),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_show_worked_marked),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f).clickable {
+                                onShowWorkedAndMarkedChange(!showWorkedAndMarked)
+                            }
+                        )
+                        Switch(
+                            checked = showWorkedAndMarked,
+                            onCheckedChange = onShowWorkedAndMarkedChange
+                        )
+                    }
                     when {
                         loading -> Text(stringResource(R.string.map_grid_activity_loading))
                         unavailable -> Text(
@@ -2788,7 +2812,8 @@ private fun setGridMode(
     activityPercentages: Map<String, Int> = emptyMap(),
     showActivityOverlay: Boolean = false,
     activityFilterMin: Int = 0,
-    activityFilterMax: Int = 100
+    activityFilterMax: Int = 100,
+    showWorkedAndMarkedWithActivity: Boolean = true
 ) {
     try {
         val gridOverlay = mapView.overlays[OVERLAY_GRID]
@@ -2804,6 +2829,7 @@ private fun setGridMode(
             gridOverlay.showActivityOverlay = gridMode && showActivityOverlay
             gridOverlay.activityFilterMin = activityFilterMin
             gridOverlay.activityFilterMax = activityFilterMax
+            gridOverlay.showWorkedAndMarkedWithActivity = showWorkedAndMarkedWithActivity
             // ownGrid must be set on EVERY update — the position is available
             // regardless of whether this frame centers (centering happens only
             // on entry, but passing null here would wipe the bold outline).
@@ -2820,6 +2846,7 @@ private fun setGridMode(
                 this.showActivityOverlay = gridMode && showActivityOverlay
                 this.activityFilterMin = activityFilterMin
                 this.activityFilterMax = activityFilterMax
+                this.showWorkedAndMarkedWithActivity = showWorkedAndMarkedWithActivity
                 this.ownGrid = ownGridOf(stationPosition)
                 applyTheme(mapIsLightUi == true)
             }
@@ -2829,6 +2856,8 @@ private fun setGridMode(
         for (index in OVERLAY_STATION..OVERLAY_MOON) {
             mapView.overlays.getOrNull(index)?.isEnabled = !gridMode
         }
+        // Settings can change while the map is stationary; redraw immediately.
+        if (gridMode) mapView.invalidate()
         // Entering grid mode: center on the station's current grid square,
         // keeping the current zoom level unchanged. post{} is essential: on the
         // first composition this runs before MapView's first layout, and a
