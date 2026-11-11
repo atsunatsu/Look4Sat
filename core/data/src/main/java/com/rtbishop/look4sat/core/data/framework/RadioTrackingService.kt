@@ -146,6 +146,7 @@ class RadioTrackingService(
 
     override suspend fun applyRadioControlSettings(settings:RadioControlSettings):Boolean=connectionMutex.withLock connection@ {
         var reconnectRequired=false
+        var wasConnected=false
         val accepted=transmitMutex.withLock edit@ {
             val current = _state.value
             val remote = txController?.remoteState?.value ?: current.remoteRadio
@@ -174,6 +175,7 @@ class RadioTrackingService(
             // Saving CAT configuration is not a frequency edit. It must not depend on
             // an attached USB device, a closed radio menu or a profile-store ACK.
             val old=settingsRepo.radioControlSettings.value
+            wasConnected=connected
             reconnectRequired=old.radioModel!=settings.radioModel || old.catTransport!=settings.catTransport ||
                 old.txRadioAddress!=settings.txRadioAddress || old.rxRadioAddress!=settings.rxRadioAddress ||
                 old.baudRate!=settings.baudRate || old.civAddress!=settings.civAddress ||
@@ -191,6 +193,12 @@ class RadioTrackingService(
         }
         if(accepted && reconnectRequired) {
             try { disconnectRadiosLocked() } finally { pendingControls.decrementAndGet() }
+            // Applying new USB/CAT settings must not silently strand a live connection.
+            // Do not reconnect a radio the operator previously left disconnected.
+            if(wasConnected && settings.enabled && settings.catTransport != RadioControlSettings.TRANSPORT_VOX) {
+                diagnose("connect/settings-reopen", "Reopening CAT after configuration change")
+                connectRadiosLocked()
+            }
         }
         accepted
     }
@@ -198,6 +206,10 @@ class RadioTrackingService(
     // ── Connection ──────────────────────────────────────────────────────────
 
     override suspend fun connectRadios() {
+        val settings = settingsRepo.radioControlSettings.value
+        diagnose("connect/request", "model=${settings.radioModel} transport=${settings.catTransport} " +
+            "enabled=${settings.enabled} split=${settings.splitMode} " +
+            "txConfigured=${settings.txRadioAddress.isNotBlank()} rxConfigured=${settings.rxRadioAddress.isNotBlank()}")
         if (!connecting.compareAndSet(false, true)) {
             diagnose("connect/skipped", "Connection attempt already in progress")
             return
@@ -1092,7 +1104,8 @@ class RadioTrackingService(
     // A cycle and a settings change own the same lock as transmit preparation.
     // During PTT, hold both CAT legs and suppress dial-change detection.
     private suspend fun runPresetSingleTracking(transponder: SatRadio, initialTxBaseFreqHz: Long?) {
-        val radio = txController ?: return failTrackingInitialization("No CAT radio is connected")
+        val radio = txController?.takeIf { it.isConnected }
+            ?: return failTrackingInitialization("No CAT radio is connected")
         transmitMutex.withLock {
             val txBase = if (transponder.uplinkLow == null) null else initialTxBaseFreqHz ?: transponder.uplinkCenterFrequency()
             val rxBase = transponder.downlinkLow
