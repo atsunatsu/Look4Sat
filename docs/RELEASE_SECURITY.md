@@ -19,7 +19,7 @@ These settings cannot be safely expressed by a repository file alone; configure 
    - `KEY_PASSWORD`
 6. Confirm a protected test deployment can access the environment secrets, then delete the repository-level copies of those four secrets. Do not leave duplicate repository secrets: an unprotected job could otherwise read them.
 
-Every signed workflow mode (`artifact`, `test`, and `release`) uses this environment and therefore waits for approval. The build and unit tests still run automatically after approval; no manual APK signing is required.
+Every signed workflow mode (`artifact`, `test`, and `release`) uses this environment. The no-secret build job runs first; when it succeeds, the separate signing/publishing job waits for approval. No manual APK signing is required.
 
 ### 2. Protect `main`
 
@@ -38,7 +38,7 @@ Under **Settings → Code security and analysis**, enable Secret Scanning and Pu
 
 ## What the workflow now enforces
 
-- Workflow-level token permission is read-only; only the guarded job that can sign and publish releases receives `contents: write`.
+- Workflow-level token permission is read-only; the no-secret build job has `contents: read`, while only the approval-gated signing/publishing job receives `actions: read` and `contents: write`.
 - Release runs are serialized to prevent concurrent publishing or tag replacement.
 - Official releases can only be published from `main`.
 - Gradle runs without the signing keystore or passwords.
