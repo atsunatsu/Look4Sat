@@ -21,6 +21,8 @@ These settings cannot be safely expressed by a repository file alone; configure 
 
 Every signed workflow mode (`artifact`, `test`, and `release`) uses this environment. The no-secret build job runs first; when it succeeds, the separate signing/publishing job waits for approval. No manual APK signing is required.
 
+For an official release, the simplest path is **Actions → Build Look4Sat APK → Run workflow → mode=release**, selecting `main`. The build and unit tests run first; approve the deployment only when the signing/publishing job reaches the Environment gate. The existing guarded `release: v4.4.8-ba7opf.` push trigger remains supported.
+
 ### 2. Protect `main`
 
 Under **Settings → Rules → Rulesets** (or **Settings → Branches**), protect `main` with:
