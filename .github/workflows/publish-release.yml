@@ -52,20 +52,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     permissions:
-      contents: write
-    environment:
-      name: release
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      apk_version: ${{ steps.version.outputs.apk_version }}
+      code: ${{ steps.version.outputs.code }}
+      tag: ${{ steps.version.outputs.tag }}
+      asset: ${{ steps.version.outputs.asset }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
+      unsigned_artifact: ${{ steps.version.outputs.unsigned_artifact }}
     steps:
-      - name: Verify the protected release environment is configured
-        env:
-          RELEASE_GUARD_ENABLED: ${{ vars.RELEASE_GUARD_ENABLED }}
-        run: |
-          set -euo pipefail
-          if [ "$RELEASE_GUARD_ENABLED" != "true" ]; then
-            echo "::error::Create the protected 'release' environment, set RELEASE_GUARD_ENABLED=true, and move signing secrets into it before running signed builds."
-            exit 1
-          fi
-
       - name: Checkout the exact commit of the chosen branch
         run: |
           git clone --depth 1 --branch "$GITHUB_REF_NAME" --single-branch https://github.com/atsunatsu/Look4Sat.git source
@@ -106,7 +102,9 @@ jobs:
             echo "code=$CODE"
             echo "tag=v$VERSION"
             echo "asset=Look4Sat-$VERSION.apk"
-            echo "short_sha=$(git rev-parse --short=8 HEAD)"
+            SHORT_SHA="$(git rev-parse --short=8 HEAD)"
+            echo "short_sha=$SHORT_SHA"
+            echo "unsigned_artifact=Look4Sat-unsigned-$GITHUB_RUN_ID-$SHORT_SHA"
           } >> "$GITHUB_OUTPUT"
           echo "APK version: $APK_VERSION (versionCode $CODE; catalog versionCode $SOURCE_CODE)"
 
@@ -164,8 +162,86 @@ jobs:
           fi
           echo "Unsigned release APK ready: $APK_INPUT"
 
-      - name: Sign APK in an isolated step
+      - name: Locate the unsigned release APK
+        id: unsigned
         working-directory: source
+        run: |
+          set -euo pipefail
+          APK_INPUT="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name "*.apk" -print -quit)"
+          if [ -z "$APK_INPUT" ]; then
+            echo "::error::Unsigned release APK was not found."
+            exit 1
+          fi
+          echo "path=source/$APK_INPUT" >> "$GITHUB_OUTPUT"
+
+      - name: Install local artifact client
+        run: npm install --prefix source/.github/actions/local-artifact --no-save --no-audit --no-fund @actions/artifact@2.3.2
+
+      - name: Upload unsigned APK for isolated signing
+        uses: ./source/.github/actions/local-artifact
+        env:
+          ARTIFACT_NAME: ${{ steps.version.outputs.unsigned_artifact }}
+          ARTIFACT_PATH: ${{ steps.unsigned.outputs.path }}
+          ARTIFACT_RETENTION_DAYS: 1
+
+  sign-and-publish:
+    name: Approve, sign and publish
+    needs: build
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.')) }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: write
+    environment:
+      name: release
+    steps:
+      - name: Verify the protected release environment is configured
+        env:
+          RELEASE_GUARD_ENABLED: ${{ vars.RELEASE_GUARD_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "$RELEASE_GUARD_ENABLED" != "true" ]; then
+            echo "::error::Create the protected 'release' environment, set RELEASE_GUARD_ENABLED=true, and move signing secrets into it before running signed builds."
+            exit 1
+          fi
+
+      - name: Checkout the exact source commit
+        run: |
+          set -euo pipefail
+          mkdir source
+          git -C source init
+          git -C source remote add origin https://github.com/atsunatsu/Look4Sat.git
+          git -C source fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git -C source checkout --detach FETCH_HEAD
+          test "$(git -C source rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Download unsigned APK from the build job
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_NAME: ${{ needs.build.outputs.unsigned_artifact }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/unsigned"
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$ARTIFACT_NAME" --dir "$RUNNER_TEMP/unsigned"
+          APK_INPUT="$(find "$RUNNER_TEMP/unsigned" -type f -name "*.apk" -print -quit)"
+          if [ -z "$APK_INPUT" ]; then
+            echo "::error::Could not download the unsigned APK from the build job."
+            exit 1
+          fi
+          echo "UNSIGNED_APK=$APK_INPUT" >> "$GITHUB_ENV"
+
+      - name: Install Android Build Tools for signing
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "build-tools;37.0.0"
+          test -x "$ANDROID_HOME/build-tools/37.0.0/apksigner"
+
+      - name: Sign APK in an isolated step
+        id: sign
         env:
           KEY_STORE_B64: ${{ secrets.KEY_STORE }}
           RELEASE_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -185,17 +261,13 @@ jobs:
           ALIGNED_APK="$RUNNER_TEMP/look4sat-aligned.apk"
           SIGNED_APK="$RUNNER_TEMP/look4sat-signed.apk"
           cleanup() {
-            rm -f "$KEYSTORE_PATH" "$ALIGNED_APK" "$SIGNED_APK"
+            rm -f "$KEYSTORE_PATH" "$ALIGNED_APK"
           }
           trap cleanup EXIT
 
           printf '%s' "$KEY_STORE_B64" | base64 -d > "$KEYSTORE_PATH"
           chmod 600 "$KEYSTORE_PATH"
-
-          APK_DIR="app/build/outputs/apk/release"
-          APK_INPUT="$(find "$APK_DIR" -maxdepth 1 -type f -name "*.apk" -print -quit)"
-          test -n "$APK_INPUT"
-          "$BUILD_TOOLS/zipalign" -f -p 4 "$APK_INPUT" "$ALIGNED_APK"
+          "$BUILD_TOOLS/zipalign" -f -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
           "$BUILD_TOOLS/apksigner" sign \
             --ks "$KEYSTORE_PATH" \
             --ks-pass env:RELEASE_STORE_PASSWORD \
@@ -203,16 +275,19 @@ jobs:
             --key-pass env:RELEASE_KEY_PASSWORD \
             --out "$SIGNED_APK" \
             "$ALIGNED_APK"
-          mv "$SIGNED_APK" "$APK_DIR/app-release.apk"
-          test -f "$APK_DIR/app-release.apk"
+          echo "signed_apk=$SIGNED_APK" >> "$GITHUB_OUTPUT"
 
       - name: Check the APK version and signing certificate
         working-directory: source
+        env:
+          SIGNED_APK: ${{ steps.sign.outputs.signed_apk }}
+          EXPECTED_APK_VERSION: ${{ needs.build.outputs.apk_version }}
+          EXPECTED_VERSION_CODE: ${{ needs.build.outputs.code }}
         run: |
           set -euo pipefail
           BUILD_TOOLS="$ANDROID_HOME/build-tools/37.0.0"
           SIGNER="$BUILD_TOOLS/apksigner"
-          APK="app/build/outputs/apk/release/app-release.apk"
+          APK="$SIGNED_APK"
           test -x "$SIGNER"
           "$SIGNER" verify --verbose "$APK"
           # The fork's release key: an APK signed with anything else cannot be installed over an
@@ -232,9 +307,9 @@ jobs:
           echo "$BADGING" | grep -E "^package:|^native-code:"
           echo "$BADGING" | grep -Fq "'armeabi-v7a'" || { echo "::error::Missing armeabi-v7a ABI"; exit 1; }
           echo "$BADGING" | grep -Fq "'arm64-v8a'" || { echo "::error::Missing arm64-v8a ABI"; exit 1; }
-          echo "$BADGING" | grep -Fq "versionName='${{ steps.version.outputs.apk_version }}'" \
+          echo "$BADGING" | grep -Fq "versionName='$EXPECTED_APK_VERSION'" \
             || { echo "::error::APK versionName does not match the CI-stamped version."; exit 1; }
-          echo "$BADGING" | grep -Fq "versionCode='${{ steps.version.outputs.code }}'" \
+          echo "$BADGING" | grep -Fq "versionCode='$EXPECTED_VERSION_CODE'" \
             || { echo "::error::APK versionCode does not match the CI-stamped version."; exit 1; }
           echo "apk bytes: $(stat -c%s "$APK")"
 
@@ -249,8 +324,8 @@ jobs:
         if: ${{ inputs.mode == 'artifact' }}
         uses: ./source/.github/actions/local-artifact
         env:
-          ARTIFACT_NAME: Look4Sat-test-${{ steps.version.outputs.code }}-${{ steps.version.outputs.short_sha }}
-          ARTIFACT_PATH: source/app/build/outputs/apk/release/app-release.apk
+          ARTIFACT_NAME: Look4Sat-test-${{ needs.build.outputs.code }}-${{ needs.build.outputs.short_sha }}
+          ARTIFACT_PATH: ${{ steps.sign.outputs.signed_apk }}
           ARTIFACT_RETENTION_DAYS: 7
 
       - name: Publish as a prerelease test package
@@ -258,13 +333,14 @@ jobs:
         working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-          ASSET: ${{ steps.version.outputs.asset }}
-          SHORT_SHA: ${{ steps.version.outputs.short_sha }}
+          VERSION: ${{ needs.build.outputs.version }}
+          ASSET: ${{ needs.build.outputs.asset }}
+          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
+          SIGNED_APK: ${{ steps.sign.outputs.signed_apk }}
         run: |
           set -euo pipefail
           TAG="test-${VERSION}-${SHORT_SHA}"
-          cp app/build/outputs/apk/release/app-release.apk "$ASSET"
+          cp "$SIGNED_APK" "$ASSET"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$ASSET" --clobber
           else
@@ -279,11 +355,12 @@ jobs:
         working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-          CODE: ${{ steps.version.outputs.code }}
-          TAG: ${{ steps.version.outputs.tag }}
-          ASSET: ${{ steps.version.outputs.asset }}
+          VERSION: ${{ needs.build.outputs.version }}
+          CODE: ${{ needs.build.outputs.code }}
+          TAG: ${{ needs.build.outputs.tag }}
+          ASSET: ${{ needs.build.outputs.asset }}
           NOTES_IN: "${{ inputs.notes }}"
+          SIGNED_APK: ${{ steps.sign.outputs.signed_apk }}
         run: |
           set -euo pipefail
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
@@ -304,7 +381,7 @@ jobs:
           # The asset must carry the versioned name: the in-app updater guesses
           # Look4Sat-<tag without v>.apk, and gh's `file#label` only sets a display label,
           # never the asset name.
-          cp app/build/outputs/apk/release/app-release.apk "$ASSET"
+          cp "$SIGNED_APK" "$ASSET"
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
