@@ -153,7 +153,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon :app:assembleRelease --stacktrace
+          ./gradlew --no-daemon -Plook4sat.unsignedRelease=true :app:assembleRelease --stacktrace
           APK_DIR="app/build/outputs/apk/release"
           APK_INPUT="$(find "$APK_DIR" -maxdepth 1 -type f -name "*.apk" -print -quit)"
           if [ -z "$APK_INPUT" ]; then
