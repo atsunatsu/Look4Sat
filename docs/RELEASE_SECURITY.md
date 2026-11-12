@@ -17,7 +17,7 @@ These settings cannot be safely expressed by a repository file alone; configure 
    - `KEY_STORE_PASSWORD`
    - `KEY_ALIAS`
    - `KEY_PASSWORD`
-6. Confirm a protected test deployment can access the environment secrets, then delete the repository-level copies of those four secrets. Do not leave duplicate repository secrets: an unprotected job could otherwise read them.
+6. After copying the values, delete the repository-level copies before the first workflow run. Do not use a test run to check whether the environment secrets were copied: if an environment secret is missing, GitHub may resolve the same-named repository secret instead. If an environment secret is missing after the repository copies are deleted, the signing step fails safely.
 
 Every signed workflow mode (`artifact`, `test`, and `release`) uses this environment. The no-secret build job runs first; when it succeeds, the separate signing/publishing job waits for approval. No manual APK signing is required.
 
