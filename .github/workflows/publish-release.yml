@@ -56,6 +56,16 @@ jobs:
     environment:
       name: release
     steps:
+      - name: Verify the protected release environment is configured
+        env:
+          RELEASE_GUARD_ENABLED: ${{ vars.RELEASE_GUARD_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "$RELEASE_GUARD_ENABLED" != "true" ]; then
+            echo "::error::Create the protected 'release' environment, set RELEASE_GUARD_ENABLED=true, and move signing secrets into it before running signed builds."
+            exit 1
+          fi
+
       - name: Checkout the exact commit of the chosen branch
         run: |
           git clone --depth 1 --branch "$GITHUB_REF_NAME" --single-branch https://github.com/atsunatsu/Look4Sat.git source
