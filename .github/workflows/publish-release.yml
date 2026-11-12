@@ -12,6 +12,12 @@ name: Build Look4Sat APK
 # to versionName; official release tags and versionName still use the version catalog.
 # Changes to the version catalog happen only in the runner's checkout, NOT in Git.
 # Local Gradle builds keep using the catalog unchanged. Most runs are manual; release commits use a guarded push trigger.
+#
+# All signed builds are gated by the GitHub Environment named "release".
+# Put KEY_STORE, KEY_STORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD in that
+# environment, require a trusted reviewer, and remove repository-level copies.
+# The Gradle build itself never receives signing secrets; signing is isolated
+# in a later step after the APK has been built.
 
 on:
   # A commit prefixed with "release: v4.4.8-ba7opf." publishes that version on push.
@@ -34,13 +40,21 @@ on:
         default: ""
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: look4sat-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: v4.4.8-ba7opf.')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 50
+    permissions:
+      contents: write
+    environment:
+      name: release
     steps:
       - name: Checkout the exact commit of the chosen branch
         run: |
@@ -126,7 +140,21 @@ jobs:
           GRADLE_INIT
           ./gradlew --no-daemon --continue --stacktrace -I /tmp/look4sat-release-tests.gradle test
 
-      - name: Build the signed release APK
+      - name: Build the unsigned release APK (no signing secrets)
+        working-directory: source
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleRelease --stacktrace
+          APK_DIR="app/build/outputs/apk/release"
+          APK_INPUT="$(find "$APK_DIR" -maxdepth 1 -type f -name "*.apk" -print -quit)"
+          if [ -z "$APK_INPUT" ]; then
+            echo "::error::Gradle did not produce a release APK."
+            exit 1
+          fi
+          echo "Unsigned release APK ready: $APK_INPUT"
+
+      - name: Sign APK in an isolated step
         working-directory: source
         env:
           KEY_STORE_B64: ${{ secrets.KEY_STORE }}
@@ -137,16 +165,36 @@ jobs:
           set -euo pipefail
           for value in "$KEY_STORE_B64" "$RELEASE_STORE_PASSWORD" "$RELEASE_KEY_ALIAS" "$RELEASE_KEY_PASSWORD"; do
             if [ -z "$value" ]; then
-              echo "::error::Repository release signing secrets are missing; cannot build a compatible release."
+              echo "::error::Release environment signing secrets are missing."
               exit 1
             fi
           done
-          printf '%s' "$KEY_STORE_B64" | base64 -d > "$HOME/my-release-key.jks"
-          chmod 600 "$HOME/my-release-key.jks"
-          chmod +x gradlew
-          ./gradlew --no-daemon :app:assembleRelease --stacktrace
-          test -f app/build/outputs/apk/release/app-release.apk
-          rm -f "$HOME/my-release-key.jks"
+
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/37.0.0"
+          KEYSTORE_PATH="$RUNNER_TEMP/look4sat-release.jks"
+          ALIGNED_APK="$RUNNER_TEMP/look4sat-aligned.apk"
+          SIGNED_APK="$RUNNER_TEMP/look4sat-signed.apk"
+          cleanup() {
+            rm -f "$KEYSTORE_PATH" "$ALIGNED_APK" "$SIGNED_APK"
+          }
+          trap cleanup EXIT
+
+          printf '%s' "$KEY_STORE_B64" | base64 -d > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+
+          APK_DIR="app/build/outputs/apk/release"
+          APK_INPUT="$(find "$APK_DIR" -maxdepth 1 -type f -name "*.apk" -print -quit)"
+          test -n "$APK_INPUT"
+          "$BUILD_TOOLS/zipalign" -f -p 4 "$APK_INPUT" "$ALIGNED_APK"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$KEYSTORE_PATH" \
+            --ks-pass env:RELEASE_STORE_PASSWORD \
+            --ks-key-alias "$RELEASE_KEY_ALIAS" \
+            --key-pass env:RELEASE_KEY_PASSWORD \
+            --out "$SIGNED_APK" \
+            "$ALIGNED_APK"
+          mv "$SIGNED_APK" "$APK_DIR/app-release.apk"
+          test -f "$APK_DIR/app-release.apk"
 
       - name: Check the APK version and signing certificate
         working-directory: source
@@ -228,6 +276,10 @@ jobs:
           NOTES_IN: "${{ inputs.notes }}"
         run: |
           set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Official Releases may only be published from main."
+            exit 1
+          fi
           # Republishing the same version is destructive: only a deliberately
           # labeled push release commit for that version may replace the public asset.
           REPUBLISH=false
@@ -265,6 +317,22 @@ jobs:
           if [ -z "$NOTES" ]; then
             NOTES="Look4Sat $VERSION (versionCode $CODE). Signed with the fork release key; installs over the previous release."
           fi
+
+          CHECKSUM="$ASSET.sha256"
+          BUILD_INFO="$ASSET.build-info.txt"
+          SHA256="$(sha256sum "$ASSET" | awk '{print $1}')"
+          sha256sum "$ASSET" > "$CHECKSUM"
+          cat > "$BUILD_INFO" <<BUILD_METADATA
+          repository=$GITHUB_REPOSITORY
+          commit=$GITHUB_SHA
+          ref=$GITHUB_REF
+          workflow_run=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          version=$VERSION
+          version_code=$CODE
+          apk=$ASSET
+          sha256=$SHA256
+          BUILD_METADATA
+
           if [ "$REPUBLISH" = true ]; then
             OLD_NOTES="$(gh release view "$TAG" --json body --jq '.body')"
             AMENDMENT="$(cat <<'REVISION_NOTES'
@@ -279,14 +347,14 @@ jobs:
           )"
             # Replace the single published asset only after all tests, signature,
             # versionCode, and both ARM ABIs have passed.
-            gh release upload "$TAG" "$ASSET" --clobber
+            gh release upload "$TAG" "$ASSET" "$CHECKSUM" "$BUILD_INFO" --clobber
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" \
               -f sha="$GITHUB_SHA" -F force=true
             gh release edit "$TAG" --title "Look4Sat $TAG" --latest \
               --notes "$(printf '%s\n\n%s\n' "$OLD_NOTES" "$AMENDMENT")"
             echo "Explicitly republished $TAG from commit $GITHUB_SHA (versionCode $CODE)"
           else
-            gh release create "$TAG" "$ASSET" --target "$GITHUB_SHA" --title "Look4Sat $TAG" \
+            gh release create "$TAG" "$ASSET" "$CHECKSUM" "$BUILD_INFO" --target "$GITHUB_SHA" --title "Look4Sat $TAG" \
               --latest --notes "$NOTES"
             echo "Published release $TAG"
           fi
