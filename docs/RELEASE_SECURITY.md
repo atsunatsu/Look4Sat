@@ -11,12 +11,13 @@ These settings cannot be safely expressed by a repository file alone; configure 
 1. Open **Settings → Environments** and create an environment named `release`.
 2. Add at least one trusted maintainer as a **Required reviewer**.
 3. Leave **Prevent self-review** disabled if the same maintainer who starts a release must be able to approve it. If a second maintainer is available, prefer requiring that second person.
-4. Add these four secrets to the `release` environment:
+4. Under **Environment variables**, add `RELEASE_GUARD_ENABLED=true`. The workflow fails closed if this variable is absent.
+5. Add these four secrets to the `release` environment:
    - `KEY_STORE`
    - `KEY_STORE_PASSWORD`
    - `KEY_ALIAS`
    - `KEY_PASSWORD`
-5. Confirm a protected test deployment can access the environment secrets, then delete the repository-level copies of those four secrets. Do not leave duplicate repository secrets: an unprotected job could otherwise read them.
+6. Confirm a protected test deployment can access the environment secrets, then delete the repository-level copies of those four secrets. Do not leave duplicate repository secrets: an unprotected job could otherwise read them.
 
 Every signed workflow mode (`artifact`, `test`, and `release`) uses this environment and therefore waits for approval. The build and unit tests still run automatically after approval; no manual APK signing is required.
 
