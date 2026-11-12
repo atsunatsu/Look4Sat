@@ -38,7 +38,7 @@ Under **Settings → Code security and analysis**, enable Secret Scanning and Pu
 
 ## What the workflow now enforces
 
-- Workflow-level token permission is read-only; only the release job receives `contents: write`.
+- Workflow-level token permission is read-only; only the guarded job that can sign and publish releases receives `contents: write`.
 - Release runs are serialized to prevent concurrent publishing or tag replacement.
 - Official releases can only be published from `main`.
 - Gradle runs without the signing keystore or passwords.
