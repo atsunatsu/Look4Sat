@@ -39,9 +39,24 @@ captures/
 *.iml
 .idea/
 
-# Keystore files
-# Uncomment the following line if you do not want to check your keystore files in.
-#*.jks
+# Private signing material and credentials
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+service_account.json
+/.env
+/.env.*
+!/.env.example
+# Explicitly retain synthetic PKCS#12 test fixtures; never put real LoTW certificates here.
+!core/data/src/test/resources/test_pbes2.p12
+!core/data/src/test/resources/test_pbes2_aes192.p12
+!core/data/src/test/resources/test_pbes2_desede3.p12
+!core/data/src/test/resources/test_pbes2_empty.p12
+!core/data/src/test/resources/test_pbes2_empty_enc.p12
+!core/data/src/test/resources/test_tqsl_empty.p12
 /*.properties
 /keystore.properties
 /app/keystore.jks

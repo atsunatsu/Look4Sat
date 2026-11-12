@@ -69,6 +69,10 @@ internal fun Project.setupAndroidApp() {
             release {
                 isMinifyEnabled = true
                 isShrinkResources = true
+                // Release APKs are deliberately built unsigned. CI signs them in a
+                // separate step after Gradle has finished, so build scripts never
+                // execute with access to the release keystore or its passwords.
+                signingConfig = null
                 proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             }
         }
