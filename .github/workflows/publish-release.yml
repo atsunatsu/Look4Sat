@@ -182,7 +182,7 @@ jobs:
         env:
           ARTIFACT_NAME: ${{ steps.version.outputs.unsigned_artifact }}
           ARTIFACT_PATH: ${{ steps.unsigned.outputs.path }}
-          ARTIFACT_RETENTION_DAYS: 1
+          ARTIFACT_RETENTION_DAYS: 7
 
   sign-and-publish:
     name: Approve, sign and publish
