@@ -172,6 +172,10 @@ jobs:
             echo "::error::Unsigned release APK was not found."
             exit 1
           fi
+          if "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify "$APK_INPUT" >/dev/null 2>&1; then
+            echo "::error::Gradle output is signed; expected an unsigned APK before the isolated signing job."
+            exit 1
+          fi
           echo "path=source/$APK_INPUT" >> "$GITHUB_OUTPUT"
 
       - name: Install local artifact client
