@@ -14,6 +14,11 @@ val releaseProps = Properties().apply {
 fun releaseCred(name: String): String =
     releaseProps.getProperty(name) ?: System.getenv(name) ?: ""
 
+// CI can opt into an unsigned release build so the untrusted Gradle build job
+// never needs the production keystore. Normal local release builds keep their
+// existing signing configuration.
+val unsignedReleaseBuild = providers.gradleProperty("look4sat.unsignedRelease").orNull == "true"
+
 android {
     testOptions.unitTests.isIncludeAndroidResources = true
     namespace = libs.versions.packageName.get()
@@ -27,16 +32,24 @@ android {
         }
     }
     signingConfigs {
-        create("release") {
-            storeFile = file(System.getProperty("user.home") + "/my-release-key.jks")
-            storePassword = releaseCred("RELEASE_STORE_PASSWORD")
-            keyAlias = releaseCred("RELEASE_KEY_ALIAS").ifEmpty { "look4sat" }
-            keyPassword = releaseCred("RELEASE_KEY_PASSWORD")
+        if (!unsignedReleaseBuild) {
+            create("release") {
+                storeFile = file(System.getProperty("user.home") + "/my-release-key.jks")
+                storePassword = releaseCred("RELEASE_STORE_PASSWORD")
+                keyAlias = releaseCred("RELEASE_KEY_ALIAS").ifEmpty { "look4sat" }
+                keyPassword = releaseCred("RELEASE_KEY_PASSWORD")
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // The convention plugin defaults release builds to unsigned. Only
+            // restore local signing when this is not the isolated CI build.
+            signingConfig = if (unsignedReleaseBuild) {
+                null
+            } else {
+                signingConfigs.getByName("release")
+            }
         }
     }
 }
