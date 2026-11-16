@@ -90,8 +90,10 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -2622,6 +2624,7 @@ private fun GridActivitySettingsDialog(
         GridActivityAward.NON_GEOSTATIONARY to R.string.map_grid_activity_award_ngs
     )
     val selectedAwardLabel = stringResource(awardOptions.first { it.first == award }.second)
+    val uriHandler = LocalUriHandler.current
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -2772,6 +2775,16 @@ private fun GridActivitySettingsDialog(
                     TextButton(onClick = onRefresh, enabled = !loading) {
                         Text(stringResource(R.string.map_grid_activity_refresh))
                     }
+                    Text(
+                        text = stringResource(R.string.map_grid_activity_source),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            textDecoration = TextDecoration.Underline
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            uriHandler.openUri("https://gridmaster.fr")
+                        }
+                    )
                 }
             }
         }
