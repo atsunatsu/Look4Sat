@@ -82,6 +82,50 @@ class GridActivityStoreTest {
     }
 
     @Test
+    fun parsesAllRecentOperatorsAndTheirDatesInNewestFirstOrder() {
+        val last = org.json.JSONArray()
+            .put(JSONObject().put("call", "DL/F4MFS").put("date", "2026-11-06"))
+            .put(JSONObject().put("call", "DF2ET").put("date", "2026-10-31"))
+            .put(JSONObject().put("call", "DL1EGL").put("date", "2026-10-30"))
+            .put(JSONObject().put("call", "DL2ABC").put("date", "2026-10-29"))
+            .put(JSONObject().put("call", "DL3DEF").put("date", "2026-10-28"))
+            .put(JSONObject().put("call", "DL4GHI").put("date", "2026-10-27"))
+        val response = JSONObject().put("grid", "JO31").put("last", last)
+
+        assertEquals(
+            listOf(
+                GridActivityRecentOperator("DL/F4MFS", "2026-11-06"),
+                GridActivityRecentOperator("DF2ET", "2026-10-31"),
+                GridActivityRecentOperator("DL1EGL", "2026-10-30"),
+                GridActivityRecentOperator("DL2ABC", "2026-10-29"),
+                GridActivityRecentOperator("DL3DEF", "2026-10-28"),
+                GridActivityRecentOperator("DL4GHI", "2026-10-27")
+            ),
+            GridActivityStore.parseRecentOperators(response.toString())
+        )
+        assertEquals("DL/F4MFS", GridActivityStore.parseLatestCall(response.toString()))
+    }
+
+    @Test
+    fun ignoresEntriesWithoutCallsignAndCapsRecentOperatorsAtSix() {
+        val last = org.json.JSONArray()
+            .put(JSONObject().put("call", "DL1AAA").put("date", "2026-11-06"))
+            .put(JSONObject().put("date", "2026-11-05"))
+            .put(JSONObject().put("call", "DL2BBB").put("date", "2026-11-04"))
+            .put(JSONObject().put("call", "DL3CCC").put("date", "2026-11-03"))
+            .put(JSONObject().put("call", "DL4DDD").put("date", "2026-11-02"))
+            .put(JSONObject().put("call", "DL5EEE").put("date", "2026-11-01"))
+            .put(JSONObject().put("call", "DL6FFF").put("date", "2026-10-31"))
+            .put(JSONObject().put("call", "DL7GGG").put("date", "2026-10-30"))
+        val response = JSONObject().put("grid", "JO31").put("last", last)
+
+        assertEquals(
+            listOf("DL1AAA", "DL2BBB", "DL3CCC", "DL4DDD", "DL5EEE", "DL6FFF"),
+            GridActivityStore.parseRecentOperators(response.toString()).map { it.call }
+        )
+    }
+
+    @Test
     fun emptyLastListMeansNoRecentCallsign() {
         val response = JSONObject().put("grid", "JO31").put("percent", 0)
             .put("operator", 0).put("last", org.json.JSONArray())
