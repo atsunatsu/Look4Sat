@@ -377,7 +377,7 @@ internal object GridActivityStore {
     internal fun parseRecentOperators(json: String): List<GridActivityRecentOperator> {
         val last = JSONObject(json).optJSONArray("last")
             ?: throw IOException("GridMaster grid response is missing last[]")
-        return (0 until minOf(last.length(), 6)).mapNotNull { index ->
+        return (0 until last.length()).mapNotNull { index ->
             val entry = last.optJSONObject(index) ?: return@mapNotNull null
             val call = entry.optString("call").trim()
             if (call.isEmpty() || call.equals("null", ignoreCase = true)) {
@@ -388,7 +388,7 @@ internal object GridActivityStore {
                 }
                 GridActivityRecentOperator(call = call, date = date)
             }
-        }
+        }.take(6)
     }
 
     /** The map label uses only the first (most recent) entry from last[]. */
@@ -455,7 +455,7 @@ internal object GridActivityStore {
         if (checkedAt <= 0L) return null
         // Read the old single-call cache format as a one-entry list for seamless upgrades.
         val operators = entry.optJSONArray("last")?.let { last ->
-            (0 until minOf(last.length(), 6)).mapNotNull { index ->
+            (0 until last.length()).mapNotNull { index ->
                 val item = last.optJSONObject(index) ?: return@mapNotNull null
                 val call = item.optString("call").trim()
                 if (call.isEmpty() || call.equals("null", ignoreCase = true)) null else {
@@ -464,7 +464,7 @@ internal object GridActivityStore {
                     }
                     GridActivityRecentOperator(call, date)
                 }
-            }
+            }.take(6)
         } ?: (entry.optString("call").trim().takeIf {
             it.isNotEmpty() && !it.equals("null", ignoreCase = true)
         }?.let { listOf(GridActivityRecentOperator(it, null)) } ?: emptyList())
