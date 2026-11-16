@@ -55,14 +55,14 @@ class GridActivityStoreTest {
     }
 
     @Test
-    fun latestCallsignCacheExpiresAtUtcMidnight() {
+    fun gridMasterCacheExpiresAtUtcMidnight() {
         val utcMidnight = 20_000L * GridActivityStore.MILLIS_PER_UTC_DAY
 
-        assertTrue(GridActivityStore.isLatestCallCacheFresh(utcMidnight - 1_000L, utcMidnight - 1L))
-        assertFalse(GridActivityStore.isLatestCallCacheFresh(utcMidnight - 1_000L, utcMidnight))
-        assertTrue(GridActivityStore.isLatestCallCacheFresh(utcMidnight, utcMidnight + 1L))
-        assertFalse(GridActivityStore.isLatestCallCacheFresh(utcMidnight + 1L, utcMidnight))
-        assertFalse(GridActivityStore.isLatestCallCacheFresh(0L, utcMidnight))
+        assertTrue(GridActivityStore.isCacheFreshForUtcDay(utcMidnight - 1_000L, utcMidnight - 1L))
+        assertFalse(GridActivityStore.isCacheFreshForUtcDay(utcMidnight - 1_000L, utcMidnight))
+        assertTrue(GridActivityStore.isCacheFreshForUtcDay(utcMidnight, utcMidnight + 1L))
+        assertFalse(GridActivityStore.isCacheFreshForUtcDay(utcMidnight + 1L, utcMidnight))
+        assertFalse(GridActivityStore.isCacheFreshForUtcDay(0L, utcMidnight))
     }
 
     @Test
