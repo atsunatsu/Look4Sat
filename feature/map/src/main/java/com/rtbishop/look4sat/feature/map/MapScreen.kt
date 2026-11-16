@@ -107,6 +107,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import com.rtbishop.look4sat.core.domain.model.AwardCalculator
 import com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
 import com.rtbishop.look4sat.core.domain.model.AwardProgress
@@ -555,8 +557,6 @@ private fun MapScreen(
         // Load the selected award when the overlay is visible or its settings are open,
         // so cached timestamps and category data are available before enabling it.
         if (!showGridActivity && !showActivitySettings) return@LaunchedEffect
-        val forceRefresh = activityRefreshSerial != handledActivityRefreshSerial
-        handledActivityRefreshSerial = activityRefreshSerial
         val requestId = activityLoadSerial + 1
         activityLoadSerial = requestId
         val requestedAward = activityAward
@@ -565,8 +565,7 @@ private fun MapScreen(
         try {
             val loaded = GridActivityStore.load(
                 mapView.context.applicationContext,
-                award = requestedAward,
-                forceRefresh = forceRefresh
+                award = requestedAward
             )
             if (activityLoadSerial == requestId && activityAward == requestedAward) {
                 activitySnapshot = loaded
@@ -775,7 +774,6 @@ private fun MapScreen(
     val firstCallsByGrid: Map<String, String> = remember(uiState.workedGridQsos, selectedStationIds) {
         uiState.workedGridQsos.firstCallsByGrid(selectedStationIds)
     }
-    var handledLatestCallRefreshSerial by remember { mutableStateOf(0) }
     LaunchedEffect(
         showGridActivity,
         uiState.isGridMode,
@@ -783,6 +781,7 @@ private fun MapScreen(
         activeAward,
         activityAward,
         activitySnapshot,
+        activityLoading,
         gridViewportRevision,
         showWorkedFirstCalls,
         workedGrids,
@@ -792,33 +791,41 @@ private fun MapScreen(
         gridMasterUtcDay
     ) {
         if (!showGridActivity || !uiState.isGridMode || gridPickerMode ||
-            activeAward != AwardType.VUCC
+            activeAward != AwardType.VUCC || activityLoading
         ) return@LaunchedEffect
-        // Map labels need the visible cells only when first-call labels are enabled.
-        // The selected grid is also fetched independently for its detail dialog.
+        // The percentage map is loaded first. Callsigns are then fetched in the background,
+        // one grid at a time, and each successful response is applied immediately.
         val visibleGrids = if (uiState.showFirstCallLabels) {
             activitySnapshot?.percentages?.keys?.let {
                 visibleGridActivitySquares(mapView, it)
             }.orEmpty()
         } else emptySet()
-        // With the default option, local first-QSO cells do not need a GridMaster
-        // request for their map labels. The selected grid is still fetched for its dialog.
-        val requestedGrids = visibleGrids.filter {
-            !showWorkedFirstCalls || it !in workedGrids
-        }.toMutableSet()
+        // Local first-QSO labels do not need GridMaster requests by default.
+        // Always put the selected grid first so its detail dialog is populated promptly.
+        val requestedGrids = linkedSetOf<String>()
         selectedGrid?.let { requestedGrids.add(it) }
-        if (requestedGrids.isEmpty()) return@LaunchedEffect
-        val forceRefresh = activityRefreshSerial != handledLatestCallRefreshSerial
-        handledLatestCallRefreshSerial = activityRefreshSerial
-        val loaded = GridActivityStore.loadLatestCalls(
-            context = mapView.context.applicationContext,
-            grids = requestedGrids,
-            award = activityAward,
-            forceRefresh = forceRefresh
-        )
-        latestCallsByGrid = (latestCallsByGrid - loaded.checkedGrids) + loaded.callsByGrid
-        latestOperatorsByGrid =
-            (latestOperatorsByGrid - loaded.checkedGrids) + loaded.operatorsByGrid
+        visibleGrids.asSequence()
+            .filter { !showWorkedFirstCalls || it !in workedGrids }
+            .sorted()
+            .forEach { requestedGrids.add(it) }
+
+        for (grid in requestedGrids) {
+            currentCoroutineContext().ensureActive()
+            val loaded = GridActivityStore.loadLatestCall(
+                context = mapView.context.applicationContext,
+                grid = grid,
+                award = activityAward
+            )
+            currentCoroutineContext().ensureActive()
+            if (loaded.checkedGrids.contains(grid)) {
+                latestCallsByGrid = (latestCallsByGrid - grid) + loaded.callsByGrid
+                latestOperatorsByGrid =
+                    (latestOperatorsByGrid - grid) + loaded.operatorsByGrid
+            }
+            // A transient network failure stops this pass. A later viewport change or
+            // next app use can retry without flooding the API with failed requests.
+            if (loaded.shouldPauseQueue) break
+        }
     }
     val isGridMode = uiState.isGridMode
     // True when this composition restored a saved viewport. Only grid mode
