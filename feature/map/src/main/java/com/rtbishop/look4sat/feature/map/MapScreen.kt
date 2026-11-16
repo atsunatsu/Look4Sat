@@ -216,7 +216,7 @@ private val darkTileFilter by lazy { createColorFilter() }
 private var mapIsLightUi: Boolean? = null
 
 /** Theme the tile filter / icon caches were last applied for (drives the per-frame theme check). */
-private var appliedLightUi: Boolean? = null
+private var appliedLightMapPalette: Boolean? = null
 
 /** True while the offline OSM source is active — satellite imagery (Tianditu) is never filtered. */
 private var offlineTilesActive = true
@@ -637,6 +637,9 @@ private fun MapScreen(
     val timeString = uiState.mapData?.aosTime ?: "00:00:00"
     val isTimeAos = uiState.mapData?.isTimeAos ?: true
     val usesTianditu = tiandituLayers(uiState.mapSource) != null && uiState.tiandituKey.isNotBlank()
+    // Tianditu supplies light, unfiltered tiles even when the app UI is in dark mode.
+    // Use the light-map label palette so custom grid, region and marker text stays legible.
+    val useLightMapPalette = uiState.isLightUi || usesTianditu
     val copyrightResId = if (usesTianditu) R.string.map_copyright_tianditu else R.string.map_copyright_osm
 
     // Slider span = the window the ground track is drawn for (2.4 orbital periods from the
@@ -998,9 +1001,9 @@ private fun MapScreen(
                 AndroidView({ mapView }) { view ->
                     // Theme change: recolor the paints/tile filter/overlays and drop the icon
                     // caches, which baked the previous theme's colors into their bitmaps.
-                    if (appliedLightUi != uiState.isLightUi) {
-                        appliedLightUi = uiState.isLightUi
-                        applyMapColors(uiState.isLightUi)
+                    if (appliedLightMapPalette != useLightMapPalette) {
+                        appliedLightMapPalette = useLightMapPalette
+                        applyMapColors(useLightMapPalette)
                         iconCache.evictAll()
                         dotIcon = null
                         view.overlayManager.tilesOverlay.setColorFilter(
@@ -1051,7 +1054,7 @@ private fun MapScreen(
                         }
                     }
                     if (!uiState.isGridMode) {
-                        uiState.stationPosition?.let { setStationPosition(it, view, uiState.isLightUi) }
+                        uiState.stationPosition?.let { setStationPosition(it, view, useLightMapPalette) }
                         setOtherStationPosition(otherStationPosition, otherStationGrid, view)
                         if (passWindow != null) {
                             // Clear the previous pass immediately while the replacement
@@ -1070,8 +1073,8 @@ private fun MapScreen(
                             uiState.positions?.let { setPositions(it, view) { item -> onAction(MapAction.SelectItem(item)) } }
                         }
                         setTerminator(uiState.sunLatDeg, uiState.sunLonDeg, view)
-                        setSubSolarPoint(uiState.sunLatDeg, uiState.sunLonDeg, view, uiState.isLightUi)
-                        setMoonPosition(uiState.moonLatDeg, uiState.moonLonDeg, view, uiState.isLightUi)
+                        setSubSolarPoint(uiState.sunLatDeg, uiState.sunLonDeg, view, useLightMapPalette)
+                        setMoonPosition(uiState.moonLatDeg, uiState.moonLonDeg, view, useLightMapPalette)
                         // Time scrub: keep the scrubbed satellite centred, in the same pass that
                         // moves its marker so the two can never disagree. The pan is applied
                         // directly instead of as an osmdroid animation: the eased clock advances
