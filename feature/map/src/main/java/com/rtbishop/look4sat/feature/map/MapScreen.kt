@@ -1527,8 +1527,11 @@ private fun WorkedGridQsoDialog(
                                 ) {
                                     Text(
                                         text = operator.call,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontWeight = MaterialTheme.typography.titleMedium.fontWeight,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        ),
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(Modifier.weight(1f))
                                     operator.date?.let { date ->
