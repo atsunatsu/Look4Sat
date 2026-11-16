@@ -389,17 +389,19 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21.6 — Grid Activity UI and Tianditu labels
-          - Keep the Match button in its original position in the grid detail header. Display recent GridMaster operators below the activity percentage and Match button.
-          - Style recent operator callsigns consistently with the QSO list, without increasing text size or row height.
-          - Use the light-map label palette for Look4Sat overlays on Tianditu vector and imagery maps, regardless of the app's dark/light UI setting.
-          - Keep the existing theme-based colors and map filtering for offline OSM maps.
+          ## v21.7 — First Callsign correction
+          - Fix First Callsign grid labels so they show only the locally logged first QSO callsign. Never replace a missing local first callsign with the latest GridMaster operator.
+          - Keep the most recent GridMaster operators and dates in the selected grid's details dialog only, independently from First Callsign map labels.
+          - Remove the obsolete "Show first callsigns for worked grids" setting, which previously switched the map to recent GridMaster callsigns.
+          - Fetch recent GridMaster operators only when opening the selected grid's detail dialog, reducing API usage.
+          - Preserve existing grid activity percentages and the v21.6 UI alignment improvements.
 
-          ## v21.6 — 网格详情布局与天地图文字
-          - 网格通联详情中，“匹配”按钮保留原位置；最近活跃电台移至活跃度与匹配按钮下方。
-          - 最近活跃呼号与通联列表采用一致的文字颜色、字重和字体，不增大字号或行高。
-          - 天地图矢量地图与影像地图采用浅色地图文字配色，不受应用深色/浅色主题影响。
-          - 离线 OSM 地图保持原有随主题变化的文字配色及地图滤镜。
+          ## v21.7 — 首通呼号与最近活跃电台分离
+          - 修复首通呼号显示错误：地图只显示本地日志中的首通呼号，本地首通数据缺失时不再用 GridMaster 最近活跃呼号代替。
+          - 最近活跃电台及日期仅在所选网格通联详情弹窗中展示，与地图首通呼号标签完全分离。
+          - 删除会把首通呼号切换为最近活跃呼号的旧设置项。
+          - 仅在打开网格详情时请求该网格的最近活跃电台，减少 GridMaster API 请求。
+          - 保留网格活跃度百分比和 v21.6 的界面对齐优化。
           RELEASE_NOTES
           )"
           fi
