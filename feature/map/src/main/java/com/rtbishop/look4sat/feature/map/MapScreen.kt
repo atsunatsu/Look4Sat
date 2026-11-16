@@ -106,6 +106,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import com.rtbishop.look4sat.core.domain.model.AwardCalculator
 import com.rtbishop.look4sat.core.domain.model.GRIDLESS_QSO_BUCKET
 import com.rtbishop.look4sat.core.domain.model.AwardProgress
@@ -511,6 +512,26 @@ private fun MapScreen(
     var showMarkedWithActivity by remember(activityPreferences) {
         mutableStateOf(activityPreferences.getBoolean("show_marked", legacyShowWorkedAndMarked))
     }
+    var showWorkedFirstCalls by remember(activityPreferences) {
+        mutableStateOf(activityPreferences.getBoolean("show_worked_first_calls", true))
+    }
+    var latestCallsByGrid by remember(activityPreferences) {
+        mutableStateOf<Map<String, String>>(emptyMap())
+    }
+    var latestCallsUtcDay by remember {
+        mutableStateOf(System.currentTimeMillis() / GridActivityStore.MILLIS_PER_UTC_DAY)
+    }
+    LaunchedEffect(showGridActivity) {
+        if (!showGridActivity) return@LaunchedEffect
+        while (true) {
+            val now = System.currentTimeMillis()
+            val nextUtcMidnight =
+                (now / GridActivityStore.MILLIS_PER_UTC_DAY + 1L) * GridActivityStore.MILLIS_PER_UTC_DAY
+            delay((nextUtcMidnight - now).coerceAtLeast(1L))
+            latestCallsUtcDay =
+                System.currentTimeMillis() / GridActivityStore.MILLIS_PER_UTC_DAY
+        }
+    }
     var activityAward by remember(activityPreferences) {
         mutableStateOf(
             GridActivityAward.fromApiCode(activityPreferences.getString("award", "sat"))
@@ -522,6 +543,33 @@ private fun MapScreen(
     var activityRefreshSerial by remember { mutableStateOf(0) }
     var handledActivityRefreshSerial by remember { mutableStateOf(0) }
     var activityLoadSerial by remember { mutableStateOf(0) }
+    var gridViewportRevision by remember(mapView) { mutableStateOf(0) }
+    DisposableEffect(mapView, showGridActivity, uiState.showFirstCallLabels, activeAward, uiState.isGridMode, gridPickerMode) {
+        if (!showGridActivity || !uiState.showFirstCallLabels ||
+            activeAward != AwardType.VUCC || !uiState.isGridMode || gridPickerMode
+        ) {
+            onDispose { }
+        } else {
+            val listener = object : MapListener {
+                override fun onScroll(event: ScrollEvent?): Boolean {
+                    gridViewportRevision += 1
+                    return false
+                }
+
+                override fun onZoom(event: ZoomEvent?): Boolean {
+                    gridViewportRevision += 1
+                    return false
+                }
+            }
+            val delayedListener = DelayedMapListener(listener, 350L)
+            mapView.addMapListener(delayedListener)
+            onDispose { mapView.removeMapListener(delayedListener) }
+        }
+    }
+    LaunchedEffect(mapView) {
+        withFrameNanos { }
+        gridViewportRevision += 1
+    }
     LaunchedEffect(showGridActivity, showActivitySettings, activityAward, activityRefreshSerial) {
         // Load the selected award when the overlay is visible or its settings are open,
         // so cached timestamps and category data are available before enabling it.
@@ -569,8 +617,13 @@ private fun MapScreen(
         showMarkedWithActivity = enabled
         activityPreferences.edit().putBoolean("show_marked", enabled).apply()
     }
+    val setShowWorkedFirstCalls: (Boolean) -> Unit = { enabled ->
+        showWorkedFirstCalls = enabled
+        activityPreferences.edit().putBoolean("show_worked_first_calls", enabled).apply()
+    }
     val setActivityAward: (GridActivityAward) -> Unit = { award ->
         activityAward = award
+        latestCallsByGrid = emptyMap()
         activitySnapshot = null
         activityLoading = showGridActivity
         activityPreferences.edit().putString("award", award.apiCode).apply()
@@ -717,6 +770,49 @@ private fun MapScreen(
     // scopes, not from the globally earliest contact or one arbitrary station.
     val firstCallsByGrid: Map<String, String> = remember(uiState.workedGridQsos, selectedStationIds) {
         uiState.workedGridQsos.firstCallsByGrid(selectedStationIds)
+    }
+    var handledLatestCallRefreshSerial by remember { mutableStateOf(0) }
+    LaunchedEffect(
+        showGridActivity,
+        uiState.isGridMode,
+        uiState.showFirstCallLabels,
+        activeAward,
+        activityAward,
+        activitySnapshot,
+        gridViewportRevision,
+        showWorkedFirstCalls,
+        workedGrids,
+        activityRefreshSerial,
+        gridPickerMode,
+        selectedGrid,
+        latestCallsUtcDay
+    ) {
+        if (!showGridActivity || !uiState.isGridMode || gridPickerMode ||
+            activeAward != AwardType.VUCC
+        ) return@LaunchedEffect
+        // Map labels need the visible cells only when first-call labels are enabled.
+        // The selected grid is also fetched independently for its detail dialog.
+        val visibleGrids = if (uiState.showFirstCallLabels) {
+            activitySnapshot?.percentages?.keys?.let {
+                visibleGridActivitySquares(mapView, it)
+            }.orEmpty()
+        } else emptySet()
+        // With the default option, local first-QSO cells do not need a GridMaster
+        // request for their map labels. The selected grid is still fetched for its dialog.
+        val requestedGrids = visibleGrids.filter {
+            !showWorkedFirstCalls || it !in workedGrids
+        }.toMutableSet()
+        selectedGrid?.let { requestedGrids.add(it) }
+        if (requestedGrids.isEmpty()) return@LaunchedEffect
+        val forceRefresh = activityRefreshSerial != handledLatestCallRefreshSerial
+        handledLatestCallRefreshSerial = activityRefreshSerial
+        val loaded = GridActivityStore.loadLatestCalls(
+            context = mapView.context.applicationContext,
+            grids = requestedGrids,
+            award = activityAward,
+            forceRefresh = forceRefresh
+        )
+        latestCallsByGrid = (latestCallsByGrid - loaded.checkedGrids) + loaded.callsByGrid
     }
     val isGridMode = uiState.isGridMode
     // True when this composition restored a saved viewport. Only grid mode
@@ -905,6 +1001,8 @@ private fun MapScreen(
                             // 首通呼号标签只作用于 VUCC 视图(用户要求); "All"/其他奖状不过滤.
                             showFirstCallLabels = uiState.showFirstCallLabels && activeAward == AwardType.VUCC,
                             firstCallsByGrid = firstCallsByGrid,
+                            latestCallsByGrid = latestCallsByGrid,
+                            showWorkedFirstCalls = showWorkedFirstCalls,
                             markedGrids = visibleMarkedGrids,
                             activityPercentages = activitySnapshot?.percentages.orEmpty(),
                             showActivityOverlay = showGridActivity && activeAward == AwardType.VUCC,
@@ -1085,6 +1183,7 @@ private fun MapScreen(
             award = activityAward,
             showWorked = showWorkedWithActivity,
             showMarked = showMarkedWithActivity,
+            showWorkedFirstCalls = showWorkedFirstCalls,
             downloadedAt = activitySnapshot?.downloadedAt,
             loading = activityLoading,
             unavailable = (showGridActivity || showActivitySettings) &&
@@ -1094,6 +1193,7 @@ private fun MapScreen(
             onAwardChange = setActivityAward,
             onShowWorkedChange = setShowWorkedWithActivity,
             onShowMarkedChange = setShowMarkedWithActivity,
+            onShowWorkedFirstCallsChange = setShowWorkedFirstCalls,
             onRefresh = {
                 activityRefreshSerial += 1
                 setActivityEnabled(true)
@@ -1108,6 +1208,7 @@ private fun MapScreen(
         WorkedGridQsoDialog(
             grid = grid,
             activityPercentage = if (showGridActivity) activitySnapshot?.percentages?.get(grid) else null,
+            recentCallsign = if (showGridActivity) latestCallsByGrid[grid] else null,
             // A multi-selection shows the union of QSO details without duplicates,
             // preserving each station's covering scope; empty selection means All.
             qsos = uiState.workedGridQsos[grid].orEmpty()
@@ -1273,6 +1374,7 @@ private fun gridActivityBadgeColor(percent: Int): ComposeColor =
 private fun WorkedGridQsoDialog(
     grid: String,
     activityPercentage: Int?,
+    recentCallsign: String?,
     qsos: List<com.rtbishop.look4sat.core.domain.model.GridQso>,
     marked: List<com.rtbishop.look4sat.core.domain.model.MarkedStation>,
     isUtc: Boolean,
@@ -1285,6 +1387,7 @@ private fun WorkedGridQsoDialog(
 ) {
     var showMarkInput by remember { mutableStateOf(false) }
     var callInput by remember { mutableStateOf("") }
+    val uriHandler = LocalUriHandler.current
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         // Centered card, ~85% width, internal scroll for long lists.
         Card(
@@ -1332,6 +1435,31 @@ private fun WorkedGridQsoDialog(
                                         text = stringResource(R.string.map_grid_activity_percent, percent),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                        recentCallsign?.takeIf { it.isNotBlank() }?.let { call ->
+                            Column(Modifier.padding(top = 4.dp)) {
+                                Text(
+                                    text = stringResource(R.string.map_grid_activity_latest_call, call),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = stringResource(R.string.map_grid_activity_source_prefix),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.map_grid_activity_source_link),
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            textDecoration = TextDecoration.Underline
+                                        ),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.clickable {
+                                            uriHandler.openUri("https://gridmaster.fr")
+                                        }
                                     )
                                 }
                             }
@@ -2604,6 +2732,7 @@ private fun GridActivitySettingsDialog(
     award: GridActivityAward,
     showWorked: Boolean,
     showMarked: Boolean,
+    showWorkedFirstCalls: Boolean,
     downloadedAt: Long?,
     loading: Boolean,
     unavailable: Boolean,
@@ -2612,6 +2741,7 @@ private fun GridActivitySettingsDialog(
     onAwardChange: (GridActivityAward) -> Unit,
     onShowWorkedChange: (Boolean) -> Unit,
     onShowMarkedChange: (Boolean) -> Unit,
+    onShowWorkedFirstCallsChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -2756,6 +2886,23 @@ private fun GridActivitySettingsDialog(
                         Switch(
                             checked = showMarked,
                             onCheckedChange = onShowMarkedChange
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_show_worked_first_calls),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f).clickable {
+                                onShowWorkedFirstCallsChange(!showWorkedFirstCalls)
+                            }
+                        )
+                        Switch(
+                            checked = showWorkedFirstCalls,
+                            onCheckedChange = onShowWorkedFirstCallsChange
                         )
                     }
                     when {
@@ -2945,6 +3092,43 @@ private fun setAwardMode(
     }
 }
 
+
+/** 4-character activity grids intersecting the current map viewport. */
+private fun visibleGridActivitySquares(mapView: MapView, candidates: Set<String>): Set<String> {
+    if (mapView.width <= 0 || mapView.height <= 0 ||
+        mapView.zoomLevelDouble < MaidenheadGridOverlay.GRID_ZOOM_SUB
+    ) return emptySet()
+
+    val bounds = mapView.boundingBox
+    val south = bounds.latSouth.coerceIn(-90.0, 90.0)
+    val north = bounds.latNorth.coerceIn(-90.0, 90.0)
+    val longitudeRanges = if (bounds.lonWest > bounds.lonEast) {
+        listOf(bounds.lonWest to 180.0, -180.0 to bounds.lonEast)
+    } else {
+        listOf(bounds.lonWest to bounds.lonEast)
+    }
+
+    return candidates.filter { raw ->
+        val grid = raw.uppercase()
+        if (grid.length != 4 || grid[0] !in 'A'..'R' || grid[1] !in 'A'..'R' ||
+            grid[2] !in '0'..'9' || grid[3] !in '0'..'9'
+        ) {
+            false
+        } else {
+            val fieldLon = grid[0] - 'A'
+            val fieldLat = grid[1] - 'A'
+            val squareLon = grid[2] - '0'
+            val squareLat = grid[3] - '0'
+            val lonLeft = -180.0 + fieldLon * 20.0 + squareLon * 2.0
+            val lonRight = lonLeft + 2.0
+            val latBottom = -90.0 + fieldLat * 10.0 + squareLat
+            val latTop = latBottom + 1.0
+            latTop >= south && latBottom <= north &&
+                longitudeRanges.any { (west, east) -> lonRight >= west && lonLeft <= east }
+        }
+    }.toSet()
+}
+
 /** Toggle the grid-mode layer visibility on/off without recreating any overlay. */
 private fun setGridMode(
     gridMode: Boolean,
@@ -2955,6 +3139,8 @@ private fun setGridMode(
     centerOnStation: Boolean = false,
     showFirstCallLabels: Boolean = false,
     firstCallsByGrid: Map<String, String> = emptyMap(),
+    latestCallsByGrid: Map<String, String> = emptyMap(),
+    showWorkedFirstCalls: Boolean = true,
     markedGrids: Map<String, List<com.rtbishop.look4sat.core.domain.model.MarkedStation>> = emptyMap(),
     activityPercentages: Map<String, Int> = emptyMap(),
     showActivityOverlay: Boolean = false,
@@ -2972,6 +3158,8 @@ private fun setGridMode(
             // 首通呼号模式: 绿格标注第一个通联的呼号, 非绿格不显示标签.
             gridOverlay.showFirstCallLabels = showFirstCallLabels
             gridOverlay.firstCallsByGrid = firstCallsByGrid
+            gridOverlay.latestCallsByGrid = latestCallsByGrid
+            gridOverlay.showWorkedFirstCalls = showWorkedFirstCalls
             gridOverlay.markedGrids = markedGrids
             gridOverlay.activityPercentages = activityPercentages
             gridOverlay.showActivityOverlay = gridMode && showActivityOverlay
@@ -2990,6 +3178,8 @@ private fun setGridMode(
                 this.roamedGrids = roamedGrids
                 this.showFirstCallLabels = showFirstCallLabels
                 this.firstCallsByGrid = firstCallsByGrid
+                this.latestCallsByGrid = latestCallsByGrid
+                this.showWorkedFirstCalls = showWorkedFirstCalls
                 this.markedGrids = markedGrids
                 this.activityPercentages = activityPercentages
                 this.showActivityOverlay = gridMode && showActivityOverlay
