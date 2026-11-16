@@ -47,6 +47,12 @@ jobs:
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "ndk;26.1.10909125" "cmake;3.22.1"
 
+      - name: Validate GridMaster snapshot builder
+        working-directory: source
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/gridmaster_snapshot.py
+
       - name: Compile Android and run radio reconnect tests
         working-directory: source
         run: |
