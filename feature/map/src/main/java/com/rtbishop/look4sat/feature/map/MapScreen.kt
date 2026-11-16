@@ -532,8 +532,23 @@ private fun MapScreen(
         )
     }
     var showActivitySettings by remember { mutableStateOf(false) }
-    LaunchedEffect(showGridActivity, showActivitySettings) {
-        if (!showGridActivity && !showActivitySettings) return@LaunchedEffect
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var lifecycleStarted by remember(lifecycle) {
+        mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+    }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> lifecycleStarted = true
+                Lifecycle.Event.ON_STOP -> lifecycleStarted = false
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(showGridActivity, showActivitySettings, lifecycleStarted) {
+        if (!lifecycleStarted || (!showGridActivity && !showActivitySettings)) return@LaunchedEffect
         while (true) {
             val now = System.currentTimeMillis()
             val nextUtcMidnight =
@@ -552,10 +567,10 @@ private fun MapScreen(
         withFrameNanos { }
         gridViewportRevision += 1
     }
-    LaunchedEffect(showGridActivity, showActivitySettings, activityAward, activityRefreshSerial, gridMasterUtcDay) {
+    LaunchedEffect(showGridActivity, showActivitySettings, activityAward, activityRefreshSerial, gridMasterUtcDay, lifecycleStarted) {
         // Load the selected award when the overlay is visible or its settings are open,
         // so cached timestamps and category data are available before enabling it.
-        if (!showGridActivity && !showActivitySettings) return@LaunchedEffect
+        if (!lifecycleStarted || (!showGridActivity && !showActivitySettings)) return@LaunchedEffect
         val requestId = activityLoadSerial + 1
         activityLoadSerial = requestId
         val requestedAward = activityAward
@@ -775,6 +790,7 @@ private fun MapScreen(
     }
     LaunchedEffect(
         showGridActivity,
+        lifecycleStarted,
         uiState.isGridMode,
         uiState.showFirstCallLabels,
         activeAward,
@@ -789,7 +805,7 @@ private fun MapScreen(
         selectedGrid,
         gridMasterUtcDay
     ) {
-        if (!showGridActivity || !uiState.isGridMode || gridPickerMode ||
+        if (!lifecycleStarted || !showGridActivity || !uiState.isGridMode || gridPickerMode ||
             activeAward != AwardType.VUCC || activityLoading
         ) return@LaunchedEffect
         // The percentage map is loaded first. Callsigns are then fetched in the background,
