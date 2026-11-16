@@ -544,28 +544,6 @@ private fun MapScreen(
     var handledActivityRefreshSerial by remember { mutableStateOf(0) }
     var activityLoadSerial by remember { mutableStateOf(0) }
     var gridViewportRevision by remember(mapView) { mutableStateOf(0) }
-    DisposableEffect(mapView, showGridActivity, uiState.showFirstCallLabels, activeAward, uiState.isGridMode, gridPickerMode) {
-        if (!showGridActivity || !uiState.showFirstCallLabels ||
-            activeAward != AwardType.VUCC || !uiState.isGridMode || gridPickerMode
-        ) {
-            onDispose { }
-        } else {
-            val listener = object : MapListener {
-                override fun onScroll(event: ScrollEvent?): Boolean {
-                    gridViewportRevision += 1
-                    return false
-                }
-
-                override fun onZoom(event: ZoomEvent?): Boolean {
-                    gridViewportRevision += 1
-                    return false
-                }
-            }
-            val delayedListener = DelayedMapListener(listener, 350L)
-            mapView.addMapListener(delayedListener)
-            onDispose { mapView.removeMapListener(delayedListener) }
-        }
-    }
     LaunchedEffect(mapView) {
         withFrameNanos { }
         gridViewportRevision += 1
@@ -664,6 +642,28 @@ private fun MapScreen(
     var selectedAward by mapFilterViewModel.selectedAward
     // Grid picking always shows the VUCC grid fill, while keeping the user's saved station selection.
     val activeAward = if (gridPickerMode) AwardType.VUCC else selectedAward
+    DisposableEffect(mapView, showGridActivity, uiState.showFirstCallLabels, activeAward, uiState.isGridMode, gridPickerMode) {
+        if (!showGridActivity || !uiState.showFirstCallLabels ||
+            activeAward != AwardType.VUCC || !uiState.isGridMode || gridPickerMode
+        ) {
+            onDispose { }
+        } else {
+            val listener = object : MapListener {
+                override fun onScroll(event: ScrollEvent?): Boolean {
+                    gridViewportRevision += 1
+                    return false
+                }
+
+                override fun onZoom(event: ZoomEvent?): Boolean {
+                    gridViewportRevision += 1
+                    return false
+                }
+            }
+            val delayedListener = DelayedMapListener(listener, 350L)
+            mapView.addMapListener(delayedListener)
+            onDispose { mapView.removeMapListener(delayedListener) }
+        }
+    }
     // 台址名单: QSOs grouped by the 台址's GRID SET. A station location (台址)
     // can span several grids (MY_GRIDSQUARE + MY_VUCC_GRIDS), and QSOs whose
     // location covers the same grid set belong to the same 台址; groups with an
