@@ -546,7 +546,6 @@ private fun MapScreen(
     var activitySnapshot by remember { mutableStateOf<GridActivitySnapshot?>(null) }
     var activityLoading by remember { mutableStateOf(false) }
     var activityRefreshSerial by remember { mutableStateOf(0) }
-    var handledActivityRefreshSerial by remember { mutableStateOf(0) }
     var activityLoadSerial by remember { mutableStateOf(0) }
     var gridViewportRevision by remember(mapView) { mutableStateOf(0) }
     LaunchedEffect(mapView) {
