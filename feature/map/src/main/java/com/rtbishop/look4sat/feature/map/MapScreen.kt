@@ -518,6 +518,9 @@ private fun MapScreen(
     var latestCallsByGrid by remember(activityPreferences) {
         mutableStateOf<Map<String, String>>(emptyMap())
     }
+    var latestOperatorsByGrid by remember(activityPreferences) {
+        mutableStateOf<Map<String, List<GridActivityRecentOperator>>>(emptyMap())
+    }
     var gridMasterUtcDay by remember {
         mutableStateOf(System.currentTimeMillis() / GridActivityStore.MILLIS_PER_UTC_DAY)
     }
@@ -602,6 +605,7 @@ private fun MapScreen(
     val setActivityAward: (GridActivityAward) -> Unit = { award ->
         activityAward = award
         latestCallsByGrid = emptyMap()
+        latestOperatorsByGrid = emptyMap()
         activitySnapshot = null
         activityLoading = showGridActivity
         activityPreferences.edit().putString("award", award.apiCode).apply()
@@ -813,6 +817,8 @@ private fun MapScreen(
             forceRefresh = forceRefresh
         )
         latestCallsByGrid = (latestCallsByGrid - loaded.checkedGrids) + loaded.callsByGrid
+        latestOperatorsByGrid =
+            (latestOperatorsByGrid - loaded.checkedGrids) + loaded.operatorsByGrid
     }
     val isGridMode = uiState.isGridMode
     // True when this composition restored a saved viewport. Only grid mode
@@ -1208,7 +1214,7 @@ private fun MapScreen(
         WorkedGridQsoDialog(
             grid = grid,
             activityPercentage = if (showGridActivity) activitySnapshot?.percentages?.get(grid) else null,
-            recentCallsign = if (showGridActivity) latestCallsByGrid[grid] else null,
+            recentOperators = if (showGridActivity) latestOperatorsByGrid[grid].orEmpty() else emptyList(),
             // A multi-selection shows the union of QSO details without duplicates,
             // preserving each station's covering scope; empty selection means All.
             qsos = uiState.workedGridQsos[grid].orEmpty()
@@ -1374,7 +1380,7 @@ private fun gridActivityBadgeColor(percent: Int): ComposeColor =
 private fun WorkedGridQsoDialog(
     grid: String,
     activityPercentage: Int?,
-    recentCallsign: String?,
+    recentOperators: List<GridActivityRecentOperator>,
     qsos: List<com.rtbishop.look4sat.core.domain.model.GridQso>,
     marked: List<com.rtbishop.look4sat.core.domain.model.MarkedStation>,
     isUtc: Boolean,
@@ -1439,13 +1445,46 @@ private fun WorkedGridQsoDialog(
                                 }
                             }
                         }
-                        recentCallsign?.takeIf { it.isNotBlank() }?.let { call ->
-                            Column(Modifier.padding(top = 4.dp)) {
+                        if (activityPercentage != null) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 6.dp),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
                                 Text(
-                                    text = stringResource(R.string.map_grid_activity_latest_call, call),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = stringResource(R.string.map_grid_activity_recent_operators),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
+                                if (recentOperators.isEmpty()) {
+                                    Text(
+                                        text = stringResource(R.string.map_grid_activity_no_recent_operators),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else {
+                                    recentOperators.take(6).forEach { operator ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = operator.call,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(Modifier.weight(1f))
+                                            operator.date?.let { date ->
+                                                Text(
+                                                    text = date,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         text = stringResource(R.string.map_grid_activity_source_prefix),
