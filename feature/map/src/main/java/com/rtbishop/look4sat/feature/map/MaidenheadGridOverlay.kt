@@ -39,6 +39,22 @@ internal fun gridLabelScale(zoom: Double): Float {
     return Math.pow(2.0, clampedZoom - GRID_LABEL_GROWTH_START_ZOOM).toFloat()
 }
 
+/**
+ * The First Callsign layer is strictly local: worked grids show the earliest local QSO,
+ * marked-only grids show their pinned target, and all other cells have no callsign.
+ * GridMaster's last-active operator must never be substituted for missing first-QSO data.
+ */
+internal fun gridFirstCallLabel(
+    grid: String,
+    workedGrids: Set<String>,
+    firstCallsByGrid: Map<String, String>,
+    markedGrids: Map<String, List<com.rtbishop.look4sat.core.domain.model.MarkedStation>>
+): String? = when {
+    grid in workedGrids -> firstCallsByGrid[grid]
+    grid in markedGrids -> markedGrids[grid]?.firstOrNull()?.call
+    else -> null
+}
+
 private const val GRID_LABEL_GROWTH_START_ZOOM = 6.5
 private const val GRID_LABEL_MAX_SCALE_ZOOM = 7.0
 
@@ -173,12 +189,6 @@ class MaidenheadGridOverlay : Overlay() {
     /** Worked grid -> first callsign worked in it (earliest QSO by time).
      *  Only read when [showFirstCallLabels] is on. */
     var firstCallsByGrid: Map<String, String> = emptyMap()
-
-    /** GridMaster's most recent operator for each visible grid. */
-    var latestCallsByGrid: Map<String, String> = emptyMap()
-
-    /** Keep local first-QSO callsigns on worked cells instead of GridMaster's latest call. */
-    var showWorkedFirstCalls: Boolean = true
 
     /**
      * Gridsquares the station operated from (4-char, uppercase) — drawn with
@@ -576,17 +586,9 @@ class MaidenheadGridOverlay : Overlay() {
                         activityPercentages[label]?.takeIf { it in activityFilterMin..activityFilterMax }
                     } else null
                     val mainLabel = if (showFirstCallLabels) {
-                        // GridMaster recent callsigns are only an alternate label for worked cells.
-                        // Never use them to label unworked squares.
-                        when {
-                            label in workedGrids && (!showActivityOverlay || showWorkedFirstCalls) ->
-                                firstCallsByGrid[label]
-                                    ?: if (showActivityOverlay) latestCallsByGrid[label] else null
-                            label in workedGrids && showActivityOverlay -> latestCallsByGrid[label]
-                            label in workedGrids -> firstCallsByGrid[label]
-                            label in markedGrids -> markedGrids[label]?.firstOrNull()?.call
-                            else -> null
-                        }
+                        // Only local first-QSO callsigns (or explicit local marks) belong to
+                        // First Callsign mode. GridMaster recent operators appear in details only.
+                        gridFirstCallLabel(label, workedGrids, firstCallsByGrid, markedGrids)
                     } else label
                     // Keep the text centred for both single- and double-line
                     // layouts, including activity-only squares in first-call mode.
