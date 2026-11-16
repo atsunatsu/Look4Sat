@@ -518,19 +518,8 @@ private fun MapScreen(
     var latestCallsByGrid by remember(activityPreferences) {
         mutableStateOf<Map<String, String>>(emptyMap())
     }
-    var latestCallsUtcDay by remember {
+    var gridMasterUtcDay by remember {
         mutableStateOf(System.currentTimeMillis() / GridActivityStore.MILLIS_PER_UTC_DAY)
-    }
-    LaunchedEffect(showGridActivity) {
-        if (!showGridActivity) return@LaunchedEffect
-        while (true) {
-            val now = System.currentTimeMillis()
-            val nextUtcMidnight =
-                (now / GridActivityStore.MILLIS_PER_UTC_DAY + 1L) * GridActivityStore.MILLIS_PER_UTC_DAY
-            delay((nextUtcMidnight - now).coerceAtLeast(1L))
-            latestCallsUtcDay =
-                System.currentTimeMillis() / GridActivityStore.MILLIS_PER_UTC_DAY
-        }
     }
     var activityAward by remember(activityPreferences) {
         mutableStateOf(
@@ -538,6 +527,17 @@ private fun MapScreen(
         )
     }
     var showActivitySettings by remember { mutableStateOf(false) }
+    LaunchedEffect(showGridActivity, showActivitySettings) {
+        if (!showGridActivity && !showActivitySettings) return@LaunchedEffect
+        while (true) {
+            val now = System.currentTimeMillis()
+            val nextUtcMidnight =
+                (now / GridActivityStore.MILLIS_PER_UTC_DAY + 1L) * GridActivityStore.MILLIS_PER_UTC_DAY
+            delay((nextUtcMidnight - now).coerceAtLeast(1L))
+            gridMasterUtcDay =
+                System.currentTimeMillis() / GridActivityStore.MILLIS_PER_UTC_DAY
+        }
+    }
     var activitySnapshot by remember { mutableStateOf<GridActivitySnapshot?>(null) }
     var activityLoading by remember { mutableStateOf(false) }
     var activityRefreshSerial by remember { mutableStateOf(0) }
@@ -570,7 +570,7 @@ private fun MapScreen(
         withFrameNanos { }
         gridViewportRevision += 1
     }
-    LaunchedEffect(showGridActivity, showActivitySettings, activityAward, activityRefreshSerial) {
+    LaunchedEffect(showGridActivity, showActivitySettings, activityAward, activityRefreshSerial, gridMasterUtcDay) {
         // Load the selected award when the overlay is visible or its settings are open,
         // so cached timestamps and category data are available before enabling it.
         if (!showGridActivity && !showActivitySettings) return@LaunchedEffect
@@ -785,7 +785,7 @@ private fun MapScreen(
         activityRefreshSerial,
         gridPickerMode,
         selectedGrid,
-        latestCallsUtcDay
+        gridMasterUtcDay
     ) {
         if (!showGridActivity || !uiState.isGridMode || gridPickerMode ||
             activeAward != AwardType.VUCC
