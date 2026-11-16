@@ -13,6 +13,8 @@ import android.content.Context
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -111,6 +113,7 @@ internal object GridActivityStore {
             }
             try {
                 awaitRequestPermit(context)
+                currentCoroutineContext().ensureActive()
                 val connection = (URL(endpointFor(award)).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 12_000
                     readTimeout = 20_000
@@ -187,6 +190,7 @@ internal object GridActivityStore {
             if (entry == null || !isCacheFreshForUtcDay(entry.checkedAt, now)) {
                 try {
                     awaitRequestPermit(context)
+                    currentCoroutineContext().ensureActive()
                     entry = CachedGridActivityCall(
                         checkedAt = System.currentTimeMillis(),
                         operators = fetchLatestOperators(normalized, award)
