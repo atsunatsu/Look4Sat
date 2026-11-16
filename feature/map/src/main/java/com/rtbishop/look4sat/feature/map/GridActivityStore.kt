@@ -274,12 +274,15 @@ internal object GridActivityStore {
                     val item = last.optJSONObject(index) ?: return@mapNotNull null
                     val call = item.optString("call").trim()
                     if (call.isEmpty()) null else {
-                        val date = item.optString("date").trim().takeIf { it.isNotEmpty() }
+                        val date = item.optString("date").trim().takeIf {
+                            it.isNotEmpty() && !it.equals("null", ignoreCase = true)
+                        }
                         GridActivityRecentOperator(call, date)
                     }
                 }
-            } ?: (entry.optString("call").trim().takeIf { it.isNotEmpty() }
-                ?.let { listOf(GridActivityRecentOperator(it, null)) } ?: emptyList())
+            } ?: (entry.optString("call").trim().takeIf {
+                it.isNotEmpty() && !it.equals("null", ignoreCase = true)
+            }?.let { listOf(GridActivityRecentOperator(it, null)) } ?: emptyList())
             result[grid] = CachedGridActivityCall(checkedAt, operators)
         }
         return result
