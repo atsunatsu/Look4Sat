@@ -18,4 +18,5 @@
     <string name="map_grid_activity_show_marked">显示已标记网格</string>
     <string name="map_grid_activity_refresh">刷新数据</string>
     <string name="map_grid_activity_percent">活跃度：%1$d%%</string>
+    <string name="map_grid_activity_source">数据来源：GridMaster.fr</string>
 </resources>
