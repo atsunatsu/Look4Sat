@@ -389,19 +389,17 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21.5 — GridMaster recent operators
-          - Show the latest GridMaster operator and QSO date in the selected grid's detail dialog, with up to six recent operators and a GridMaster.fr source link.
-          - When First Callsign and Grid Activity are both enabled, worked-grid labels use the local first callsign by default; disabling “Show first callsigns for worked grids” switches those labels to GridMaster's latest operator.
-          - Keep unworked map squares on their normal Maidenhead labels; do not fetch or display recent callsigns just to label unworked squares.
-          - Load worked-grid recent-call details progressively in the background, prioritizing the selected grid and applying each successful result immediately.
-          - Cache per-grid recent-call data once per UTC day and protect the shared GridMaster API quota with a persistent request budget and HTTP 429 Retry-After handling.
+          ## v21.6 — Grid Activity UI and Tianditu labels
+          - Keep the Match button in its original position in the grid detail header. Display recent GridMaster operators below the activity percentage and Match button.
+          - Style recent operator callsigns consistently with the QSO list, without increasing text size or row height.
+          - Use the light-map label palette for Look4Sat overlays on Tianditu vector and imagery maps, regardless of the app's dark/light UI setting.
+          - Keep the existing theme-based colors and map filtering for offline OSM maps.
 
-          ## v21.5 — GridMaster 最近活跃电台
-          - 网格通联详情弹窗显示 GridMaster 最近活跃电台，最多六个呼号及对应 QSO 日期，并提供 GridMaster.fr 数据来源链接。
-          - 同时开启首通呼号和网格活跃度时，已通联网格默认显示本地首通呼号；关闭“显示已通联网格的首通呼号”后，改为显示 GridMaster 最近活跃呼号。
-          - 未通联网格继续显示原有四位网格编号，不请求也不显示最近活跃呼号。
-          - 已通联网格的最近呼号在后台逐步加载，优先处理当前选中的网格，每次成功后立即更新显示。
-          - 最近呼号按 UTC 日期缓存，每个网格每天最多请求一次；增加持久化请求额度保护，并遵守 HTTP 429 的 Retry-After。
+          ## v21.6 — 网格详情布局与天地图文字
+          - 网格通联详情中，“匹配”按钮保留原位置；最近活跃电台移至活跃度与匹配按钮下方。
+          - 最近活跃呼号与通联列表采用一致的文字颜色、字重和字体，不增大字号或行高。
+          - 天地图矢量地图与影像地图采用浅色地图文字配色，不受应用深色/浅色主题影响。
+          - 离线 OSM 地图保持原有随主题变化的文字配色及地图滤镜。
           RELEASE_NOTES
           )"
           fi
