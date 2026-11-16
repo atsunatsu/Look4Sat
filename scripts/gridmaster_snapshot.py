@@ -46,6 +46,18 @@ def normalize_grid(value: Any) -> str | None:
     return grid if GRID_RE.fullmatch(grid) else None
 
 
+def all_four_char_grids() -> list[str]:
+    """Return all 18×18×10×10 = 32,400 valid Maidenhead 4-character squares."""
+    letters = "ABCDEFGHIJKLMNOPQR"
+    return [
+        field_lon + field_lat + str(square_lon) + str(square_lat)
+        for field_lon in letters
+        for field_lat in letters
+        for square_lon in range(10)
+        for square_lat in range(10)
+    ]
+
+
 def parse_retry_after(value: str | None) -> float:
     if not value:
         return TOKEN_REFILL_SECONDS
@@ -265,11 +277,14 @@ def write_snapshot(
         "award": award,
         "updated": metadata["updated"],
         "operators": metadata["operators"],
-        "grid_count": len(percentages),
+        "grid_count": len(all_four_char_grids()),
+        "worked_grid_count": len(percentages),
         "percentages": dict(sorted(percentages.items())),
+        # Unworked squares are known to have 0% and no recent activators. Store them
+        # locally as checked-empty entries so the app does not query 27k blank grids.
         "latest_calls": {
             grid: latest_calls.get(grid, [])
-            for grid in sorted(percentages)
+            for grid in all_four_char_grids()
         },
     }
     raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
