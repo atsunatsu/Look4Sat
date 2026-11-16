@@ -581,6 +581,7 @@ class MaidenheadGridOverlay : Overlay() {
                         when {
                             label in workedGrids && (!showActivityOverlay || showWorkedFirstCalls) ->
                                 firstCallsByGrid[label]
+                                    ?: if (showActivityOverlay) latestCallsByGrid[label] else null
                             label in workedGrids && showActivityOverlay -> latestCallsByGrid[label]
                             label in workedGrids -> firstCallsByGrid[label]
                             label in markedGrids -> markedGrids[label]?.firstOrNull()?.call
