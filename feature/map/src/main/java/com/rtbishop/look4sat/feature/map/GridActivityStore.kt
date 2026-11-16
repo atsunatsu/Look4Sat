@@ -278,7 +278,7 @@ internal object GridActivityStore {
         val value = header?.trim().orEmpty()
         if (value.isEmpty()) return REQUEST_REFILL_INTERVAL_MS
         value.toLongOrNull()?.let { seconds ->
-            return seconds.coerceAtLeast(1L) * 1_000L
+            return seconds.coerceIn(1L, Long.MAX_VALUE / 1_000L) * 1_000L
         }
         val retryAt = try {
             SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
@@ -322,9 +322,9 @@ internal object GridActivityStore {
     }
 
     /**
-     * App-wide token bucket for all GridMaster endpoints. The local burst is capped at 80,
-     * reserving 20 of the documented 100-token burst for other clients sharing the public IP.
-     * The server remains authoritative; 429/Retry-After is always honored.
+     * App-wide token bucket for all GridMaster endpoints used by this feature. This installation
+     * caps its own burst at 80 to leave headroom within the documented 100-token IP-wide burst.
+     * Other devices on the same IP cannot be observed locally, so the server remains authoritative.
      */
     private suspend fun awaitRequestPermit(context: Context) {
         val file = requestBudgetFile(context)
@@ -422,7 +422,11 @@ internal object GridActivityStore {
                 try {
                     val record = JSONObject(line)
                     val grid = normalizeGrid(record.optString("grid")) ?: return@forEachLine
-                    parseCachedGridActivityCall(record)?.let { cache[grid] = it }
+                    parseCachedGridActivityCall(record)?.let { candidate ->
+                        if (cache[grid]?.checkedAt?.let { it >= candidate.checkedAt } != true) {
+                            cache[grid] = candidate
+                        }
+                    }
                 } catch (_: Exception) {
                     // Ignore a truncated or malformed journal line; later entries remain usable.
                 }
