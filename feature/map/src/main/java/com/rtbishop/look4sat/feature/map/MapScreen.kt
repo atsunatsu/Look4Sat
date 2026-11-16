@@ -1508,13 +1508,14 @@ private fun WorkedGridQsoDialog(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 6.dp),
+                            // Match the 16dp horizontal inset used by the QSO rows below.
+                            .padding(start = 16.dp, end = 16.dp, top = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.map_grid_activity_recent_operators),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.primary
                         )
                         if (recentOperators.isEmpty()) {
                             Text(
@@ -1530,13 +1531,17 @@ private fun WorkedGridQsoDialog(
                                 ) {
                                     Text(
                                         text = operator.call,
+                                        // Match the QSO callsign's color, typeface and weight,
+                                        // but keep bodySmall sizing identical to the date.
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontWeight = MaterialTheme.typography.titleMedium.fontWeight,
                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                                         ),
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
                                     )
-                                    Spacer(Modifier.weight(1f))
                                     operator.date?.let { date ->
                                         Text(
                                             text = date,
