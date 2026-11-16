@@ -58,15 +58,14 @@ internal data class GridActivityLatestCallSnapshot(
 
 /**
  * Public, aggregate GridMaster satellite data; no callsigns or local QSOs are uploaded.
- * Updates are infrequent (Wavelog refreshes this dataset monthly). Retain the last
- * successfully validated response so the overlay continues to work offline.
+ * Refresh the aggregate and per-grid snapshots once per UTC calendar day. Retain the last
+ * successfully validated responses so the overlay continues to work offline.
  */
 internal object GridActivityStore {
     private const val ENDPOINT = "https://gridmaster.fr/api/grids.json"
 
     internal fun endpointFor(award: GridActivityAward): String =
         "$ENDPOINT?award=${award.apiCode}&format=map"
-    private const val CACHE_VALID_MS = 30L * 24 * 60 * 60 * 1000
     internal const val MILLIS_PER_UTC_DAY = 24L * 60 * 60 * 1000
     private const val GRID_DETAIL_MAX_BYTES = 64_000
     private const val GRID_DETAIL_PARALLELISM = 4
@@ -88,7 +87,7 @@ internal object GridActivityStore {
                 null
             }
             val now = System.currentTimeMillis()
-            if (!forceRefresh && cached != null && now - cached.downloadedAt in 0 until CACHE_VALID_MS) {
+            if (!forceRefresh && cached != null && isCacheFreshForUtcDay(cached.downloadedAt, now)) {
                 return@withContext cached
             }
             try {
@@ -166,7 +165,7 @@ internal object GridActivityStore {
         val now = System.currentTimeMillis()
         val toFetch = requested.filter { grid ->
             forceRefresh || cache[grid]?.let {
-                isLatestCallCacheFresh(it.checkedAt, now)
+                isCacheFreshForUtcDay(it.checkedAt, now)
             } != true
         }
         val semaphore = Semaphore(GRID_DETAIL_PARALLELISM)
@@ -208,9 +207,9 @@ internal object GridActivityStore {
      * A callsign cache entry is valid only for the UTC calendar day on which it was fetched.
      * The first lookup after 00:00 UTC refreshes it, independent of the device's local timezone.
      */
-    internal fun isLatestCallCacheFresh(checkedAt: Long, now: Long): Boolean =
-        checkedAt > 0L && now >= checkedAt &&
-            checkedAt / MILLIS_PER_UTC_DAY == now / MILLIS_PER_UTC_DAY
+    internal fun isCacheFreshForUtcDay(fetchedAt: Long, now: Long): Boolean =
+        fetchedAt > 0L && now >= fetchedAt &&
+            fetchedAt / MILLIS_PER_UTC_DAY == now / MILLIS_PER_UTC_DAY
 
     /** Parse the newest operator from GridMaster's last[] list; an empty list is a valid result. */
     internal fun parseLatestCall(json: String): String? {
