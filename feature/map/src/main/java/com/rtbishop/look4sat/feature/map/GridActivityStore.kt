@@ -338,7 +338,7 @@ internal object GridActivityStore {
             writeRequestBudgetState(
                 file,
                 state.copy(
-                    tokens = 1.0,
+                    tokens = 0.0,
                     updatedAt = now,
                     blockedUntil = maxOf(state.blockedUntil, now + retryAfterMillis)
                 )
