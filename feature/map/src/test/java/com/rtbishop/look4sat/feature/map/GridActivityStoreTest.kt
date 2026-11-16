@@ -66,6 +66,53 @@ class GridActivityStoreTest {
     }
 
     @Test
+    fun sharedRequestBudgetRefillsAtOneTokenEveryThirtySixSecondsAndCapsBurst() {
+        val empty = GridActivityStore.RequestBudgetState(tokens = 0.0, updatedAt = 1_000L)
+        assertEquals(
+            1.0,
+            GridActivityStore.refillRequestBudget(empty, 37_000L).tokens,
+            0.0001
+        )
+        assertEquals(
+            0.5,
+            GridActivityStore.refillRequestBudget(empty, 19_000L).tokens,
+            0.0001
+        )
+        val full = GridActivityStore.RequestBudgetState(
+            tokens = GridActivityStore.REQUEST_BUDGET_CAPACITY,
+            updatedAt = 1_000L
+        )
+        assertEquals(
+            GridActivityStore.REQUEST_BUDGET_CAPACITY,
+            GridActivityStore.refillRequestBudget(full, 3_601_000L).tokens,
+            0.0001
+        )
+    }
+
+    @Test
+    fun sharedRequestBudgetWaitsForBothRetryAfterAndNextToken() {
+        val empty = GridActivityStore.RequestBudgetState(tokens = 0.0, updatedAt = 1_000L)
+        assertEquals(
+            GridActivityStore.REQUEST_REFILL_INTERVAL_MS,
+            GridActivityStore.requestBudgetWaitMillis(empty, 1_000L)
+        )
+        val rateLimited = empty.copy(blockedUntil = 50_000L)
+        assertEquals(
+            49_000L,
+            GridActivityStore.requestBudgetWaitMillis(rateLimited, 1_000L)
+        )
+    }
+
+    @Test
+    fun parsesRetryAfterSecondsAndUsesSafeFallbackWhenMissing() {
+        assertEquals(12_000L, GridActivityStore.parseRetryAfterDelayMillis("12", 1_000L))
+        assertEquals(
+            GridActivityStore.REQUEST_REFILL_INTERVAL_MS,
+            GridActivityStore.parseRetryAfterDelayMillis(null, 1_000L)
+        )
+    }
+
+    @Test
     fun parsesMostRecentCallsignFromTheFirstLastEntry() {
         val response = JSONObject()
             .put("grid", "JO31")
