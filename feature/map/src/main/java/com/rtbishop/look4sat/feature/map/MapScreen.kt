@@ -1476,64 +1476,7 @@ private fun WorkedGridQsoDialog(
                                 }
                             }
                         }
-                        if (showGridActivity) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 6.dp),
-                                verticalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.map_grid_activity_recent_operators),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                if (recentOperators.isEmpty()) {
-                                    Text(
-                                        text = stringResource(R.string.map_grid_activity_no_recent_operators),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                } else {
-                                    recentOperators.take(6).forEach { operator ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = operator.call,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Spacer(Modifier.weight(1f))
-                                            operator.date?.let { date ->
-                                                Text(
-                                                    text = date,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = stringResource(R.string.map_grid_activity_source_prefix),
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.map_grid_activity_source_link),
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            textDecoration = TextDecoration.Underline
-                                        ),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.clickable {
-                                            uriHandler.openUri("https://gridmaster.fr")
-                                        }
-                                    )
-                                }
-                            }
-                        }
+
                     }
                     TextButton(
                         enabled = !matchCalculating,
@@ -1556,6 +1499,64 @@ private fun WorkedGridQsoDialog(
                         }
                         Spacer(Modifier.width(4.dp))
                         Text(stringResource(R.string.grid_qso_match))
+                    }
+                }
+                if (showGridActivity) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_recent_operators),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (recentOperators.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.map_grid_activity_no_recent_operators),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            recentOperators.take(6).forEach { operator ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = operator.call,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(Modifier.weight(1f))
+                                    operator.date?.let { date ->
+                                        Text(
+                                            text = date,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(R.string.map_grid_activity_source_prefix),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = stringResource(R.string.map_grid_activity_source_link),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    textDecoration = TextDecoration.Underline
+                                ),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable {
+                                    uriHandler.openUri("https://gridmaster.fr")
+                                }
+                            )
+                        }
                     }
                 }
                 androidx.compose.material3.HorizontalDivider()
