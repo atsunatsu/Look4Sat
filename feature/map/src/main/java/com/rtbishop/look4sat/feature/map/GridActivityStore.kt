@@ -233,6 +233,134 @@ internal object GridActivityStore {
         fetchedAt > 0L && now >= fetchedAt &&
             fetchedAt / MILLIS_PER_UTC_DAY == now / MILLIS_PER_UTC_DAY
 
+    internal fun refillRequestBudget(
+        state: RequestBudgetState,
+        now: Long
+    ): RequestBudgetState {
+        if (now <= state.updatedAt) return state
+        val replenished = state.tokens.coerceIn(0.0, REQUEST_BUDGET_CAPACITY) +
+            (now - state.updatedAt).toDouble() / REQUEST_REFILL_INTERVAL_MS
+        return state.copy(
+            tokens = replenished.coerceAtMost(REQUEST_BUDGET_CAPACITY),
+            updatedAt = now
+        )
+    }
+
+    internal fun requestBudgetWaitMillis(
+        state: RequestBudgetState,
+        now: Long
+    ): Long {
+        val blockedWait = (state.blockedUntil - now).coerceAtLeast(0L)
+        val tokenWait = if (state.tokens >= 1.0) {
+            0L
+        } else {
+            kotlin.math.ceil(
+                (1.0 - state.tokens.coerceAtLeast(0.0)) * REQUEST_REFILL_INTERVAL_MS
+            ).toLong()
+        }
+        return maxOf(blockedWait, tokenWait)
+    }
+
+    /** Retry-After may be a delay in seconds or an HTTP date. */
+    internal fun parseRetryAfterDelayMillis(header: String?, now: Long): Long {
+        val value = header?.trim().orEmpty()
+        if (value.isEmpty()) return REQUEST_REFILL_INTERVAL_MS
+        value.toLongOrNull()?.let { seconds ->
+            return seconds.coerceAtLeast(1L) * 1_000L
+        }
+        val retryAt = try {
+            SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
+                .apply { isLenient = false }
+                .parse(value)?.time
+        } catch (_: Exception) {
+            null
+        }
+        return retryAt?.minus(now)?.coerceAtLeast(1_000L) ?: REQUEST_REFILL_INTERVAL_MS
+    }
+
+    private fun requestBudgetFile(context: Context) =
+        File(context.applicationContext.filesDir, REQUEST_BUDGET_FILE)
+
+    private fun readRequestBudgetState(file: File, now: Long): RequestBudgetState {
+        if (!file.isFile) return RequestBudgetState(REQUEST_BUDGET_CAPACITY, now)
+        return try {
+            val json = JSONObject(file.readText())
+            RequestBudgetState(
+                tokens = json.optDouble("tokens", 0.0).coerceIn(0.0, REQUEST_BUDGET_CAPACITY),
+                updatedAt = json.optLong("updated_at", now).coerceAtMost(now),
+                blockedUntil = json.optLong("blocked_until", 0L)
+            )
+        } catch (_: Exception) {
+            // Corrupt state must not reset the local request budget to a full burst.
+            RequestBudgetState(0.0, now)
+        }
+    }
+
+    private fun writeRequestBudgetState(file: File, state: RequestBudgetState) {
+        val json = JSONObject()
+            .put("tokens", state.tokens)
+            .put("updated_at", state.updatedAt)
+            .put("blocked_until", state.blockedUntil)
+        val temporary = File(file.parentFile, file.name + ".tmp")
+        temporary.writeText(json.toString())
+        if (!temporary.renameTo(file)) {
+            file.writeText(json.toString())
+            temporary.delete()
+        }
+    }
+
+    /**
+     * App-wide token bucket for all GridMaster endpoints. The local burst is capped at 80,
+     * reserving 20 of the documented 100-token burst for other clients sharing the public IP.
+     * The server remains authoritative; 429/Retry-After is always honored.
+     */
+    private suspend fun awaitRequestPermit(context: Context) {
+        val file = requestBudgetFile(context)
+        while (true) {
+            val waitMillis = requestBudgetMutex.withLock {
+                val now = System.currentTimeMillis()
+                val state = refillRequestBudget(readRequestBudgetState(file, now), now)
+                val wait = requestBudgetWaitMillis(state, now)
+                val updated = if (wait == 0L) state.copy(tokens = state.tokens - 1.0) else state
+                writeRequestBudgetState(file, updated)
+                wait
+            }
+            if (waitMillis == 0L) return
+            delay(waitMillis)
+        }
+    }
+
+    private suspend fun pauseAfterRateLimit(context: Context, retryAfterMillis: Long) {
+        val file = requestBudgetFile(context)
+        requestBudgetMutex.withLock {
+            val now = System.currentTimeMillis()
+            val state = refillRequestBudget(readRequestBudgetState(file, now), now)
+            writeRequestBudgetState(
+                file,
+                state.copy(
+                    tokens = 1.0,
+                    updatedAt = now,
+                    blockedUntil = maxOf(state.blockedUntil, now + retryAfterMillis)
+                )
+            )
+        }
+    }
+
+    private fun checkSuccessfulResponse(connection: HttpURLConnection) {
+        val code = connection.responseCode
+        if (code == 429) {
+            throw GridMasterRateLimitException(
+                parseRetryAfterDelayMillis(
+                    connection.getHeaderField("Retry-After"),
+                    System.currentTimeMillis()
+                )
+            )
+        }
+        if (code != HttpURLConnection.HTTP_OK) {
+            throw IOException("GridMaster HTTP $code")
+        }
+    }
+
     /** Parse up to all six recent operators from GridMaster's newest-first last[] list. */
     internal fun parseRecentOperators(json: String): List<GridActivityRecentOperator> {
         val last = JSONObject(json).optJSONArray("last")
@@ -337,9 +465,7 @@ internal object GridActivityStore {
             setRequestProperty("User-Agent", "Look4Sat/1.0 (satellite grid activity)")
         }
         return try {
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                throw IOException("GridMaster HTTP " + connection.responseCode)
-            }
+            checkSuccessfulResponse(connection)
             val response = connection.inputStream.use { stream ->
                 val bytes = ByteArray(GRID_DETAIL_MAX_BYTES + 1)
                 var count = 0
