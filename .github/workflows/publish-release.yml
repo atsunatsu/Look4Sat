@@ -389,19 +389,19 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21.4 — Grid activity Most Wanted colour bands
-          - Replace the continuously interpolated grid activity heatmap with seven fixed percentage bands inspired by Gridmaster SAT / LEO maps: 0–2 deep red, 3–7 red-orange, 8–12 orange, 13–17 yellow, 18–22 yellow-green, 23–32 bright green, 33–100 dark green.
-          - Keep SAT / LEO / MEO / GEO / NGS palette boundaries consistent and independent of dataset maximum and filter range; filtering only changes visible grids.
-          - Use the same seven-band colours for activity percentages in grid details and range-slider endpoint labels.
-          - Preserve map transparency and existing worked/marked grid colours; add unit coverage for the colour thresholds.
-          - Gridmaster band thresholds and colours are estimated from screenshots rather than verified upstream implementation.
+          ## v21.5 — GridMaster recent operators
+          - Show the latest GridMaster operator and QSO date in the selected grid's detail dialog, with up to six recent operators and a GridMaster.fr source link.
+          - When First Callsign and Grid Activity are both enabled, worked-grid labels use the local first callsign by default; disabling “Show first callsigns for worked grids” switches those labels to GridMaster's latest operator.
+          - Keep unworked map squares on their normal Maidenhead labels; do not fetch or display recent callsigns just to label unworked squares.
+          - Load worked-grid recent-call details progressively in the background, prioritizing the selected grid and applying each successful result immediately.
+          - Cache per-grid recent-call data once per UTC day and protect the shared GridMaster API quota with a persistent request budget and HTTP 429 Retry-After handling.
 
-          ## v21.4 — 网格活跃度分档填色
-          - 将网格活跃度的连续渐变替换为参考 Gridmaster SAT/LEO 截图估算的七档固定填色：0–2% 深红、3–7% 橘红、8–12% 橙、13–17% 黄、18–22% 黄绿、23–32% 亮绿、33–100% 深绿。
-          - SAT、LEO、MEO、GEO 和 NGS 统一采用固定百分比色阶；筛选范围只控制网格可见性，不再改变颜色对应关系。
-          - 网格详情的活跃度颜色和范围滑块端点文字颜色同步更新。
-          - 保留原有地图透明度和已通联/已标记网格颜色，并为各颜色阈值补充单元测试。
-          - 色阶边界及色值来自截图推断，暂未核实 Gridmaster 上游实现。
+          ## v21.5 — GridMaster 最近活跃电台
+          - 网格通联详情弹窗显示 GridMaster 最近活跃电台，最多六个呼号及对应 QSO 日期，并提供 GridMaster.fr 数据来源链接。
+          - 同时开启首通呼号和网格活跃度时，已通联网格默认显示本地首通呼号；关闭“显示已通联网格的首通呼号”后，改为显示 GridMaster 最近活跃呼号。
+          - 未通联网格继续显示原有四位网格编号，不请求也不显示最近活跃呼号。
+          - 已通联网格的最近呼号在后台逐步加载，优先处理当前选中的网格，每次成功后立即更新显示。
+          - 最近呼号按 UTC 日期缓存，每个网格每天最多请求一次；增加持久化请求额度保护，并遵守 HTTP 429 的 Retry-After。
           RELEASE_NOTES
           )"
           fi
