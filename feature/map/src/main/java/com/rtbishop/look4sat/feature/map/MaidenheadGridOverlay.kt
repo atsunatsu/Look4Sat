@@ -576,11 +576,12 @@ class MaidenheadGridOverlay : Overlay() {
                         activityPercentages[label]?.takeIf { it in activityFilterMin..activityFilterMax }
                     } else null
                     val mainLabel = if (showFirstCallLabels) {
-                        val latestCall = if (showActivityOverlay) latestCallsByGrid[label] else null
+                        // GridMaster recent callsigns are only an alternate label for worked cells.
+                        // Never use them to label unworked squares.
                         when {
                             label in workedGrids && (!showActivityOverlay || showWorkedFirstCalls) ->
-                                firstCallsByGrid[label] ?: latestCall
-                            latestCall != null -> latestCall
+                                firstCallsByGrid[label]
+                            label in workedGrids && showActivityOverlay -> latestCallsByGrid[label]
                             label in workedGrids -> firstCallsByGrid[label]
                             label in markedGrids -> markedGrids[label]?.firstOrNull()?.call
                             else -> null
