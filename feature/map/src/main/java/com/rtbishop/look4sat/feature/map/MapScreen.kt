@@ -2775,16 +2775,25 @@ private fun GridActivitySettingsDialog(
                     TextButton(onClick = onRefresh, enabled = !loading) {
                         Text(stringResource(R.string.map_grid_activity_refresh))
                     }
-                    Text(
-                        text = stringResource(R.string.map_grid_activity_source),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            textDecoration = TextDecoration.Underline
-                        ),
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            uriHandler.openUri("https://gridmaster.fr")
-                        }
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_source_prefix),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_source_link),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                textDecoration = TextDecoration.Underline
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable {
+                                uriHandler.openUri("https://gridmaster.fr")
+                            }
+                        )
+                    }
                 }
             }
         }
