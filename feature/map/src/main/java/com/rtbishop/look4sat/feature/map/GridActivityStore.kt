@@ -25,8 +25,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Locale
-import java.util.TimeZone
-import java.util.zip.GZIPInputStream
 
 /** GridMaster award codes exposed by its public API for the satellite activity map. */
 internal enum class GridActivityAward(
@@ -101,7 +99,6 @@ internal object GridActivityStore {
         context: Context,
         award: GridActivityAward = GridActivityAward.SATELLITE
     ): GridActivitySnapshot? = withContext(Dispatchers.IO) {
-            seedBundledSnapshot(context.applicationContext, award)
             // Keep the original Satellite cache filename for seamless v21.1 upgrades;
             // each additional award receives its own independent cache and timestamp.
             val file = File(context.applicationContext.filesDir, award.cacheFileName)
@@ -162,72 +159,6 @@ internal object GridActivityStore {
             }
         }
 
-    /**
-     * Import the optional prebuilt snapshot on first install. The script writes a gzip JSON
-     * asset with aggregate percentages and all currently worked-grid recent activators.
-     * The timestamp comes from GridMaster's UTC ranking date, not the APK installation time.
-     */
-    private fun seedBundledSnapshot(context: Context, award: GridActivityAward) {
-        val activityFile = File(context.filesDir, award.cacheFileName)
-        val suffix = award.cacheFileName.removeSuffix("_activity.json")
-        val journalFile = File(context.filesDir, suffix + "_latest_calls.jsonl")
-        if (activityFile.isFile && journalFile.isFile) return
-
-        val assetPath = "gridmaster/snapshots/" + suffix + "_snapshot.json.gz"
-        try {
-            val snapshotText = GZIPInputStream(context.assets.open(assetPath)).bufferedReader(
-                Charsets.UTF_8
-            ).use { it.readText() }
-            val snapshot = JSONObject(snapshotText)
-            if (snapshot.optInt("schema_version", -1) != 1 ||
-                snapshot.optString("award") != award.apiCode
-            ) return
-
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
-                isLenient = false
-                timeZone = TimeZone.getTimeZone("UTC")
-            }
-            val updatedAt = dateFormat.parse(snapshot.optString("updated"))?.time ?: return
-            val percentages = snapshot.optJSONObject("percentages") ?: return
-            // Validate before copying anything into the durable app cache.
-            parse(percentages.toString(), award.minimumGridCount)
-
-            if (!activityFile.isFile) {
-                val temporary = File(activityFile.parentFile, activityFile.name + ".tmp")
-                temporary.writeText(percentages.toString())
-                if (!temporary.renameTo(activityFile)) {
-                    temporary.copyTo(activityFile, overwrite = true)
-                    temporary.delete()
-                }
-                activityFile.setLastModified(updatedAt)
-            }
-
-            if (!journalFile.isFile) {
-                val latestCalls = snapshot.optJSONObject("latest_calls") ?: JSONObject()
-                val temporary = File(journalFile.parentFile, journalFile.name + ".tmp")
-                temporary.bufferedWriter(Charsets.UTF_8).use { writer ->
-                    val grids = latestCalls.keys()
-                    while (grids.hasNext()) {
-                        val grid = normalizeGrid(grids.next()) ?: continue
-                        val last = latestCalls.optJSONArray(grid) ?: org.json.JSONArray()
-                        val record = JSONObject()
-                            .put("grid", grid)
-                            .put("checked_at", updatedAt)
-                            .put("last", last)
-                        writer.append(record.toString()).append('\n')
-                    }
-                }
-                if (!temporary.renameTo(journalFile)) {
-                    temporary.copyTo(journalFile, overwrite = true)
-                    temporary.delete()
-                }
-                journalFile.setLastModified(updatedAt)
-            }
-        } catch (_: Exception) {
-            // No bundled snapshot (or an invalid one): retain the normal network/cache path.
-        }
-    }
-
     /** Build the public single-grid endpoint used to retrieve its latest operators. */
     internal fun endpointForGrid(grid: String, award: GridActivityAward): String {
         val normalized = normalizeGrid(grid) ?: throw IllegalArgumentException("Invalid Maidenhead grid")
@@ -235,8 +166,8 @@ internal object GridActivityStore {
     }
 
     /**
-     * Fetch one grid at a time so the map can progressively fill in callsign labels.
-     * The cache is shared by the map and detail dialog and is refreshed once per UTC day.
+     * Fetch one grid at a time for the selected grid's detail dialog and optional labels on
+     * worked grids. The cache is shared by both and refreshed once per UTC day.
      */
     suspend fun loadLatestCall(
         context: Context,
@@ -246,7 +177,6 @@ internal object GridActivityStore {
         val normalized = normalizeGrid(grid)
             ?: return@withContext GridActivityLatestCallSnapshot(emptyMap(), emptyMap(), emptySet())
         latestCallLoadMutex.withLock {
-            seedBundledSnapshot(context.applicationContext, award)
             val cacheFile = File(
                 context.applicationContext.filesDir,
                 "gridmaster_" + award.cacheFileName.removePrefix("gridmaster_")
