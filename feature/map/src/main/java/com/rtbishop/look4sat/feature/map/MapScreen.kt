@@ -809,21 +809,26 @@ private fun MapScreen(
             .forEach { requestedGrids.add(it) }
 
         for (grid in requestedGrids) {
-            currentCoroutineContext().ensureActive()
-            val loaded = GridActivityStore.loadLatestCall(
-                context = mapView.context.applicationContext,
-                grid = grid,
-                award = activityAward
-            )
-            currentCoroutineContext().ensureActive()
-            if (loaded.checkedGrids.contains(grid)) {
-                latestCallsByGrid = (latestCallsByGrid - grid) + loaded.callsByGrid
-                latestOperatorsByGrid =
-                    (latestOperatorsByGrid - grid) + loaded.operatorsByGrid
+            var retryDelayMillis = 60_000L
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                val loaded = GridActivityStore.loadLatestCall(
+                    context = mapView.context.applicationContext,
+                    grid = grid,
+                    award = activityAward
+                )
+                currentCoroutineContext().ensureActive()
+                if (loaded.checkedGrids.contains(grid)) {
+                    latestCallsByGrid = (latestCallsByGrid - grid) + loaded.callsByGrid
+                    latestOperatorsByGrid =
+                        (latestOperatorsByGrid - grid) + loaded.operatorsByGrid
+                }
+                if (!loaded.shouldPauseQueue) break
+                // Back off transient failures. Viewport changes cancel this delay and
+                // discard the remaining off-screen queue; the selected grid is reprioritized.
+                delay(retryDelayMillis)
+                retryDelayMillis = (retryDelayMillis * 2L).coerceAtMost(15L * 60 * 1000)
             }
-            // A transient network failure stops this pass. A later viewport change or
-            // next app use can retry without flooding the API with failed requests.
-            if (loaded.shouldPauseQueue) break
         }
     }
     val isGridMode = uiState.isGridMode
