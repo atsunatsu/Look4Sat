@@ -808,8 +808,8 @@ private fun MapScreen(
         if (!lifecycleStarted || !showGridActivity || !uiState.isGridMode || gridPickerMode ||
             activeAward != AwardType.VUCC || activityLoading
         ) return@LaunchedEffect
-        // The percentage map is loaded first. Callsigns are then fetched in the background,
-        // one grid at a time, and each successful response is applied immediately.
+        // The percentage map is loaded first. Recent operators are fetched in the background
+        // for the selected grid's detail dialog, and optionally for worked-grid labels.
         val visibleGrids = if (uiState.showFirstCallLabels) {
             activitySnapshot?.percentages?.keys?.let {
                 visibleGridActivitySquares(mapView, it)
@@ -819,8 +819,10 @@ private fun MapScreen(
         // Always put the selected grid first so its detail dialog is populated promptly.
         val requestedGrids = linkedSetOf<String>()
         selectedGrid?.let { requestedGrids.add(it) }
+        // Never fetch recent callsigns just to label unworked squares. The selected grid
+        // is still fetched above so its detail dialog can show GridMaster's recent operators.
         visibleGrids.asSequence()
-            .filter { !showWorkedFirstCalls || it !in workedGrids }
+            .filter { !showWorkedFirstCalls && it in workedGrids }
             .sorted()
             .forEach { requestedGrids.add(it) }
 
