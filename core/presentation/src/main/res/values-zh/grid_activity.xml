@@ -16,7 +16,6 @@
     <string name="map_grid_activity_last_updated">上次下载：%1$s</string>
     <string name="map_grid_activity_show_worked">显示已通联网格</string>
     <string name="map_grid_activity_show_marked">显示已标记网格</string>
-    <string name="map_grid_activity_show_worked_first_calls">显示已通联网格的首通呼号</string>
     <string name="map_grid_activity_refresh">检查更新</string>
     <string name="map_grid_activity_percent">活跃度：%1$d%%</string>
     <string name="map_grid_activity_recent_operators">最近活跃电台</string>
