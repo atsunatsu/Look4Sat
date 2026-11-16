@@ -12,17 +12,16 @@ package com.rtbishop.look4sat.feature.map
 import android.content.Context
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
 import java.util.Locale
 
 /** GridMaster award codes exposed by its public API for the satellite activity map. */
@@ -60,7 +59,8 @@ internal data class GridActivityRecentOperator(
 internal data class GridActivityLatestCallSnapshot(
     val callsByGrid: Map<String, String>,
     val operatorsByGrid: Map<String, List<GridActivityRecentOperator>>,
-    val checkedGrids: Set<String>
+    val checkedGrids: Set<String>,
+    val shouldPauseQueue: Boolean = false
 )
 
 /**
@@ -74,9 +74,22 @@ internal object GridActivityStore {
     internal fun endpointFor(award: GridActivityAward): String =
         "$ENDPOINT?award=${award.apiCode}&format=map"
     internal const val MILLIS_PER_UTC_DAY = 24L * 60 * 60 * 1000
+    internal const val REQUEST_REFILL_INTERVAL_MS = 36_000L
+    internal const val REQUEST_BUDGET_CAPACITY = 80.0
+    private const val REQUEST_BUDGET_FILE = "gridmaster_request_budget.json"
     private const val GRID_DETAIL_MAX_BYTES = 64_000
-    private const val GRID_DETAIL_PARALLELISM = 4
     private const val MAX_BYTES = 2_000_000
+    private val requestBudgetMutex = Mutex()
+    private val latestCallLoadMutex = Mutex()
+
+    internal data class RequestBudgetState(
+        val tokens: Double,
+        val updatedAt: Long,
+        val blockedUntil: Long = 0L
+    )
+
+    private class GridMasterRateLimitException(val retryAfterMillis: Long) :
+        IOException("GridMaster rate limit reached")
 
     suspend fun load(
         context: Context,
