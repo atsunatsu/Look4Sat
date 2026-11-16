@@ -93,8 +93,7 @@ internal object GridActivityStore {
 
     suspend fun load(
         context: Context,
-        award: GridActivityAward = GridActivityAward.SATELLITE,
-        forceRefresh: Boolean = false
+        award: GridActivityAward = GridActivityAward.SATELLITE
     ): GridActivitySnapshot? = withContext(Dispatchers.IO) {
             // Keep the original Satellite cache filename for seamless v21.1 upgrades;
             // each additional award receives its own independent cache and timestamp.
@@ -107,10 +106,11 @@ internal object GridActivityStore {
                 null
             }
             val now = System.currentTimeMillis()
-            if (!forceRefresh && cached != null && isCacheFreshForUtcDay(cached.downloadedAt, now)) {
+            if (cached != null && isCacheFreshForUtcDay(cached.downloadedAt, now)) {
                 return@withContext cached
             }
             try {
+                awaitRequestPermit(context)
                 val connection = (URL(endpointFor(award)).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 12_000
                     readTimeout = 20_000
@@ -119,9 +119,7 @@ internal object GridActivityStore {
                     setRequestProperty("User-Agent", "Look4Sat/1.0 (satellite grid activity)")
                 }
                 val response = try {
-                    if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                        throw IOException("GridMaster HTTP " + connection.responseCode)
-                    }
+                    checkSuccessfulResponse(connection)
                     connection.inputStream.use { stream ->
                         // Reject oversized/untrusted responses before parsing or overwriting cache.
                         val bytes = ByteArray(MAX_BYTES + 1)
@@ -146,6 +144,11 @@ internal object GridActivityStore {
                     tmp.delete()
                 }
                 GridActivitySnapshot(parsed, file.lastModified(), fromCache = false)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (limited: GridMasterRateLimitException) {
+                pauseAfterRateLimit(context, limited.retryAfterMillis)
+                cached
             } catch (_: Exception) {
                 cached
             }
@@ -158,75 +161,67 @@ internal object GridActivityStore {
     }
 
     /**
-     * Load the latest callsign for each requested grid. Successful empty responses are cached too,
-     * while network/parse failures leave the previous cache untouched. Requests are bounded so a
-     * portrait viewport cannot create an unbounded burst of HTTP connections.
+     * Fetch one grid at a time so the map can progressively fill in callsign labels.
+     * The cache is shared by the map and detail dialog and is refreshed once per UTC day.
      */
-    suspend fun loadLatestCalls(
+    suspend fun loadLatestCall(
         context: Context,
-        grids: Set<String>,
-        award: GridActivityAward = GridActivityAward.SATELLITE,
-        forceRefresh: Boolean = false
+        grid: String,
+        award: GridActivityAward = GridActivityAward.SATELLITE
     ): GridActivityLatestCallSnapshot = withContext(Dispatchers.IO) {
-        val requested = grids.mapNotNull(::normalizeGrid).toSet()
-        if (requested.isEmpty()) {
-            return@withContext GridActivityLatestCallSnapshot(emptyMap(), emptyMap(), emptySet())
-        }
-
-        val cacheFile = File(
-            context.applicationContext.filesDir,
-            "gridmaster_" + award.cacheFileName.removePrefix("gridmaster_").removeSuffix("_activity.json") + "_latest_calls.json"
-        )
-        val cache = try {
-            readLatestCallCache(cacheFile)
-        } catch (_: Exception) {
-            mutableMapOf()
-        }
-        val now = System.currentTimeMillis()
-        val toFetch = requested.filter { grid ->
-            forceRefresh || cache[grid]?.let {
-                isCacheFreshForUtcDay(it.checkedAt, now)
-            } != true
-        }
-        val semaphore = Semaphore(GRID_DETAIL_PARALLELISM)
-        val fetched = coroutineScope {
-            toFetch.map { grid ->
-                async {
-                    semaphore.withPermit {
-                        try {
-                            grid to CachedGridActivityCall(
-                                checkedAt = System.currentTimeMillis(),
-                                operators = fetchLatestOperators(grid, award)
-                            )
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            null
-                        }
-                    }
-                }
-            }.awaitAll().filterNotNull()
-        }
-        if (fetched.isNotEmpty()) {
-            cache.putAll(fetched)
-            try {
-                writeLatestCallCache(cacheFile, cache)
+        val normalized = normalizeGrid(grid)
+            ?: return@withContext GridActivityLatestCallSnapshot(emptyMap(), emptyMap(), emptySet())
+        latestCallLoadMutex.withLock {
+            val cacheFile = File(
+                context.applicationContext.filesDir,
+                "gridmaster_" + award.cacheFileName.removePrefix("gridmaster_")
+                    .removeSuffix("_activity.json") + "_latest_calls.json"
+            )
+            val cache = try {
+                readLatestCallCache(cacheFile)
             } catch (_: Exception) {
-                // Fresh network results remain usable even if the private cache cannot be written.
+                mutableMapOf()
             }
+            var entry = cache[normalized]
+            val now = System.currentTimeMillis()
+            if (entry == null || !isCacheFreshForUtcDay(entry.checkedAt, now)) {
+                try {
+                    awaitRequestPermit(context)
+                    entry = CachedGridActivityCall(
+                        checkedAt = System.currentTimeMillis(),
+                        operators = fetchLatestOperators(normalized, award)
+                    )
+                    cache[normalized] = entry
+                    try {
+                        writeLatestCallCache(cacheFile, cache)
+                    } catch (_: Exception) {
+                        // Keep the response usable for this session if disk caching fails.
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (limited: GridMasterRateLimitException) {
+                    pauseAfterRateLimit(context, limited.retryAfterMillis)
+                } catch (_: Exception) {
+                    return@withLock snapshotForGrid(normalized, entry, shouldPauseQueue = true)
+                }
+            }
+            snapshotForGrid(normalized, entry)
         }
+    }
 
-        val checked = requested.filterTo(linkedSetOf()) { cache.containsKey(it) }
-        val operators = checked.mapNotNull { grid ->
-            cache[grid]?.operators?.takeIf { it.isNotEmpty() }?.let { grid to it }
-        }.toMap()
-        val calls = operators.mapNotNull { (grid, entries) ->
-            entries.firstOrNull()?.call?.let { grid to it }
-        }.toMap()
-        GridActivityLatestCallSnapshot(
+    private fun snapshotForGrid(
+        grid: String,
+        entry: CachedGridActivityCall?,
+        shouldPauseQueue: Boolean = false
+    ): GridActivityLatestCallSnapshot {
+        val operators = entry?.operators?.takeIf { it.isNotEmpty() }?.let { mapOf(grid to it) }
+            ?: emptyMap()
+        val calls = operators[grid]?.firstOrNull()?.call?.let { mapOf(grid to it) } ?: emptyMap()
+        return GridActivityLatestCallSnapshot(
             callsByGrid = calls,
             operatorsByGrid = operators,
-            checkedGrids = checked
+            checkedGrids = if (entry != null) setOf(grid) else emptySet(),
+            shouldPauseQueue = shouldPauseQueue
         )
     }
 
