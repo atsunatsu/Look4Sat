@@ -83,6 +83,8 @@ internal object GridActivityStore {
     private const val MAX_BYTES = 2_000_000
     private val requestBudgetMutex = Mutex()
     private val latestCallLoadMutex = Mutex()
+    // Kept in memory for the current process; the append-only journal persists each result cheaply.
+    private val latestCallCaches = mutableMapOf<String, MutableMap<String, CachedGridActivityCall>>()
 
     internal data class RequestBudgetState(
         val tokens: Double,
@@ -180,11 +182,12 @@ internal object GridActivityStore {
                 "gridmaster_" + award.cacheFileName.removePrefix("gridmaster_")
                     .removeSuffix("_activity.json") + "_latest_calls.json"
             )
-            val cache = try {
-                readLatestCallCache(cacheFile)
-            } catch (_: Exception) {
-                mutableMapOf()
-            }
+            val journalFile = File(
+                context.applicationContext.filesDir,
+                "gridmaster_" + award.cacheFileName.removePrefix("gridmaster_")
+                    .removeSuffix("_activity.json") + "_latest_calls.jsonl"
+            )
+            val cache = loadLatestCallCache(award, cacheFile, journalFile)
             var entry = cache[normalized]
             val now = System.currentTimeMillis()
             if (entry == null || !isCacheFreshForUtcDay(entry.checkedAt, now)) {
@@ -197,9 +200,14 @@ internal object GridActivityStore {
                     )
                     cache[normalized] = entry
                     try {
-                        writeLatestCallCache(cacheFile, cache)
+                        appendLatestCallCache(journalFile, normalized, entry)
                     } catch (_: Exception) {
-                        // Keep the response usable for this session if disk caching fails.
+                        // Fall back to the legacy snapshot format if appending the journal fails.
+                        try {
+                            writeLatestCallCache(cacheFile, cache)
+                        } catch (_: Exception) {
+                            // Keep the response usable for this session if disk caching fails.
+                        }
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -397,6 +405,33 @@ internal object GridActivityStore {
         return normalized.takeIf { it.matches(Regex("[A-R]{2}[0-9]{2}")) }
     }
 
+    private fun loadLatestCallCache(
+        award: GridActivityAward,
+        legacyFile: File,
+        journalFile: File
+    ): MutableMap<String, CachedGridActivityCall> {
+        val key = award.apiCode
+        latestCallCaches[key]?.let { return it }
+        val cache = try {
+            readLatestCallCache(legacyFile)
+        } catch (_: Exception) {
+            mutableMapOf()
+        }
+        if (journalFile.isFile) {
+            journalFile.forEachLine { line ->
+                try {
+                    val record = JSONObject(line)
+                    val grid = normalizeGrid(record.optString("grid")) ?: return@forEachLine
+                    parseCachedGridActivityCall(record)?.let { cache[grid] = it }
+                } catch (_: Exception) {
+                    // Ignore a truncated or malformed journal line; later entries remain usable.
+                }
+            }
+        }
+        latestCallCaches[key] = cache
+        return cache
+    }
+
     private fun readLatestCallCache(file: File): MutableMap<String, CachedGridActivityCall> {
         if (!file.isFile) return mutableMapOf()
         val root = JSONObject(file.readText())
@@ -406,26 +441,50 @@ internal object GridActivityStore {
             val rawGrid = keys.next()
             val grid = normalizeGrid(rawGrid) ?: continue
             val entry = root.optJSONObject(rawGrid) ?: continue
-            val checkedAt = entry.optLong("checked_at", 0L)
-            if (checkedAt <= 0L) continue
-            // Read the old single-call cache format as a one-entry list for seamless upgrades.
-            val operators = entry.optJSONArray("last")?.let { last ->
-                (0 until minOf(last.length(), 6)).mapNotNull { index ->
-                    val item = last.optJSONObject(index) ?: return@mapNotNull null
-                    val call = item.optString("call").trim()
-                    if (call.isEmpty()) null else {
-                        val date = item.optString("date").trim().takeIf {
-                            it.isNotEmpty() && !it.equals("null", ignoreCase = true)
-                        }
-                        GridActivityRecentOperator(call, date)
-                    }
-                }
-            } ?: (entry.optString("call").trim().takeIf {
-                it.isNotEmpty() && !it.equals("null", ignoreCase = true)
-            }?.let { listOf(GridActivityRecentOperator(it, null)) } ?: emptyList())
-            result[grid] = CachedGridActivityCall(checkedAt, operators)
+            parseCachedGridActivityCall(entry)?.let { result[grid] = it }
         }
         return result
+    }
+
+    private fun parseCachedGridActivityCall(entry: JSONObject): CachedGridActivityCall? {
+        val checkedAt = entry.optLong("checked_at", 0L)
+        if (checkedAt <= 0L) return null
+        // Read the old single-call cache format as a one-entry list for seamless upgrades.
+        val operators = entry.optJSONArray("last")?.let { last ->
+            (0 until minOf(last.length(), 6)).mapNotNull { index ->
+                val item = last.optJSONObject(index) ?: return@mapNotNull null
+                val call = item.optString("call").trim()
+                if (call.isEmpty() || call.equals("null", ignoreCase = true)) null else {
+                    val date = item.optString("date").trim().takeIf {
+                        it.isNotEmpty() && !it.equals("null", ignoreCase = true)
+                    }
+                    GridActivityRecentOperator(call, date)
+                }
+            }
+        } ?: (entry.optString("call").trim().takeIf {
+            it.isNotEmpty() && !it.equals("null", ignoreCase = true)
+        }?.let { listOf(GridActivityRecentOperator(it, null)) } ?: emptyList())
+        return CachedGridActivityCall(checkedAt, operators)
+    }
+
+    private fun appendLatestCallCache(
+        file: File,
+        grid: String,
+        entry: CachedGridActivityCall
+    ) {
+        val record = JSONObject()
+            .put("grid", grid)
+            .put("checked_at", entry.checkedAt)
+            .put("last", org.json.JSONArray().apply {
+                entry.operators.forEach { operator ->
+                    put(
+                        JSONObject()
+                            .put("call", operator.call)
+                            .put("date", operator.date ?: JSONObject.NULL)
+                    )
+                }
+            })
+        file.appendText(record.toString() + "\n")
     }
 
     private fun writeLatestCallCache(
