@@ -204,7 +204,7 @@ internal object GridActivityStore {
     }
 
     /**
-     * A callsign cache entry is valid only for the UTC calendar day on which it was fetched.
+     * A GridMaster cache entry is valid only for the UTC calendar day on which it was fetched.
      * The first lookup after 00:00 UTC refreshes it, independent of the device's local timezone.
      */
     internal fun isCacheFreshForUtcDay(fetchedAt: Long, now: Long): Boolean =
