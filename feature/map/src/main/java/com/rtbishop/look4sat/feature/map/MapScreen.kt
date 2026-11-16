@@ -1213,6 +1213,7 @@ private fun MapScreen(
     selectedGrid?.let { grid ->
         WorkedGridQsoDialog(
             grid = grid,
+            showGridActivity = showGridActivity,
             activityPercentage = if (showGridActivity) activitySnapshot?.percentages?.get(grid) else null,
             recentOperators = if (showGridActivity) latestOperatorsByGrid[grid].orEmpty() else emptyList(),
             // A multi-selection shows the union of QSO details without duplicates,
@@ -1379,6 +1380,7 @@ private fun gridActivityBadgeColor(percent: Int): ComposeColor =
 @Composable
 private fun WorkedGridQsoDialog(
     grid: String,
+    showGridActivity: Boolean,
     activityPercentage: Int?,
     recentOperators: List<GridActivityRecentOperator>,
     qsos: List<com.rtbishop.look4sat.core.domain.model.GridQso>,
@@ -1445,7 +1447,7 @@ private fun WorkedGridQsoDialog(
                                 }
                             }
                         }
-                        if (activityPercentage != null) {
+                        if (showGridActivity) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
