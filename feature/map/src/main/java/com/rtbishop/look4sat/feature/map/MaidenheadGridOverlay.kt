@@ -174,6 +174,12 @@ class MaidenheadGridOverlay : Overlay() {
      *  Only read when [showFirstCallLabels] is on. */
     var firstCallsByGrid: Map<String, String> = emptyMap()
 
+    /** GridMaster's most recent operator for each visible grid. */
+    var latestCallsByGrid: Map<String, String> = emptyMap()
+
+    /** Keep local first-QSO callsigns on worked cells instead of GridMaster's latest call. */
+    var showWorkedFirstCalls: Boolean = true
+
     /**
      * Gridsquares the station operated from (4-char, uppercase) — drawn with
      * blue 45° stripes (GridMaster-style zebra), e.g. {"OL62", "PM95"}.
@@ -570,7 +576,11 @@ class MaidenheadGridOverlay : Overlay() {
                         activityPercentages[label]?.takeIf { it in activityFilterMin..activityFilterMax }
                     } else null
                     val mainLabel = if (showFirstCallLabels) {
+                        val latestCall = if (showActivityOverlay) latestCallsByGrid[label] else null
                         when {
+                            label in workedGrids && (!showActivityOverlay || showWorkedFirstCalls) ->
+                                firstCallsByGrid[label] ?: latestCall
+                            latestCall != null -> latestCall
                             label in workedGrids -> firstCallsByGrid[label]
                             label in markedGrids -> markedGrids[label]?.firstOrNull()?.call
                             else -> null
