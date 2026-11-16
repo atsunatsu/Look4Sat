@@ -18,5 +18,6 @@
     <string name="map_grid_activity_show_marked">Show marked grids</string>
     <string name="map_grid_activity_refresh">Refresh data</string>
     <string name="map_grid_activity_percent">Activity: %1$d%%</string>
-    <string name="map_grid_activity_source">Data provided by GridMaster.fr</string>
+    <string name="map_grid_activity_source_prefix">Data provided by </string>
+    <string name="map_grid_activity_source_link">GridMaster.fr</string>
 </resources>
