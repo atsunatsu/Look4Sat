@@ -579,7 +579,7 @@ private fun MapScreen(
         val requestId = activityLoadSerial + 1
         activityLoadSerial = requestId
         val requestedAward = activityAward
-        activitySnapshot = null
+        // Keep the previous snapshot visible while the daily UTC refresh is in flight.
         activityLoading = true
         try {
             val loaded = GridActivityStore.load(
