@@ -50,9 +50,16 @@ internal data class GridActivitySnapshot(
     val fromCache: Boolean
 )
 
-/** Latest GridMaster callsigns fetched for the currently visible 4-character grids. */
+/** One of the latest operators reported by GridMaster for a Maidenhead grid. */
+internal data class GridActivityRecentOperator(
+    val call: String,
+    val date: String?
+)
+
+/** Latest GridMaster operators fetched for the currently visible 4-character grids. */
 internal data class GridActivityLatestCallSnapshot(
     val callsByGrid: Map<String, String>,
+    val operatorsByGrid: Map<String, List<GridActivityRecentOperator>>,
     val checkedGrids: Set<String>
 )
 
@@ -150,7 +157,7 @@ internal object GridActivityStore {
     ): GridActivityLatestCallSnapshot = withContext(Dispatchers.IO) {
         val requested = grids.mapNotNull(::normalizeGrid).toSet()
         if (requested.isEmpty()) {
-            return@withContext GridActivityLatestCallSnapshot(emptyMap(), emptySet())
+            return@withContext GridActivityLatestCallSnapshot(emptyMap(), emptyMap(), emptySet())
         }
 
         val cacheFile = File(
@@ -176,7 +183,7 @@ internal object GridActivityStore {
                         try {
                             grid to CachedGridActivityCall(
                                 checkedAt = System.currentTimeMillis(),
-                                call = fetchLatestCall(grid, award)
+                                operators = fetchLatestOperators(grid, award)
                             )
                         } catch (cancelled: CancellationException) {
                             throw cancelled
@@ -197,10 +204,17 @@ internal object GridActivityStore {
         }
 
         val checked = requested.filterTo(linkedSetOf()) { cache.containsKey(it) }
-        val calls = checked.mapNotNull { grid ->
-            cache[grid]?.call?.let { grid to it }
+        val operators = checked.mapNotNull { grid ->
+            cache[grid]?.operators?.takeIf { it.isNotEmpty() }?.let { grid to it }
         }.toMap()
-        GridActivityLatestCallSnapshot(callsByGrid = calls, checkedGrids = checked)
+        val calls = operators.mapNotNull { (grid, entries) ->
+            entries.firstOrNull()?.call?.let { grid to it }
+        }.toMap()
+        GridActivityLatestCallSnapshot(
+            callsByGrid = calls,
+            operatorsByGrid = operators,
+            checkedGrids = checked
+        )
     }
 
     /**
@@ -211,18 +225,32 @@ internal object GridActivityStore {
         fetchedAt > 0L && now >= fetchedAt &&
             fetchedAt / MILLIS_PER_UTC_DAY == now / MILLIS_PER_UTC_DAY
 
-    /** Parse the newest operator from GridMaster's last[] list; an empty list is a valid result. */
-    internal fun parseLatestCall(json: String): String? {
+    /** Parse up to all six recent operators from GridMaster's newest-first last[] list. */
+    internal fun parseRecentOperators(json: String): List<GridActivityRecentOperator> {
         val last = JSONObject(json).optJSONArray("last")
             ?: throw IOException("GridMaster grid response is missing last[]")
-        for (index in 0 until last.length()) {
-            val call = last.optJSONObject(index)?.optString("call")?.trim().orEmpty()
-            if (call.isNotEmpty() && !call.equals("null", ignoreCase = true)) return call
+        return (0 until minOf(last.length(), 6)).mapNotNull { index ->
+            val entry = last.optJSONObject(index) ?: return@mapNotNull null
+            val call = entry.optString("call").trim()
+            if (call.isEmpty() || call.equals("null", ignoreCase = true)) {
+                null
+            } else {
+                val date = entry.optString("date").trim().takeIf {
+                    it.isNotEmpty() && !it.equals("null", ignoreCase = true)
+                }
+                GridActivityRecentOperator(call = call, date = date)
+            }
         }
-        return null
     }
 
-    private data class CachedGridActivityCall(val checkedAt: Long, val call: String?)
+    /** The map label uses only the first (most recent) entry from last[]. */
+    internal fun parseLatestCall(json: String): String? =
+        parseRecentOperators(json).firstOrNull()?.call
+
+    private data class CachedGridActivityCall(
+        val checkedAt: Long,
+        val operators: List<GridActivityRecentOperator>
+    )
 
     private fun normalizeGrid(grid: String): String? {
         val normalized = grid.trim().uppercase(Locale.ROOT)
@@ -240,9 +268,19 @@ internal object GridActivityStore {
             val entry = root.optJSONObject(rawGrid) ?: continue
             val checkedAt = entry.optLong("checked_at", 0L)
             if (checkedAt <= 0L) continue
-            val rawCall = entry.opt("call")
-            val call = (rawCall as? String)?.trim()?.takeIf { it.isNotEmpty() }
-            result[grid] = CachedGridActivityCall(checkedAt, call)
+            // Read the old single-call cache format as a one-entry list for seamless upgrades.
+            val operators = entry.optJSONArray("last")?.let { last ->
+                (0 until minOf(last.length(), 6)).mapNotNull { index ->
+                    val item = last.optJSONObject(index) ?: return@mapNotNull null
+                    val call = item.optString("call").trim()
+                    if (call.isEmpty()) null else {
+                        val date = item.optString("date").trim().takeIf { it.isNotEmpty() }
+                        GridActivityRecentOperator(call, date)
+                    }
+                }
+            } ?: (entry.optString("call").trim().takeIf { it.isNotEmpty() }
+                ?.let { listOf(GridActivityRecentOperator(it, null)) } ?: emptyList())
+            result[grid] = CachedGridActivityCall(checkedAt, operators)
         }
         return result
     }
@@ -257,7 +295,15 @@ internal object GridActivityStore {
                 grid,
                 JSONObject()
                     .put("checked_at", entry.checkedAt)
-                    .put("call", entry.call ?: JSONObject.NULL)
+                    .put("last", org.json.JSONArray().apply {
+                        entry.operators.forEach { operator ->
+                            put(
+                                JSONObject()
+                                    .put("call", operator.call)
+                                    .put("date", operator.date ?: JSONObject.NULL)
+                            )
+                        }
+                    })
             )
         }
         val temporary = File(file.parentFile, file.name + ".tmp")
@@ -268,7 +314,10 @@ internal object GridActivityStore {
         }
     }
 
-    private fun fetchLatestCall(grid: String, award: GridActivityAward): String? {
+    private fun fetchLatestOperators(
+        grid: String,
+        award: GridActivityAward
+    ): List<GridActivityRecentOperator> {
         val connection = (URL(endpointForGrid(grid, award)).openConnection() as HttpURLConnection).apply {
             connectTimeout = 8_000
             readTimeout = 10_000
@@ -291,7 +340,7 @@ internal object GridActivityStore {
                 if (count > GRID_DETAIL_MAX_BYTES) throw IOException("GridMaster grid response too large")
                 String(bytes, 0, count, Charsets.UTF_8)
             }
-            parseLatestCall(response)
+            parseRecentOperators(response)
         } finally {
             connection.disconnect()
         }
