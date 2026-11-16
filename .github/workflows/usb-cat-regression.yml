@@ -18,19 +18,16 @@ jobs:
       # This repository rejects external Marketplace action references at workflow startup.
       # Use the runner's preinstalled tools instead of actions/checkout, setup-java or setup-gradle.
       - name: Checkout the exact commit
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           mkdir source
           cd source
           git init
           git remote add origin https://github.com/atsunatsu/Look4Sat.git
-          if [ -n "$PR_NUMBER" ]; then
-            git fetch --no-tags --depth=1 origin "refs/pull/$PR_NUMBER/merge"
-          else
-            git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
-          fi
+          # For pull_request events, GITHUB_SHA is the event's merge commit.
+          # refs/pull/<number>/merge is mutable and can move while queued CI runs,
+          # causing an unrelated commit to be checked out and the SHA assertion to fail.
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
 

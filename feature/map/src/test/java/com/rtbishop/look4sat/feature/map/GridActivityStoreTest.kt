@@ -41,6 +41,150 @@ class GridActivityStoreTest {
         )
     }
 
+
+    @Test
+    fun buildsSingleGridDetailUrlForSelectedAward() {
+        assertEquals(
+            "https://gridmaster.fr/api/grid.json?grid=JO31&award=sat",
+            GridActivityStore.endpointForGrid("jo31", GridActivityAward.SATELLITE)
+        )
+        assertEquals(
+            "https://gridmaster.fr/api/grid.json?grid=OL62&award=sat/leo",
+            GridActivityStore.endpointForGrid("OL62", GridActivityAward.LEO)
+        )
+    }
+
+    @Test
+    fun gridMasterCacheExpiresAtUtcMidnight() {
+        val utcMidnight = 20_000L * GridActivityStore.MILLIS_PER_UTC_DAY
+
+        assertTrue(GridActivityStore.isCacheFreshForUtcDay(utcMidnight - 1_000L, utcMidnight - 1L))
+        assertFalse(GridActivityStore.isCacheFreshForUtcDay(utcMidnight - 1_000L, utcMidnight))
+        assertTrue(GridActivityStore.isCacheFreshForUtcDay(utcMidnight, utcMidnight + 1L))
+        assertFalse(GridActivityStore.isCacheFreshForUtcDay(utcMidnight + 1L, utcMidnight))
+        assertFalse(GridActivityStore.isCacheFreshForUtcDay(0L, utcMidnight))
+    }
+
+    @Test
+    fun sharedRequestBudgetRefillsAtOneTokenEveryThirtySixSecondsAndCapsBurst() {
+        val empty = GridActivityStore.RequestBudgetState(tokens = 0.0, updatedAt = 1_000L)
+        assertEquals(
+            1.0,
+            GridActivityStore.refillRequestBudget(empty, 37_000L).tokens,
+            0.0001
+        )
+        assertEquals(
+            0.5,
+            GridActivityStore.refillRequestBudget(empty, 19_000L).tokens,
+            0.0001
+        )
+        val full = GridActivityStore.RequestBudgetState(
+            tokens = GridActivityStore.REQUEST_BUDGET_CAPACITY,
+            updatedAt = 1_000L
+        )
+        assertEquals(
+            GridActivityStore.REQUEST_BUDGET_CAPACITY,
+            GridActivityStore.refillRequestBudget(full, 3_601_000L).tokens,
+            0.0001
+        )
+    }
+
+    @Test
+    fun sharedRequestBudgetWaitsForBothRetryAfterAndNextToken() {
+        val empty = GridActivityStore.RequestBudgetState(tokens = 0.0, updatedAt = 1_000L)
+        assertEquals(
+            GridActivityStore.REQUEST_REFILL_INTERVAL_MS,
+            GridActivityStore.requestBudgetWaitMillis(empty, 1_000L)
+        )
+        val rateLimited = empty.copy(blockedUntil = 50_000L)
+        assertEquals(
+            49_000L,
+            GridActivityStore.requestBudgetWaitMillis(rateLimited, 1_000L)
+        )
+    }
+
+    @Test
+    fun parsesRetryAfterSecondsAndUsesSafeFallbackWhenMissing() {
+        assertEquals(12_000L, GridActivityStore.parseRetryAfterDelayMillis("12", 1_000L))
+        assertEquals(
+            GridActivityStore.REQUEST_REFILL_INTERVAL_MS,
+            GridActivityStore.parseRetryAfterDelayMillis(null, 1_000L)
+        )
+    }
+
+    @Test
+    fun parsesMostRecentCallsignFromTheFirstLastEntry() {
+        val response = JSONObject()
+            .put("grid", "JO31")
+            .put("percent", 48)
+            .put("operator", 1503)
+            .put(
+                "last",
+                org.json.JSONArray()
+                    .put(JSONObject().put("call", "DL/F4MFS").put("date", "2026-11-06"))
+                    .put(JSONObject().put("call", "DF2ET").put("date", "2026-10-31"))
+            )
+
+        assertEquals("DL/F4MFS", GridActivityStore.parseLatestCall(response.toString()))
+    }
+
+    @Test
+    fun parsesAllRecentOperatorsAndTheirDatesInNewestFirstOrder() {
+        val last = org.json.JSONArray()
+            .put(JSONObject().put("call", "DL/F4MFS").put("date", "2026-11-06"))
+            .put(JSONObject().put("call", "DF2ET").put("date", "2026-10-31"))
+            .put(JSONObject().put("call", "DL1EGL").put("date", "2026-10-30"))
+            .put(JSONObject().put("call", "DL2ABC").put("date", "2026-10-29"))
+            .put(JSONObject().put("call", "DL3DEF").put("date", "2026-10-28"))
+            .put(JSONObject().put("call", "DL4GHI").put("date", "2026-10-27"))
+        val response = JSONObject().put("grid", "JO31").put("last", last)
+
+        assertEquals(
+            listOf(
+                GridActivityRecentOperator("DL/F4MFS", "2026-11-06"),
+                GridActivityRecentOperator("DF2ET", "2026-10-31"),
+                GridActivityRecentOperator("DL1EGL", "2026-10-30"),
+                GridActivityRecentOperator("DL2ABC", "2026-10-29"),
+                GridActivityRecentOperator("DL3DEF", "2026-10-28"),
+                GridActivityRecentOperator("DL4GHI", "2026-10-27")
+            ),
+            GridActivityStore.parseRecentOperators(response.toString())
+        )
+        assertEquals("DL/F4MFS", GridActivityStore.parseLatestCall(response.toString()))
+    }
+
+    @Test
+    fun ignoresEntriesWithoutCallsignAndCapsRecentOperatorsAtSix() {
+        val last = org.json.JSONArray()
+            .put(JSONObject().put("call", "DL1AAA").put("date", "2026-11-06"))
+            .put(JSONObject().put("date", "2026-11-05"))
+            .put(JSONObject().put("call", "DL2BBB").put("date", "2026-11-04"))
+            .put(JSONObject().put("call", "DL3CCC").put("date", "2026-11-03"))
+            .put(JSONObject().put("call", "DL4DDD").put("date", "2026-11-02"))
+            .put(JSONObject().put("call", "DL5EEE").put("date", "2026-11-01"))
+            .put(JSONObject().put("call", "DL6FFF").put("date", "2026-10-31"))
+            .put(JSONObject().put("call", "DL7GGG").put("date", "2026-10-30"))
+        val response = JSONObject().put("grid", "JO31").put("last", last)
+
+        assertEquals(
+            listOf("DL1AAA", "DL2BBB", "DL3CCC", "DL4DDD", "DL5EEE", "DL6FFF"),
+            GridActivityStore.parseRecentOperators(response.toString()).map { it.call }
+        )
+    }
+
+    @Test
+    fun emptyLastListMeansNoRecentCallsign() {
+        val response = JSONObject().put("grid", "JO31").put("percent", 0)
+            .put("operator", 0).put("last", org.json.JSONArray())
+
+        assertEquals(null, GridActivityStore.parseLatestCall(response.toString()))
+    }
+
+    @Test(expected = IOException::class)
+    fun rejectsGridDetailResponsesWithoutLastList() {
+        GridActivityStore.parseLatestCall(JSONObject().put("grid", "JO31").toString())
+    }
+
     @Test
     fun parsesFourCharacterGridPercentagesAndIgnoresBadEntries() {
         val raw = JSONObject()

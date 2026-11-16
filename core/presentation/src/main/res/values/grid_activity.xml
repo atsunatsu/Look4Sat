@@ -16,8 +16,11 @@
     <string name="map_grid_activity_last_updated">Last downloaded: %1$s</string>
     <string name="map_grid_activity_show_worked">Show worked grids</string>
     <string name="map_grid_activity_show_marked">Show marked grids</string>
-    <string name="map_grid_activity_refresh">Refresh data</string>
+    <string name="map_grid_activity_show_worked_first_calls">Show first callsigns for worked grids</string>
+    <string name="map_grid_activity_refresh">Check for updates</string>
     <string name="map_grid_activity_percent">Activity: %1$d%%</string>
+    <string name="map_grid_activity_recent_operators">Recent active stations</string>
+    <string name="map_grid_activity_no_recent_operators">No recent activity records</string>
     <string name="map_grid_activity_source_prefix">Data provided by </string>
     <string name="map_grid_activity_source_link">GridMaster.fr</string>
 </resources>
