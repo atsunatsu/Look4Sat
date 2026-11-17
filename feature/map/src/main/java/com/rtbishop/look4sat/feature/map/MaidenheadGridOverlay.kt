@@ -128,8 +128,9 @@ class MaidenheadGridOverlay : Overlay() {
     private val activityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
-    private data class ActivityCell(val grid: String, val bounds: CellBounds, val percentage: Int)
+    private data class ActivityCell(val grid: String, val bounds: CellBounds, val color: Int)
     private var activityCells: List<ActivityCell> = emptyList()
+    private var recentActivityCells: List<ActivityCell> = emptyList()
 
     /** GridMaster share of participating SAT logs containing a given 4-character grid. */
     var activityPercentages: Map<String, Int> = emptyMap()
@@ -137,13 +138,24 @@ class MaidenheadGridOverlay : Overlay() {
             if (field === value) return
             field = value
             activityCells = value.mapNotNull { (grid, percentage) ->
-                gridCellBounds(grid)?.let { ActivityCell(grid, it, percentage.coerceIn(0, 100)) }
+                gridCellBounds(grid)?.let { ActivityCell(grid, it, gridActivityPaletteColor(percentage)) }
+            }
+        }
+    /** Last-active date bands from GridMaster's bulk last.json endpoint. */
+    var recentActivityBands: Map<String, Int> = emptyMap()
+        set(value) {
+            if (field === value) return
+            field = value
+            recentActivityCells = value.mapNotNull { (grid, band) ->
+                gridCellBounds(grid)?.let { ActivityCell(grid, it, recentActivityTimePaletteColor(band)) }
             }
         }
     /** First/Most Wanted combined mode only; one call per unworked activated grid. */
     var latestCallLabelsByGrid: Map<String, String> = emptyMap()
     var showRecentActiveCalls: Boolean = true
     var showActivityOverlay: Boolean = false
+    /** When enabled, replace percentage colors with last-active-date bands. */
+    var showRecentActivityTime: Boolean = false
     var activityFilterMin: Int = 0
     var activityFilterMax: Int = 100
     /** Whether personal green worked fills remain visible over the activity heatmap. */
@@ -285,24 +297,28 @@ class MaidenheadGridOverlay : Overlay() {
         // Heatmap geometry always uses four-character squares at either zoom.
         val drawWorkedFills = !showActivityOverlay || showWorkedWithActivity
         val drawMarkedFills = !showActivityOverlay || showMarkedWithActivity
-        if (showActivityOverlay && activityCells.isNotEmpty()) {
+        val heatmapCells = if (showRecentActivityTime) recentActivityCells else activityCells
+        if (showActivityOverlay && heatmapCells.isNotEmpty()) {
             val pixelsPerDegreeLon = worldWidthPx / 360.0
-            for (entry in activityCells) {
+            for (entry in heatmapCells) {
                 val workedVisible = drawWorkedFills && entry.grid in workedGrids
                 val markedVisible = drawMarkedFills && entry.grid in markedGrids &&
                     (entry.grid !in workedGrids || !drawWorkedFills)
                 if (workedVisible || markedVisible) continue
-                if (entry.percentage !in activityFilterMin..activityFilterMax) continue
+                if (!showRecentActivityTime) {
+                    val percentage = activityPercentages[entry.grid] ?: continue
+                    if (percentage !in activityFilterMin..activityFilterMax) continue
+                }
                 val cell = entry.bounds
                 if (cell.latTop < bottomLat || cell.latBottom > topLat) continue
                 val yTop = projectionToY(projection, cell.latTop) ?: continue
                 val yBottom = projectionToY(projection, cell.latBottom) ?: continue
                 if (yBottom < 0f || yTop > canvas.height) continue
-                // Keep the SAT/LEO GridMaster bands fixed regardless of source data
-                // or range filter; only the visible cells change when filtering.
-                val paletteColor = gridActivityPaletteColor(entry.percentage)
                 activityPaint.color = Color.argb(
-                    110, Color.red(paletteColor), Color.green(paletteColor), Color.blue(paletteColor)
+                    GRID_ACTIVITY_FILL_ALPHA,
+                    Color.red(entry.color),
+                    Color.green(entry.color),
+                    Color.blue(entry.color)
                 )
                 for (turn in -colRepeats..colRepeats) {
                     val lonLeft = cell.lonLeft + turn * 360.0
@@ -601,9 +617,12 @@ class MaidenheadGridOverlay : Overlay() {
                     // the two-letter Maidenhead fields, with no percentages.
                     canvas.drawText(label, xCenter, yCenter, labelPaint)
                 } else {
-                    val percent = if (showActivityOverlay) {
+                    val percent = if (showActivityOverlay && !showRecentActivityTime) {
                         activityPercentages[label]?.takeIf { it in activityFilterMin..activityFilterMax }
                     } else null
+                    val isInActivityRange = if (showRecentActivityTime) {
+                        label in recentActivityBands
+                    } else percent != null
                     val mainLabel = if (showFirstCallLabels) {
                         // Worked grids show latest or local first-QSO depending on the
                         // settings toggle. Marked grids use latest activators in
@@ -616,7 +635,7 @@ class MaidenheadGridOverlay : Overlay() {
                             latestGridMasterCalls = latestCallLabelsByGrid,
                             showRecentActiveCalls = showRecentActiveCalls,
                             gridMasterActivityEnabled = showActivityOverlay,
-                            unworkedInActivityRange = percent != null
+                            unworkedInActivityRange = isInActivityRange
                         )
                     } else label
                     // Keep the text centred for both single- and double-line

@@ -517,6 +517,9 @@ private fun MapScreen(
     var showRecentActiveCalls by remember(activityPreferences) {
         mutableStateOf(activityPreferences.getBoolean("show_recent_active_calls", true))
     }
+    var showRecentActivityTime by remember(activityPreferences) {
+        mutableStateOf(activityPreferences.getBoolean("recent_activity_time", false))
+    }
     var latestOperatorsByGrid by remember(activityPreferences) {
         mutableStateOf<Map<String, List<GridActivityRecentOperator>>>(emptyMap())
     }
@@ -610,6 +613,10 @@ private fun MapScreen(
     val setShowRecentActiveCalls: (Boolean) -> Unit = { enabled ->
         showRecentActiveCalls = enabled
         activityPreferences.edit().putBoolean("show_recent_active_calls", enabled).apply()
+    }
+    val setShowRecentActivityTime: (Boolean) -> Unit = { enabled ->
+        showRecentActivityTime = enabled
+        activityPreferences.edit().putBoolean("recent_activity_time", enabled).apply()
     }
     val setActivityAward: (GridActivityAward) -> Unit = { award ->
         activityAward = award
@@ -767,11 +774,11 @@ private fun MapScreen(
     // The combined First Callsign + Most Wanted overlay uses one bulk request
     // per award per UTC day, not one grid.json request for every visible square.
     LaunchedEffect(
-        showGridActivity, uiState.showFirstCallLabels, lifecycleStarted,
+        showGridActivity, uiState.showFirstCallLabels, showRecentActivityTime, lifecycleStarted,
         uiState.isGridMode, activeAward, activityAward, gridMasterUtcDay
     ) {
         if (!lifecycleStarted || !uiState.isGridMode || activeAward != AwardType.VUCC ||
-            !showGridActivity || !uiState.showFirstCallLabels
+            !showGridActivity || (!uiState.showFirstCallLabels && !showRecentActivityTime)
         ) return@LaunchedEffect
         val requestedAward = activityAward
         val result = GridActivityStore.loadBulkLatest(
@@ -787,6 +794,12 @@ private fun MapScreen(
         ?.takeIf { it.first == activityAward }?.second?.operatorsByGrid.orEmpty()
     val bulkLatestLabels = remember(bulkLatestOperators) {
         bulkLatestOperators.mapValues { (_, operator) -> operator.call }
+    }
+    // Convert the cached last.json dates into fixed age bands using today's UTC date.
+    val recentActivityBands = remember(bulkLatestOperators, gridMasterUtcDay) {
+        bulkLatestOperators.mapNotNull { (grid, operator) ->
+            recentActivityTimeBand(operator.date, gridMasterUtcDay)?.let { band -> grid to band }
+        }.toMap()
     }
     // GridMaster operators are loaded only for the opened grid-detail dialog.
     // Neither the First Callsign overlay nor viewport scrolling triggers per-grid requests.
@@ -1009,7 +1022,9 @@ private fun MapScreen(
                             latestCallLabelsByGrid = bulkLatestLabels,
                             showRecentActiveCalls = showRecentActiveCalls,
                             activityPercentages = activitySnapshot?.percentages.orEmpty(),
+                            recentActivityBands = recentActivityBands,
                             showActivityOverlay = showGridActivity && activeAward == AwardType.VUCC,
+                            showRecentActivityTime = showRecentActivityTime,
                             activityFilterMin = activityMin,
                             activityFilterMax = activityMax,
                             showWorkedWithActivity = showWorkedWithActivity,
@@ -1188,6 +1203,7 @@ private fun MapScreen(
             showWorked = showWorkedWithActivity,
             showMarked = showMarkedWithActivity,
             showRecentActiveCalls = showRecentActiveCalls,
+            showRecentActivityTime = showRecentActivityTime,
             downloadedAt = activitySnapshot?.downloadedAt,
             loading = activityLoading,
             unavailable = (showGridActivity || showActivitySettings) &&
@@ -1198,6 +1214,7 @@ private fun MapScreen(
             onShowWorkedChange = setShowWorkedWithActivity,
             onShowMarkedChange = setShowMarkedWithActivity,
             onShowRecentActiveCallsChange = setShowRecentActiveCalls,
+            onShowRecentActivityTimeChange = setShowRecentActivityTime,
             onRefresh = {
                 activityRefreshSerial += 1
                 setActivityEnabled(true)
@@ -2785,6 +2802,7 @@ private fun GridActivitySettingsDialog(
     showWorked: Boolean,
     showMarked: Boolean,
     showRecentActiveCalls: Boolean,
+    showRecentActivityTime: Boolean,
     downloadedAt: Long?,
     loading: Boolean,
     unavailable: Boolean,
@@ -2794,6 +2812,7 @@ private fun GridActivitySettingsDialog(
     onShowWorkedChange: (Boolean) -> Unit,
     onShowMarkedChange: (Boolean) -> Unit,
     onShowRecentActiveCallsChange: (Boolean) -> Unit,
+    onShowRecentActivityTimeChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -2870,42 +2889,62 @@ private fun GridActivitySettingsDialog(
                         }
                     }
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = stringResource(R.string.map_grid_activity_filter_title),
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
+                            text = stringResource(R.string.map_grid_activity_recent_time_toggle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f).clickable {
+                                onShowRecentActivityTimeChange(!showRecentActivityTime)
+                            }
                         )
-                        Text(
-                            text = "${minPercent}%",
-                            fontSize = 18.sp,
-                            color = gridActivityBadgeColor(minPercent)
-                        )
-                        Text(
-                            text = "...",
-                            fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "${maxPercent}%",
-                            fontSize = 18.sp,
-                            color = gridActivityBadgeColor(maxPercent)
+                        Switch(
+                            checked = showRecentActivityTime,
+                            onCheckedChange = onShowRecentActivityTimeChange
                         )
                     }
-                    RangeSlider(
-                        value = minPercent.toFloat()..maxPercent.toFloat(),
-                        onValueChange = { range ->
-                            val min = range.start.roundToInt().coerceIn(0, 100)
-                            val max = range.endInclusive.roundToInt().coerceIn(min, 100)
-                            if (min != minPercent) onMinChange(min)
-                            if (max != maxPercent) onMaxChange(max)
-                        },
-                        valueRange = 0f..100f,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (showRecentActivityTime) {
+                        GridRecentActivityLegend()
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.map_grid_activity_filter_title),
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "${minPercent}%",
+                                fontSize = 18.sp,
+                                color = gridActivityBadgeColor(minPercent)
+                            )
+                            Text(
+                                text = "...",
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "${maxPercent}%",
+                                fontSize = 18.sp,
+                                color = gridActivityBadgeColor(maxPercent)
+                            )
+                        }
+                        RangeSlider(
+                            value = minPercent.toFloat()..maxPercent.toFloat(),
+                            onValueChange = { range ->
+                                val min = range.start.roundToInt().coerceIn(0, 100)
+                                val max = range.endInclusive.roundToInt().coerceIn(min, 100)
+                                if (min != minPercent) onMinChange(min)
+                                if (max != maxPercent) onMaxChange(max)
+                            },
+                            valueRange = 0f..100f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
@@ -2998,6 +3037,49 @@ private fun GridActivitySettingsDialog(
         }
     }
 }
+
+@Composable
+private fun GridRecentActivityLegend() {
+    val entries = listOf(
+        R.string.map_grid_recent_time_0_7 to 0xFFF44336.toInt(),
+        R.string.map_grid_recent_time_8_30 to 0xFFFF7043.toInt(),
+        R.string.map_grid_recent_time_31_90 to 0xFFFFB74D.toInt(),
+        R.string.map_grid_recent_time_91_180 to 0xFFC6DBEF.toInt(),
+        R.string.map_grid_recent_time_181_365 to 0xFF9ECAE1.toInt(),
+        R.string.map_grid_recent_time_1_3_years to 0xFF6BAED6.toInt(),
+        R.string.map_grid_recent_time_3_10_years to 0xFF3182BD.toInt(),
+        R.string.map_grid_recent_time_over_10_years to 0xFF08519C.toInt()
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        entries.chunked(2).forEach { rowEntries ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowEntries.forEach { (label, color) ->
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(12.dp).background(
+                                ComposeColor(color).copy(alpha = GRID_ACTIVITY_FILL_ALPHA / 255f),
+                                RoundedCornerShape(3.dp)
+                            )
+                        )
+                        Text(
+                            text = stringResource(label),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 // endregion
 
 // region Tile sources
@@ -3159,7 +3241,9 @@ private fun setGridMode(
     latestCallLabelsByGrid: Map<String, String> = emptyMap(),
     showRecentActiveCalls: Boolean = true,
     activityPercentages: Map<String, Int> = emptyMap(),
+    recentActivityBands: Map<String, Int> = emptyMap(),
     showActivityOverlay: Boolean = false,
+    showRecentActivityTime: Boolean = false,
     activityFilterMin: Int = 0,
     activityFilterMax: Int = 100,
     showWorkedWithActivity: Boolean = true,
@@ -3178,7 +3262,9 @@ private fun setGridMode(
             gridOverlay.latestCallLabelsByGrid = latestCallLabelsByGrid
             gridOverlay.showRecentActiveCalls = showRecentActiveCalls
             gridOverlay.activityPercentages = activityPercentages
+            gridOverlay.recentActivityBands = recentActivityBands
             gridOverlay.showActivityOverlay = gridMode && showActivityOverlay
+            gridOverlay.showRecentActivityTime = showRecentActivityTime
             gridOverlay.activityFilterMin = activityFilterMin
             gridOverlay.activityFilterMax = activityFilterMax
             gridOverlay.showWorkedWithActivity = showWorkedWithActivity
@@ -3198,7 +3284,9 @@ private fun setGridMode(
                 this.latestCallLabelsByGrid = latestCallLabelsByGrid
                 this.showRecentActiveCalls = showRecentActiveCalls
                 this.activityPercentages = activityPercentages
+                this.recentActivityBands = recentActivityBands
                 this.showActivityOverlay = gridMode && showActivityOverlay
+                this.showRecentActivityTime = showRecentActivityTime
                 this.activityFilterMin = activityFilterMin
                 this.activityFilterMax = activityFilterMax
                 this.showWorkedWithActivity = showWorkedWithActivity

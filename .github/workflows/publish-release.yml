@@ -389,19 +389,17 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21.8 — GridMaster latest activators and Wavelog connection fix
-          - Integrate GridMaster's new bulk last-activator API for recent callsigns on the grid map, avoiding expensive per-grid downloads.
-          - Add the "Show latest active callsign" control to grid activity settings while keeping locally worked first callsigns distinct from GridMaster activity.
-          - Fix Wavelog fetching station profiles without persisting its URL/API key, which caused the misleading "Wavelog URL/key not configured" error.
-          - Full and incremental Wavelog sync now use the edited connection, verify changes before syncing, and keep the LoTW-to-Wavelog handover confirmation.
-          - Prevent stale station selection when switching Wavelog servers; refresh dialog fields and add connection regression tests.
+          ## v21.9 — GridMaster grid activity time heatmap
+          - Add an optional grid activity time heatmap using GridMaster's bulk last-active dates.
+          - Show eight discrete age bands from 0–7 days to over 10 years with the agreed red-to-blue palette and the existing 110/255 map fill opacity.
+          - Reuse the existing cached bulk last.json data; no per-grid API requests are added.
+          - Keep the Most Wanted percentage heatmap available as the alternative mode, with existing worked/marked grid and recent callsign controls unchanged.
 
-          ## v21.8 — GridMaster 最近活跃呼号与 Wavelog 同步修复
-          - 接入 GridMaster 最新批量活跃呼号 API，减少逐网格请求，支持在网格活跃度设置中控制最近活跃呼号的显示。
-          - 首通呼号继续使用本地通联记录，与 GridMaster 最近活跃呼号分离。
-          - 修复 Wavelog 获取台站成功但 URL/API Key 未保存，导致同步错误提示未配置的问题。
-          - 全量与增量同步使用当前输入的连接信息；更换服务器时重新验证，避免旧台站缓存混用。
-          - 保留 LoTW/Wavelog 切换确认，增加回归测试。
+          ## v21.9 — GridMaster 网格活跃时间热力图
+          - 新增「网格活跃时间热力图」，根据 GridMaster API 返回的最近活跃日期，将网格划分为八个离散时间区间并按约定的红蓝配色填色。
+          - 沿用地图原有 110/255 填充不透明度。
+          - 复用现有批量 last.json 缓存，不增加逐网格 API 请求。
+          - 保留原有 Most Wanted 百分比热力图，可在两种模式间切换；已通联、已标记网格及最近活跃呼号开关保持不变。
           RELEASE_NOTES
           )"
           fi

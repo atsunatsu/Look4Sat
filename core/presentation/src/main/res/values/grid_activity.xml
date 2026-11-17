@@ -17,6 +17,15 @@
     <string name="map_grid_activity_show_worked">Show worked grids</string>
     <string name="map_grid_activity_show_marked">Show marked grids</string>
     <string name="map_grid_activity_show_recent_calls">Show recent active callsigns</string>
+    <string name="map_grid_activity_recent_time_toggle">Grid Activity Time Heatmap</string>
+    <string name="map_grid_recent_time_0_7">0–7 days</string>
+    <string name="map_grid_recent_time_8_30">8–30 days</string>
+    <string name="map_grid_recent_time_31_90">31–90 days</string>
+    <string name="map_grid_recent_time_91_180">91–180 days</string>
+    <string name="map_grid_recent_time_181_365">181–365 days</string>
+    <string name="map_grid_recent_time_1_3_years">1–3 years</string>
+    <string name="map_grid_recent_time_3_10_years">3–10 years</string>
+    <string name="map_grid_recent_time_over_10_years">Over 10 years</string>
     <string name="map_grid_activity_refresh">Check for updates</string>
     <string name="map_grid_activity_percent">Activity: %1$d%%</string>
     <string name="map_grid_activity_recent_operators">Recent active stations</string>

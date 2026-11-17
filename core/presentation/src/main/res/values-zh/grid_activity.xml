@@ -17,6 +17,15 @@
     <string name="map_grid_activity_show_worked">显示已通联网格</string>
     <string name="map_grid_activity_show_marked">显示已标记网格</string>
     <string name="map_grid_activity_show_recent_calls">显示最近活跃呼号</string>
+    <string name="map_grid_activity_recent_time_toggle">网格活跃时间热力图</string>
+    <string name="map_grid_recent_time_0_7">0–7 天</string>
+    <string name="map_grid_recent_time_8_30">8–30 天</string>
+    <string name="map_grid_recent_time_31_90">31–90 天</string>
+    <string name="map_grid_recent_time_91_180">91–180 天</string>
+    <string name="map_grid_recent_time_181_365">181–365 天</string>
+    <string name="map_grid_recent_time_1_3_years">1–3 年</string>
+    <string name="map_grid_recent_time_3_10_years">3–10 年</string>
+    <string name="map_grid_recent_time_over_10_years">超过 10 年</string>
     <string name="map_grid_activity_refresh">检查更新</string>
     <string name="map_grid_activity_percent">活跃度：%1$d%%</string>
     <string name="map_grid_activity_recent_operators">最近活跃电台</string>
