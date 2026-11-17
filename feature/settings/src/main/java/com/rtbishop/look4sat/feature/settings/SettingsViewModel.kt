@@ -45,6 +45,10 @@ import com.rtbishop.look4sat.core.domain.repository.resolveWavelogSyncMode
 import com.rtbishop.look4sat.core.domain.repository.shouldPromoteWavelogFullSync
 import com.rtbishop.look4sat.core.domain.repository.WavelogStationInfo
 import com.rtbishop.look4sat.core.domain.repository.withStationProfile
+import com.rtbishop.look4sat.core.domain.repository.hasWavelogConnection
+import com.rtbishop.look4sat.core.domain.repository.withVerifiedWavelogConnection
+import com.rtbishop.look4sat.core.domain.repository.withUnverifiedWavelogConnection
+import com.rtbishop.look4sat.core.domain.repository.normalizeWavelogUrl
 import com.rtbishop.look4sat.core.domain.repository.refreshWavelogStationForUpload
 import com.rtbishop.look4sat.core.domain.repository.WavelogUploadOutcome
 import com.rtbishop.look4sat.core.domain.repository.WavelogUploadPreview
@@ -264,7 +268,7 @@ class SettingsViewModel(
             is SettingsAction.UpdateWavelogUpload -> applyWavelogUploadSettings(action.settings)
             is SettingsAction.FetchWavelogUploadStations -> fetchWavelogUploadStations(action.url, action.apiKey)
             is SettingsAction.SelectWavelogUploadStation -> applyWavelogUploadStation(action.station)
-            is SettingsAction.SyncWavelog -> syncWavelog(action.mode)
+            is SettingsAction.SyncWavelog -> syncWavelogWithInput(action.mode, action.url, action.apiKey)
             SettingsAction.ConfirmWavelogSwitch -> confirmWavelogSwitch()
             SettingsAction.CancelWavelogSwitch -> cancelWavelogSwitch()
             SettingsAction.ClearWavelogConfig -> clearWavelogConfig()
@@ -307,26 +311,42 @@ class SettingsViewModel(
     /** A switch that needs the LoTW→Wavelog hand-over confirmation before it applies. */
     private var pendingWavelogSwitch: (() -> Unit)? = null
 
+    /** An in-flight probe must never overwrite a newer Save or Clear action. */
+    private var wavelogProbeGeneration = 0
+
     private fun currentLoTWConfigured(): Boolean =
         settingsRepo.lotwSettings.value.isConfigured || _uiState.value.lotwCertificate != null
 
-    /**
-     * Applies a Wavelog config change. Completing the configuration (the block turning
-     * ready) while LoTW is configured pauses for the operator's confirmation: from then
-     * on uploads and syncs go through Wavelog only and the LoTW sides stay unavailable
-     * (the one-of-two rule). A half-filled config changes nothing about the routing.
-     */
+    /** Saving draft credentials does not verify a new station profile. */
     private fun applyWavelogUploadSettings(settings: WavelogUploadSettings) {
+        wavelogProbeGeneration++
         val current = settingsRepo.wavelogUploadSettings.value
-        if (!current.isReady && settings.isReady && currentLoTWConfigured()) {
-            pendingWavelogSwitch = { settingsRepo.updateWavelogUploadSettings(settings) }
-            _uiState.update { it.copy(wavelogSwitchWarning = true) }
-            return
+        val changed = !current.hasWavelogConnection(settings.url, settings.apiKey)
+        val updated = current.withUnverifiedWavelogConnection(settings.url, settings.apiKey)
+        if (changed) {
+            settingsRepo.setWavelogStations(emptyList())
+            _uiState.update {
+                it.copy(
+                    wavelogUploadStations = emptyList(),
+                    wavelogUploadRights = "",
+                    logbookStationFilter = null,
+                    wavelogUploadMessage = null
+                )
+            }
         }
-        settingsRepo.updateWavelogUploadSettings(settings)
+        settingsRepo.updateWavelogUploadSettings(updated)
     }
 
     private fun applyWavelogUploadStation(station: WavelogStationInfo) {
+        // Reject a station picked from stale UI data or from another server.
+        if (!settingsRepo.wavelogUploadSettings.value.isConfigured ||
+            settingsRepo.getWavelogStations().none { it.id == station.id }
+        ) {
+            _uiState.update {
+                it.copy(wavelogUploadMessage = "Fetch stations for the current URL/key first")
+            }
+            return
+        }
         val current = settingsRepo.wavelogUploadSettings.value
         val updated = current.withStationProfile(station)
         if (!current.isReady && updated.isReady && currentLoTWConfigured()) {
@@ -338,9 +358,10 @@ class SettingsViewModel(
     }
 
     private fun confirmWavelogSwitch() {
-        pendingWavelogSwitch?.invoke()
+        val apply = pendingWavelogSwitch
         pendingWavelogSwitch = null
         _uiState.update { it.copy(wavelogSwitchWarning = false) }
+        apply?.invoke()
     }
 
     private fun cancelWavelogSwitch() {
@@ -348,42 +369,123 @@ class SettingsViewModel(
         _uiState.update { it.copy(wavelogSwitchWarning = false) }
     }
 
-    /** Wipe the configuration — routing falls back to LoTW on the next check. */
+    /** Wipe the configuration, including the cached station list. */
     private fun clearWavelogConfig() {
+        wavelogProbeGeneration++
+        pendingWavelogSwitch = null
         settingsRepo.updateWavelogUploadSettings(WavelogUploadSettings())
-        _uiState.update { it.copy(logbookStationFilter = null, logbookWavelogPreview = null) }
+        settingsRepo.setWavelogStations(emptyList())
+        _uiState.update {
+            it.copy(
+                wavelogSwitchWarning = false,
+                wavelogUploadStations = emptyList(),
+                wavelogUploadRights = "",
+                wavelogUploadMessage = null,
+                logbookStationFilter = null,
+                logbookWavelogPreview = null
+            )
+        }
     }
 
-    private fun fetchWavelogUploadStations(url: String, apiKey: String) {
-        if (_uiState.value.wavelogUploadProbeBusy) return
-        _uiState.update { it.copy(wavelogUploadProbeBusy = true, wavelogUploadMessage = null) }
+    /**
+     * Verify the credentials first, then save them together with the matching
+     * server's station list. If LoTW is active, do not switch modes or sync
+     * until the user explicitly confirms the hand-over.
+     */
+    private fun fetchWavelogUploadStations(
+        url: String,
+        apiKey: String,
+        syncAfter: WavelogSyncMode? = null
+    ) {
+        if (_uiState.value.wavelogUploadProbeBusy || _uiState.value.wavelogSyncing ||
+            _uiState.value.wavelogSwitchWarning
+        ) return
+        val base = normalizeWavelogUrl(url)
+        val key = apiKey.trim()
+        if (base.isBlank() || key.isBlank()) {
+            _uiState.update {
+                it.copy(wavelogUploadMessage = "Wavelog URL/key not configured", wavelogUploadMessageIsError = true)
+            }
+            return
+        }
+        val generation = ++wavelogProbeGeneration
+        _uiState.update {
+            it.copy(wavelogUploadProbeBusy = true, wavelogUploadMessage = null)
+        }
         viewModelScope.launch {
-            val probe = wavelogUploadRepository.probe(url.trim(), apiKey.trim())
+            val probe = wavelogUploadRepository.probe(base, key)
+            if (generation != wavelogProbeGeneration) {
+                _uiState.update { it.copy(wavelogUploadProbeBusy = false) }
+                return@launch
+            }
             if (probe == null) {
                 _uiState.update {
                     it.copy(
                         wavelogUploadProbeBusy = false,
-                        wavelogUploadMessage = "Wavelog probe failed — check URL/key/network"
+                        wavelogUploadMessage = "Wavelog probe failed — check URL/key/network",
+                        wavelogUploadMessageIsError = true
                     )
                 }
                 return@launch
             }
-            // Persist the full list: the logbook's 台址 selector and the sync use it,
-            // not just the dialog that fetched it.
-            settingsRepo.setWavelogStations(probe.stations)
-            _uiState.update {
-                it.copy(
-                    wavelogUploadProbeBusy = false,
-                    wavelogUploadStations = probe.stations,
-                    wavelogUploadRights = probe.rights
-                )
-            }
-            // Single-station setups select themselves; a saved station that the server
-            // still reports stays selected.
+
             val current = settingsRepo.wavelogUploadSettings.value
-            val selected = probe.stations.firstOrNull { it.id == current.stationId }
-            val auto = if (selected == null && current.stationId.isBlank() && probe.stations.size == 1) probe.stations.single() else null
-            (selected ?: auto)?.let(::applyWavelogUploadStation)
+            val verified = current.withVerifiedWavelogConnection(base, key, probe.stations)
+            val commitVerifiedConnection: () -> Unit = {
+                settingsRepo.updateWavelogUploadSettings(verified)
+                settingsRepo.setWavelogStations(probe.stations)
+                _uiState.update {
+                    it.copy(
+                        wavelogUploadProbeBusy = false,
+                        wavelogUploadStations = probe.stations,
+                        wavelogUploadRights = probe.rights,
+                        logbookStationFilter = null,
+                        wavelogUploadMessage = "Wavelog connected — URL/key saved",
+                        wavelogUploadMessageIsError = false
+                    )
+                }
+                if (syncAfter != null) {
+                    if (currentLoTWConfigured() && !verified.isReady) {
+                        _uiState.update {
+                            it.copy(
+                                wavelogUploadMessage = "Select a Wavelog station and confirm switching from LoTW before syncing",
+                                wavelogUploadMessageIsError = true
+                            )
+                        }
+                    } else {
+                        syncWavelog(syncAfter)
+                    }
+                }
+            }
+
+            if (!current.isReady && verified.isReady && currentLoTWConfigured()) {
+                pendingWavelogSwitch = commitVerifiedConnection
+                _uiState.update {
+                    it.copy(
+                        wavelogUploadProbeBusy = false,
+                        wavelogSwitchWarning = true,
+                        wavelogUploadMessage = "Confirm the switch from LoTW to save the Wavelog connection",
+                        wavelogUploadMessageIsError = true
+                    )
+                }
+            } else {
+                commitVerifiedConnection()
+            }
+        }
+    }
+
+    /** Use the edited fields, not an earlier saved URL/key or cached station list. */
+    private fun syncWavelogWithInput(mode: WavelogSyncMode, url: String, apiKey: String) {
+        if (_uiState.value.wavelogUploadProbeBusy || _uiState.value.wavelogSyncing ||
+            _uiState.value.wavelogSwitchWarning
+        ) return
+        val current = settingsRepo.wavelogUploadSettings.value
+        if (!current.hasWavelogConnection(url, apiKey) ||
+            settingsRepo.getWavelogStations().isEmpty()
+        ) {
+            fetchWavelogUploadStations(url, apiKey, syncAfter = mode)
+        } else {
+            syncWavelog(mode)
         }
     }
 
@@ -397,7 +499,16 @@ class SettingsViewModel(
         if (_uiState.value.wavelogSyncing) return
         val settings = settingsRepo.wavelogUploadSettings.value
         if (!settings.isConfigured) {
-            _uiState.update { it.copy(wavelogUploadMessage = "Wavelog URL/key not configured") }
+            _uiState.update { it.copy(wavelogUploadMessage = "Wavelog URL/key not configured", wavelogUploadMessageIsError = true) }
+            return
+        }
+        if (!settings.isReady && currentLoTWConfigured()) {
+            _uiState.update {
+                it.copy(
+                    wavelogUploadMessage = "Select a Wavelog station and confirm switching from LoTW before syncing",
+                    wavelogUploadMessageIsError = true
+                )
+            }
             return
         }
         val stations = settingsRepo.getWavelogStations()
@@ -455,7 +566,8 @@ class SettingsViewModel(
                         logbookRecords = syncedRecords,
                         workedGridsCount = settingsRepo.getWorkedGrids().size,
                         wavelogLastSyncEpochMs = settingsRepo.getLastWavelogSyncEpochMs(),
-                        wavelogUploadMessage = wavelogSyncSummary(actualMode, fetch, merge, stations.size, promoted)
+                        wavelogUploadMessage = wavelogSyncSummary(actualMode, fetch, merge, stations.size, promoted),
+                        wavelogUploadMessageIsError = fetch.failedStations.isNotEmpty()
                     )
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {

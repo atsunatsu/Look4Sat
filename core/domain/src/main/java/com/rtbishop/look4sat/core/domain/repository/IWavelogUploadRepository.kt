@@ -89,3 +89,37 @@ fun WavelogUploadSettings.withStationProfile(station: WavelogStationInfo): Wavel
         stationCallsign = station.callsign,
         stationGrid = station.grid
     )
+
+/** URL and key are edited locally before they are verified with the Wavelog server. */
+fun WavelogUploadSettings.hasWavelogConnection(url: String, apiKey: String): Boolean =
+    normalizeWavelogUrl(this.url) == normalizeWavelogUrl(url) &&
+        this.apiKey.trim() == apiKey.trim()
+
+/** Never carry a station ID (or station metadata) into unverified credentials. */
+fun WavelogUploadSettings.withUnverifiedWavelogConnection(url: String, apiKey: String): WavelogUploadSettings {
+    val normalizedUrl = normalizeWavelogUrl(url)
+    val normalizedKey = apiKey.trim()
+    return if (hasWavelogConnection(normalizedUrl, normalizedKey)) {
+        copy(url = normalizedUrl, apiKey = normalizedKey)
+    } else {
+        WavelogUploadSettings(url = normalizedUrl, apiKey = normalizedKey)
+    }
+}
+
+/**
+ * A successful check_auth + station_info verifies the URL and key.
+ * Keep a selected station only if the same server still returns that ID.
+ * A single new station can be selected automatically; multi-station servers need a choice.
+ */
+fun WavelogUploadSettings.withVerifiedWavelogConnection(
+    url: String,
+    apiKey: String,
+    stations: List<WavelogStationInfo>
+): WavelogUploadSettings {
+    val normalizedUrl = normalizeWavelogUrl(url)
+    val sameServer = normalizeWavelogUrl(this.url) == normalizedUrl
+    val selected = (if (sameServer) stations.firstOrNull { it.id == stationId } else null)
+        ?: stations.singleOrNull()
+    return WavelogUploadSettings(url = normalizedUrl, apiKey = apiKey.trim())
+        .let { if (selected != null) it.withStationProfile(selected) else it }
+}
