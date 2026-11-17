@@ -187,6 +187,11 @@ fun WavelogUploadDialog(
 ) {
     val url = rememberSaveable { mutableStateOf(initialSettings.url) }
     val apiKey = rememberSaveable { mutableStateOf(initialSettings.apiKey) }
+    // A successful probe, or Clear, changes the stored connection while the dialog stays open.
+    LaunchedEffect(initialSettings.url, initialSettings.apiKey) {
+        url.value = initialSettings.url
+        apiKey.value = initialSettings.apiKey
+    }
     val stationListMatchesInput = initialSettings.hasWavelogConnection(url.value, apiKey.value)
     var showClearConfirm by remember { mutableStateOf(false) }
     SharedDialog(
