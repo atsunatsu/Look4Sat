@@ -55,6 +55,50 @@ class GridActivityStoreTest {
     }
 
     @Test
+    fun bulkLatestEndpointUsesAwardAndNoPerGridRequests() {
+        assertEquals(
+            "https://gridmaster.fr/api/last.json?award=sat",
+            GridActivityStore.endpointForBulkLatest(GridActivityAward.SATELLITE)
+        )
+        assertEquals(
+            "https://gridmaster.fr/api/last.json?award=sat/leo",
+            GridActivityStore.endpointForBulkLatest(GridActivityAward.LEO)
+        )
+    }
+
+    @Test
+    fun parsesLatestOperatorsAndDatesForEveryActivatedGrid() {
+        val response = JSONObject()
+            .put("award", JSONObject().put("code", "sat"))
+            .put("updated", "2026-11-16")
+            .put("grids", 2)
+            .put("worked", JSONObject()
+                .put("JO31", JSONObject().put("call", "DF2ET").put("date", "2026-11-12"))
+                .put("OL62", JSONObject().put("call", "BA7OPF").put("date", "2026-11-16")))
+        assertEquals(
+            mapOf(
+                "JO31" to GridActivityRecentOperator("DF2ET", "2026-11-12"),
+                "OL62" to GridActivityRecentOperator("BA7OPF", "2026-11-16")
+            ),
+            GridActivityStore.parseBulkLatest(response.toString(), minimumEntries = 1)
+        )
+    }
+
+    @Test(expected = IOException::class)
+    fun rejectsBulkLatestDatasetWithMissingWorkedMap() {
+        GridActivityStore.parseBulkLatest(JSONObject().put("grids", 2).toString(), 1)
+    }
+
+    @Test(expected = IOException::class)
+    fun refusesIncompleteBulkLatestSoGoodCacheIsNotOverwritten() {
+        val response = JSONObject()
+            .put("grids", 2)
+            .put("worked", JSONObject()
+                .put("JO31", JSONObject().put("call", "DF2ET").put("date", "2026-11-12")))
+        GridActivityStore.parseBulkLatest(response.toString(), minimumEntries = 1)
+    }
+
+    @Test
     fun gridMasterCacheExpiresAtUtcMidnight() {
         val utcMidnight = 20_000L * GridActivityStore.MILLIS_PER_UTC_DAY
 
