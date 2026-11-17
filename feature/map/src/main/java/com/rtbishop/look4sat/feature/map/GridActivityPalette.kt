@@ -9,6 +9,9 @@
  */
 package com.rtbishop.look4sat.feature.map
 
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+
 /**
  * Fixed seven-band GridMaster-style activity palette.
  *
@@ -28,4 +31,42 @@ internal fun gridActivityPaletteColor(percentage: Int): Int = when (percentage.c
     in 18..22 -> 0xFFB5E133.toInt() // yellow-green
     in 23..32 -> 0xFF32E64D.toInt() // bright green
     else -> 0xFF087C30.toInt()      // deep green, from 33%
+}
+
+
+/** Shared fill opacity for GridMaster map heatmaps (110/255 = 43.1%). */
+internal const val GRID_ACTIVITY_FILL_ALPHA = 110
+
+/**
+ * Maps a GridMaster last-active ISO date to the user's eight fixed age bands.
+ * [today] must be the current UTC calendar date so every grid changes band together.
+ * Invalid and future dates are omitted rather than shown as fresh activity.
+ */
+internal fun recentActivityTimeBand(date: String?, today: LocalDate): Int? {
+    val lastActive = date?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+    if (lastActive.isAfter(today)) return null
+
+    val daysAgo = ChronoUnit.DAYS.between(lastActive, today)
+    return when {
+        daysAgo <= 7L -> 0
+        daysAgo <= 30L -> 1
+        daysAgo <= 90L -> 2
+        daysAgo <= 180L -> 3
+        daysAgo <= 365L -> 4
+        !lastActive.isBefore(today.minusYears(3)) -> 5
+        !lastActive.isBefore(today.minusYears(10)) -> 6
+        else -> 7
+    }
+}
+
+/** Opaque palette colors; [GRID_ACTIVITY_FILL_ALPHA] is applied only by the map paint. */
+internal fun recentActivityTimePaletteColor(band: Int): Int = when (band.coerceIn(0, 7)) {
+    0 -> 0xFFF44336.toInt() // 0–7 days
+    1 -> 0xFFFF7043.toInt() // 8–30 days
+    2 -> 0xFFFFB74D.toInt() // 31–90 days
+    3 -> 0xFFC6DBEF.toInt() // 91–180 days
+    4 -> 0xFF9ECAE1.toInt() // 181–365 days
+    5 -> 0xFF6BAED6.toInt() // 1–3 years
+    6 -> 0xFF3182BD.toInt() // 3–10 years
+    else -> 0xFF08519C.toInt() // over 10 years
 }
