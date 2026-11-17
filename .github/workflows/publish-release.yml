@@ -400,7 +400,7 @@ jobs:
           - 沿用地图原有 110/255 填充不透明度。
           - 复用现有批量 last.json 缓存，不增加逐网格 API 请求。
           - 保留原有 Most Wanted 百分比热力图，可在两种模式间切换；已通联、已标记网格及最近活跃呼号开关保持不变。
-                    RELEASE_NOTES
+          RELEASE_NOTES
           )"
           fi
           if [ -z "$NOTES" ]; then
