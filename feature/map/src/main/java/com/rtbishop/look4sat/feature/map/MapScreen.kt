@@ -797,11 +797,8 @@ private fun MapScreen(
     }
     // Convert the cached last.json dates into fixed age bands using today's UTC date.
     val recentActivityBands = remember(bulkLatestOperators, gridMasterUtcDay) {
-        val todayUtc = java.time.Instant.ofEpochMilli(
-            gridMasterUtcDay * GridActivityStore.MILLIS_PER_UTC_DAY
-        ).atZone(java.time.ZoneOffset.UTC).toLocalDate()
         bulkLatestOperators.mapNotNull { (grid, operator) ->
-            recentActivityTimeBand(operator.date, todayUtc)?.let { band -> grid to band }
+            recentActivityTimeBand(operator.date, gridMasterUtcDay)?.let { band -> grid to band }
         }.toMap()
     }
     // GridMaster operators are loaded only for the opened grid-detail dialog.

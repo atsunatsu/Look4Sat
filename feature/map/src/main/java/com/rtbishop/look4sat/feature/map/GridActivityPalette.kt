@@ -9,8 +9,10 @@
  */
 package com.rtbishop.look4sat.feature.map
 
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
+import java.util.Calendar
+import java.util.GregorianCalendar
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Fixed seven-band GridMaster-style activity palette.
@@ -37,27 +39,58 @@ internal fun gridActivityPaletteColor(percentage: Int): Int = when (percentage.c
 /** Shared fill opacity for GridMaster map heatmaps (110/255 = 43.1%). */
 internal const val GRID_ACTIVITY_FILL_ALPHA = 110
 
+private const val MILLIS_PER_UTC_DAY = 24L * 60L * 60L * 1000L
+private val UTC_TIME_ZONE: TimeZone = TimeZone.getTimeZone("UTC")
+
+/** Parse an ISO date as an integer UTC epoch day. Invalid dates return null. */
+internal fun parseGridMasterUtcDate(date: String?): Long? {
+    val value = date ?: return null
+    if (!value.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) return null
+    val year = value.substring(0, 4).toIntOrNull() ?: return null
+    val month = value.substring(5, 7).toIntOrNull() ?: return null
+    val day = value.substring(8, 10).toIntOrNull() ?: return null
+    if (year < 1 || month !in 1..12 || day !in 1..31) return null
+
+    return try {
+        GregorianCalendar(UTC_TIME_ZONE, Locale.US).apply {
+            isLenient = false
+            clear()
+            set(year, month - 1, day, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis / MILLIS_PER_UTC_DAY
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+}
+
 /**
  * Maps a GridMaster last-active ISO date to the user's eight fixed age bands.
- * [today] must be the current UTC calendar date so every grid changes band together.
+ * [todayUtcDay] is the current UTC epoch day so every grid changes band together.
  * Invalid and future dates are omitted rather than shown as fresh activity.
  */
-internal fun recentActivityTimeBand(date: String?, today: LocalDate): Int? {
-    val lastActive = date?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
-    if (lastActive.isAfter(today)) return null
+internal fun recentActivityTimeBand(date: String?, todayUtcDay: Long): Int? {
+    val lastActiveDay = parseGridMasterUtcDate(date) ?: return null
+    if (lastActiveDay > todayUtcDay) return null
 
-    val daysAgo = ChronoUnit.DAYS.between(lastActive, today)
+    val daysAgo = todayUtcDay - lastActiveDay
     return when {
         daysAgo <= 7L -> 0
         daysAgo <= 30L -> 1
         daysAgo <= 90L -> 2
         daysAgo <= 180L -> 3
         daysAgo <= 365L -> 4
-        !lastActive.isBefore(today.minusYears(3)) -> 5
-        !lastActive.isBefore(today.minusYears(10)) -> 6
+        lastActiveDay >= utcDayYearsBefore(todayUtcDay, 3) -> 5
+        lastActiveDay >= utcDayYearsBefore(todayUtcDay, 10) -> 6
         else -> 7
     }
 }
+
+private fun utcDayYearsBefore(todayUtcDay: Long, years: Int): Long =
+    GregorianCalendar(UTC_TIME_ZONE, Locale.US).run {
+        timeInMillis = todayUtcDay * MILLIS_PER_UTC_DAY
+        add(Calendar.YEAR, -years)
+        timeInMillis / MILLIS_PER_UTC_DAY
+    }
 
 /** Opaque palette colors; [GRID_ACTIVITY_FILL_ALPHA] is applied only by the map paint. */
 internal fun recentActivityTimePaletteColor(band: Int): Int = when (band.coerceIn(0, 7)) {

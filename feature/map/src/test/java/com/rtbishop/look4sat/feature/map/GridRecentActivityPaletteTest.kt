@@ -3,33 +3,32 @@ package com.rtbishop.look4sat.feature.map
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-import java.time.LocalDate
 
 class GridRecentActivityPaletteTest {
 
-    private val today = LocalDate.of(2026, 11, 16)
+    private val today = requireNotNull(parseGridMasterUtcDate("2026-11-16"))
 
     @Test
     fun mapsEveryExactDayBoundaryToTheRequestedBand() {
-        assertEquals(0, recentActivityTimeBand(today.toString(), today))
-        assertEquals(0, recentActivityTimeBand(today.minusDays(7).toString(), today))
-        assertEquals(1, recentActivityTimeBand(today.minusDays(8).toString(), today))
-        assertEquals(1, recentActivityTimeBand(today.minusDays(30).toString(), today))
-        assertEquals(2, recentActivityTimeBand(today.minusDays(31).toString(), today))
-        assertEquals(2, recentActivityTimeBand(today.minusDays(90).toString(), today))
-        assertEquals(3, recentActivityTimeBand(today.minusDays(91).toString(), today))
-        assertEquals(3, recentActivityTimeBand(today.minusDays(180).toString(), today))
-        assertEquals(4, recentActivityTimeBand(today.minusDays(181).toString(), today))
-        assertEquals(4, recentActivityTimeBand(today.minusDays(365).toString(), today))
-        assertEquals(5, recentActivityTimeBand(today.minusDays(366).toString(), today))
+        assertEquals(0, recentActivityTimeBand("2026-11-16", today))
+        assertEquals(0, recentActivityTimeBand("2026-11-09", today))
+        assertEquals(1, recentActivityTimeBand("2026-11-08", today))
+        assertEquals(1, recentActivityTimeBand("2026-10-17", today))
+        assertEquals(2, recentActivityTimeBand("2026-10-16", today))
+        assertEquals(2, recentActivityTimeBand("2026-08-18", today))
+        assertEquals(3, recentActivityTimeBand("2026-08-17", today))
+        assertEquals(3, recentActivityTimeBand("2026-05-20", today))
+        assertEquals(4, recentActivityTimeBand("2026-05-19", today))
+        assertEquals(4, recentActivityTimeBand("2025-11-16", today))
+        assertEquals(5, recentActivityTimeBand("2025-11-15", today))
     }
 
     @Test
     fun mapsThreeAndTenYearBoundariesUsingCalendarYears() {
-        assertEquals(5, recentActivityTimeBand(today.minusYears(3).toString(), today))
-        assertEquals(6, recentActivityTimeBand(today.minusYears(3).minusDays(1).toString(), today))
-        assertEquals(6, recentActivityTimeBand(today.minusYears(10).toString(), today))
-        assertEquals(7, recentActivityTimeBand(today.minusYears(10).minusDays(1).toString(), today))
+        assertEquals(5, recentActivityTimeBand("2023-11-16", today))
+        assertEquals(6, recentActivityTimeBand("2023-11-15", today))
+        assertEquals(6, recentActivityTimeBand("2016-11-16", today))
+        assertEquals(7, recentActivityTimeBand("2016-11-15", today))
     }
 
     @Test
@@ -37,7 +36,14 @@ class GridRecentActivityPaletteTest {
         assertNull(recentActivityTimeBand(null, today))
         assertNull(recentActivityTimeBand("", today))
         assertNull(recentActivityTimeBand("2026-13-40", today))
-        assertNull(recentActivityTimeBand(today.plusDays(1).toString(), today))
+        assertNull(recentActivityTimeBand("2026-11-17", today))
+    }
+
+    @Test
+    fun parsesLeapDaysAndRejectsImpossibleDates() {
+        assertEquals(5, recentActivityTimeBand("2024-11-16", today))
+        assertNull(parseGridMasterUtcDate("2025-02-29"))
+        assertNull(parseGridMasterUtcDate("2026-04-31"))
     }
 
     @Test
