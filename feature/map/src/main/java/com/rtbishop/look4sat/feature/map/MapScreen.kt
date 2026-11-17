@@ -514,6 +514,9 @@ private fun MapScreen(
     var showMarkedWithActivity by remember(activityPreferences) {
         mutableStateOf(activityPreferences.getBoolean("show_marked", legacyShowWorkedAndMarked))
     }
+    var showRecentActiveCalls by remember(activityPreferences) {
+        mutableStateOf(activityPreferences.getBoolean("show_recent_active_calls", true))
+    }
     var latestOperatorsByGrid by remember(activityPreferences) {
         mutableStateOf<Map<String, List<GridActivityRecentOperator>>>(emptyMap())
     }
@@ -603,6 +606,10 @@ private fun MapScreen(
     val setShowMarkedWithActivity: (Boolean) -> Unit = { enabled ->
         showMarkedWithActivity = enabled
         activityPreferences.edit().putBoolean("show_marked", enabled).apply()
+    }
+    val setShowRecentActiveCalls: (Boolean) -> Unit = { enabled ->
+        showRecentActiveCalls = enabled
+        activityPreferences.edit().putBoolean("show_recent_active_calls", enabled).apply()
     }
     val setActivityAward: (GridActivityAward) -> Unit = { award ->
         activityAward = award
@@ -1000,6 +1007,7 @@ private fun MapScreen(
                             firstCallsByGrid = firstCallsByGrid,
                             markedGrids = visibleMarkedGrids,
                             latestCallLabelsByGrid = bulkLatestLabels,
+                            showRecentActiveCalls = showRecentActiveCalls,
                             activityPercentages = activitySnapshot?.percentages.orEmpty(),
                             showActivityOverlay = showGridActivity && activeAward == AwardType.VUCC,
                             activityFilterMin = activityMin,
@@ -1179,6 +1187,7 @@ private fun MapScreen(
             award = activityAward,
             showWorked = showWorkedWithActivity,
             showMarked = showMarkedWithActivity,
+            showRecentActiveCalls = showRecentActiveCalls,
             downloadedAt = activitySnapshot?.downloadedAt,
             loading = activityLoading,
             unavailable = (showGridActivity || showActivitySettings) &&
@@ -1188,6 +1197,7 @@ private fun MapScreen(
             onAwardChange = setActivityAward,
             onShowWorkedChange = setShowWorkedWithActivity,
             onShowMarkedChange = setShowMarkedWithActivity,
+            onShowRecentActiveCallsChange = setShowRecentActiveCalls,
             onRefresh = {
                 activityRefreshSerial += 1
                 setActivityEnabled(true)
@@ -2774,6 +2784,7 @@ private fun GridActivitySettingsDialog(
     award: GridActivityAward,
     showWorked: Boolean,
     showMarked: Boolean,
+    showRecentActiveCalls: Boolean,
     downloadedAt: Long?,
     loading: Boolean,
     unavailable: Boolean,
@@ -2782,6 +2793,7 @@ private fun GridActivitySettingsDialog(
     onAwardChange: (GridActivityAward) -> Unit,
     onShowWorkedChange: (Boolean) -> Unit,
     onShowMarkedChange: (Boolean) -> Unit,
+    onShowRecentActiveCallsChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -2926,6 +2938,23 @@ private fun GridActivitySettingsDialog(
                         Switch(
                             checked = showMarked,
                             onCheckedChange = onShowMarkedChange
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_show_recent_calls),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f).clickable {
+                                onShowRecentActiveCallsChange(!showRecentActiveCalls)
+                            }
+                        )
+                        Switch(
+                            checked = showRecentActiveCalls,
+                            onCheckedChange = onShowRecentActiveCallsChange
                         )
                     }
                     when {
@@ -3128,6 +3157,7 @@ private fun setGridMode(
     firstCallsByGrid: Map<String, String> = emptyMap(),
     markedGrids: Map<String, List<com.rtbishop.look4sat.core.domain.model.MarkedStation>> = emptyMap(),
     latestCallLabelsByGrid: Map<String, String> = emptyMap(),
+    showRecentActiveCalls: Boolean = true,
     activityPercentages: Map<String, Int> = emptyMap(),
     showActivityOverlay: Boolean = false,
     activityFilterMin: Int = 0,
@@ -3146,6 +3176,7 @@ private fun setGridMode(
             gridOverlay.firstCallsByGrid = firstCallsByGrid
             gridOverlay.markedGrids = markedGrids
             gridOverlay.latestCallLabelsByGrid = latestCallLabelsByGrid
+            gridOverlay.showRecentActiveCalls = showRecentActiveCalls
             gridOverlay.activityPercentages = activityPercentages
             gridOverlay.showActivityOverlay = gridMode && showActivityOverlay
             gridOverlay.activityFilterMin = activityFilterMin
@@ -3165,6 +3196,7 @@ private fun setGridMode(
                 this.firstCallsByGrid = firstCallsByGrid
                 this.markedGrids = markedGrids
                 this.latestCallLabelsByGrid = latestCallLabelsByGrid
+                this.showRecentActiveCalls = showRecentActiveCalls
                 this.activityPercentages = activityPercentages
                 this.showActivityOverlay = gridMode && showActivityOverlay
                 this.activityFilterMin = activityFilterMin
