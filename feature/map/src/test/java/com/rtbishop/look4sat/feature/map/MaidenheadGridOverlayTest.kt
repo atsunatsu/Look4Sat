@@ -49,6 +49,32 @@ class MaidenheadGridOverlayTest {
     }
 
     @Test
+    fun bulkRecentCallOnlyAppearsForUnworkedUnmarkedGridWhenProvided() {
+        val bulk = mapOf("OL61" to "BH6RJD")
+        assertEquals("BH6RJD", gridFirstCallLabel(
+            "OL61", emptySet(), emptyMap(), emptyMap(), bulk
+        ))
+        assertEquals(null, gridFirstCallLabel(
+            "OL61", emptySet(), emptyMap(), emptyMap()
+        ))
+    }
+
+    @Test
+    fun localFirstQsoAndPinnedTargetsAlwaysWinOverBulkRecentCall() {
+        val bulk = mapOf("OL62" to "DF2ET", "OL63" to "DL1EGL")
+        assertEquals("BA7OPF", gridFirstCallLabel(
+            "OL62", setOf("OL62"), mapOf("OL62" to "BA7OPF"), emptyMap(), bulk
+        ))
+        assertEquals(null, gridFirstCallLabel(
+            "OL62", setOf("OL62"), emptyMap(), emptyMap(), bulk
+        ))
+        val mark = com.rtbishop.look4sat.core.domain.model.MarkedStation("BH6RJD", 1L)
+        assertEquals("BH6RJD", gridFirstCallLabel(
+            "OL63", emptySet(), emptyMap(), mapOf("OL63" to listOf(mark)), bulk
+        ))
+    }
+
+    @Test
     fun unworkedUnmarkedGridHasNoCallsignLabel() {
         assertEquals(null, gridFirstCallLabel(
             "OL61", emptySet(), mapOf("OL62" to "BA7OPF"), emptyMap()
