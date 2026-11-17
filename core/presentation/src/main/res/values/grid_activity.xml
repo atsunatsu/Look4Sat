@@ -17,7 +17,7 @@
     <string name="map_grid_activity_show_worked">Show worked grids</string>
     <string name="map_grid_activity_show_marked">Show marked grids</string>
     <string name="map_grid_activity_show_recent_calls">Show recent active callsigns</string>
-    <string name="map_grid_activity_recent_time_toggle">Color by recent activity date</string>
+    <string name="map_grid_activity_recent_time_toggle">Grid Activity Time Heatmap</string>
     <string name="map_grid_recent_time_0_7">0–7 days</string>
     <string name="map_grid_recent_time_8_30">8–30 days</string>
     <string name="map_grid_recent_time_31_90">31–90 days</string>

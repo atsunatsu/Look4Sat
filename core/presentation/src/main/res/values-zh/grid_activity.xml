@@ -17,7 +17,7 @@
     <string name="map_grid_activity_show_worked">显示已通联网格</string>
     <string name="map_grid_activity_show_marked">显示已标记网格</string>
     <string name="map_grid_activity_show_recent_calls">显示最近活跃呼号</string>
-    <string name="map_grid_activity_recent_time_toggle">按最近活跃时间填色</string>
+    <string name="map_grid_activity_recent_time_toggle">网格活跃时间热力图</string>
     <string name="map_grid_recent_time_0_7">0–7 天</string>
     <string name="map_grid_recent_time_8_30">8–30 天</string>
     <string name="map_grid_recent_time_31_90">31–90 天</string>
