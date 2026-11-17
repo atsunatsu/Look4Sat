@@ -57,6 +57,13 @@ internal data class GridActivityRecentOperator(
     val date: String?
 )
 
+/** One latest operator per activated grid, downloaded in a single request. */
+internal data class GridActivityBulkLatestSnapshot(
+    val operatorsByGrid: Map<String, GridActivityRecentOperator>,
+    val downloadedAt: Long,
+    val fromCache: Boolean
+)
+
 /** Latest GridMaster operators fetched for the currently visible 4-character grids. */
 internal data class GridActivityLatestCallSnapshot(
     val callsByGrid: Map<String, String>,
@@ -72,9 +79,13 @@ internal data class GridActivityLatestCallSnapshot(
  */
 internal object GridActivityStore {
     private const val ENDPOINT = "https://gridmaster.fr/api/grids.json"
+    private const val BULK_LATEST_ENDPOINT = "https://gridmaster.fr/api/last.json"
 
     internal fun endpointFor(award: GridActivityAward): String =
         "$ENDPOINT?award=${award.apiCode}&format=map"
+    internal fun endpointForBulkLatest(award: GridActivityAward): String =
+        "$BULK_LATEST_ENDPOINT?award=${award.apiCode}"
+
     internal const val MILLIS_PER_UTC_DAY = 24L * 60 * 60 * 1000
     internal const val REQUEST_REFILL_INTERVAL_MS = 36_000L
     internal const val REQUEST_BUDGET_CAPACITY = 80.0
@@ -158,6 +169,79 @@ internal object GridActivityStore {
                 cached
             }
         }
+
+
+    /**
+     * Fetch all grids' latest activators in one call and persist per-award cache.
+     * The source is updated daily; offline/failed requests retain the last valid snapshot.
+     */
+    suspend fun loadBulkLatest(
+        context: Context,
+        award: GridActivityAward = GridActivityAward.SATELLITE
+    ): GridActivityBulkLatestSnapshot? = withContext(Dispatchers.IO) {
+        val file = File(
+            context.applicationContext.filesDir,
+            "gridmaster_" + award.apiCode.replace('/', '_') + "_last.json"
+        )
+        val cached = try {
+            if (file.isFile) {
+                GridActivityBulkLatestSnapshot(
+                    parseBulkLatest(file.readText(), award.minimumGridCount),
+                    file.lastModified(),
+                    fromCache = true
+                )
+            } else null
+        } catch (_: Exception) {
+            null
+        }
+        val now = System.currentTimeMillis()
+        if (cached != null && isCacheFreshForUtcDay(cached.downloadedAt, now)) {
+            return@withContext cached
+        }
+        try {
+            awaitRequestPermit(context)
+            currentCoroutineContext().ensureActive()
+            val connection =
+                (URL(endpointForBulkLatest(award)).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 12_000
+                    readTimeout = 20_000
+                    instanceFollowRedirects = true
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty("User-Agent", "Look4Sat/1.0 (satellite grid activity)")
+                }
+            val response = try {
+                checkSuccessfulResponse(connection)
+                connection.inputStream.use { stream ->
+                    val bytes = ByteArray(MAX_BYTES + 1)
+                    var count = 0
+                    while (count < bytes.size) {
+                        val n = stream.read(bytes, count, bytes.size - count)
+                        if (n < 0) break
+                        count += n
+                    }
+                    if (count > MAX_BYTES) throw IOException("GridMaster latest data too large")
+                    String(bytes, 0, count, Charsets.UTF_8)
+                }
+            } finally {
+                connection.disconnect()
+            }
+            val parsed = parseBulkLatest(response, award.minimumGridCount)
+            val tmp = File(file.parentFile, file.name + ".tmp")
+            tmp.writeText(response)
+            if (!tmp.renameTo(file)) {
+                file.writeText(response)
+                tmp.delete()
+            }
+            GridActivityBulkLatestSnapshot(parsed, file.lastModified(), fromCache = false)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (limited: GridMasterRateLimitException) {
+            pauseAfterRateLimit(context, limited.retryAfterMillis)
+            cached
+        } catch (_: Exception) {
+            cached
+        }
+    }
 
     /** Build the public single-grid endpoint used to retrieve its latest operators. */
     internal fun endpointForGrid(grid: String, award: GridActivityAward): String {
@@ -371,6 +455,35 @@ internal object GridActivityStore {
         if (code != HttpURLConnection.HTTP_OK) {
             throw IOException("GridMaster HTTP $code")
         }
+    }
+
+
+    /** The bulk endpoint returns the latest QSO's call/date for every worked grid. */
+    internal fun parseBulkLatest(
+        json: String,
+        minimumEntries: Int = 50
+    ): Map<String, GridActivityRecentOperator> {
+        val root = JSONObject(json)
+        val worked = root.optJSONObject("worked")
+            ?: throw IOException("GridMaster bulk response is missing worked{}")
+        val result = LinkedHashMap<String, GridActivityRecentOperator>()
+        val keys = worked.keys()
+        while (keys.hasNext()) {
+            val rawGrid = keys.next()
+            val grid = normalizeGrid(rawGrid) ?: continue
+            val entry = worked.optJSONObject(rawGrid) ?: continue
+            val call = entry.optString("call").trim()
+            if (call.isEmpty() || call.equals("null", ignoreCase = true)) continue
+            val date = entry.optString("date").trim().takeIf {
+                it.isNotEmpty() && !it.equals("null", ignoreCase = true)
+            }
+            result[grid] = GridActivityRecentOperator(call, date)
+        }
+        val declaredCount = root.optInt("grids", -1)
+        if (result.size < minimumEntries || (declaredCount >= 0 && result.size != declaredCount)) {
+            throw IOException("GridMaster bulk latest dataset is empty or incomplete")
+        }
+        return result
     }
 
     /** Parse up to all six recent operators from GridMaster's newest-first last[] list. */

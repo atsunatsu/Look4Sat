@@ -514,8 +514,15 @@ private fun MapScreen(
     var showMarkedWithActivity by remember(activityPreferences) {
         mutableStateOf(activityPreferences.getBoolean("show_marked", legacyShowWorkedAndMarked))
     }
+    var showRecentActiveCalls by remember(activityPreferences) {
+        mutableStateOf(activityPreferences.getBoolean("show_recent_active_calls", true))
+    }
     var latestOperatorsByGrid by remember(activityPreferences) {
         mutableStateOf<Map<String, List<GridActivityRecentOperator>>>(emptyMap())
+    }
+    // Bulk last.json data is tagged by award so switching categories cannot leak old calls.
+    var bulkLatestByAward by remember {
+        mutableStateOf<Pair<GridActivityAward, GridActivityBulkLatestSnapshot>?>(null)
     }
     var gridMasterUtcDay by remember {
         mutableStateOf(System.currentTimeMillis() / GridActivityStore.MILLIS_PER_UTC_DAY)
@@ -599,6 +606,10 @@ private fun MapScreen(
     val setShowMarkedWithActivity: (Boolean) -> Unit = { enabled ->
         showMarkedWithActivity = enabled
         activityPreferences.edit().putBoolean("show_marked", enabled).apply()
+    }
+    val setShowRecentActiveCalls: (Boolean) -> Unit = { enabled ->
+        showRecentActiveCalls = enabled
+        activityPreferences.edit().putBoolean("show_recent_active_calls", enabled).apply()
     }
     val setActivityAward: (GridActivityAward) -> Unit = { award ->
         activityAward = award
@@ -752,6 +763,30 @@ private fun MapScreen(
     // scopes, not from the globally earliest contact or one arbitrary station.
     val firstCallsByGrid: Map<String, String> = remember(uiState.workedGridQsos, selectedStationIds) {
         uiState.workedGridQsos.firstCallsByGrid(selectedStationIds)
+    }
+    // The combined First Callsign + Most Wanted overlay uses one bulk request
+    // per award per UTC day, not one grid.json request for every visible square.
+    LaunchedEffect(
+        showGridActivity, uiState.showFirstCallLabels, lifecycleStarted,
+        uiState.isGridMode, activeAward, activityAward, gridMasterUtcDay
+    ) {
+        if (!lifecycleStarted || !uiState.isGridMode || activeAward != AwardType.VUCC ||
+            !showGridActivity || !uiState.showFirstCallLabels
+        ) return@LaunchedEffect
+        val requestedAward = activityAward
+        val result = GridActivityStore.loadBulkLatest(
+            context = mapView.context.applicationContext,
+            award = requestedAward
+        )
+        currentCoroutineContext().ensureActive()
+        if (result != null && activityAward == requestedAward) {
+            bulkLatestByAward = requestedAward to result
+        }
+    }
+    val bulkLatestOperators = bulkLatestByAward
+        ?.takeIf { it.first == activityAward }?.second?.operatorsByGrid.orEmpty()
+    val bulkLatestLabels = remember(bulkLatestOperators) {
+        bulkLatestOperators.mapValues { (_, operator) -> operator.call }
     }
     // GridMaster operators are loaded only for the opened grid-detail dialog.
     // Neither the First Callsign overlay nor viewport scrolling triggers per-grid requests.
@@ -971,6 +1006,8 @@ private fun MapScreen(
                             showFirstCallLabels = uiState.showFirstCallLabels && activeAward == AwardType.VUCC,
                             firstCallsByGrid = firstCallsByGrid,
                             markedGrids = visibleMarkedGrids,
+                            latestCallLabelsByGrid = bulkLatestLabels,
+                            showRecentActiveCalls = showRecentActiveCalls,
                             activityPercentages = activitySnapshot?.percentages.orEmpty(),
                             showActivityOverlay = showGridActivity && activeAward == AwardType.VUCC,
                             activityFilterMin = activityMin,
@@ -1150,6 +1187,7 @@ private fun MapScreen(
             award = activityAward,
             showWorked = showWorkedWithActivity,
             showMarked = showMarkedWithActivity,
+            showRecentActiveCalls = showRecentActiveCalls,
             downloadedAt = activitySnapshot?.downloadedAt,
             loading = activityLoading,
             unavailable = (showGridActivity || showActivitySettings) &&
@@ -1159,6 +1197,7 @@ private fun MapScreen(
             onAwardChange = setActivityAward,
             onShowWorkedChange = setShowWorkedWithActivity,
             onShowMarkedChange = setShowMarkedWithActivity,
+            onShowRecentActiveCallsChange = setShowRecentActiveCalls,
             onRefresh = {
                 activityRefreshSerial += 1
                 setActivityEnabled(true)
@@ -1174,7 +1213,11 @@ private fun MapScreen(
             grid = grid,
             showGridActivity = showGridActivity,
             activityPercentage = if (showGridActivity) activitySnapshot?.percentages?.get(grid) else null,
-            recentOperators = if (showGridActivity) latestOperatorsByGrid[grid].orEmpty() else emptyList(),
+            recentOperators = if (showGridActivity) {
+                latestOperatorsByGrid[grid]
+                    ?: bulkLatestOperators[grid]?.let { listOf(it) }
+                    ?: emptyList()
+            } else emptyList(),
             // A multi-selection shows the union of QSO details without duplicates,
             // preserving each station's covering scope; empty selection means All.
             qsos = uiState.workedGridQsos[grid].orEmpty()
@@ -2741,6 +2784,7 @@ private fun GridActivitySettingsDialog(
     award: GridActivityAward,
     showWorked: Boolean,
     showMarked: Boolean,
+    showRecentActiveCalls: Boolean,
     downloadedAt: Long?,
     loading: Boolean,
     unavailable: Boolean,
@@ -2749,6 +2793,7 @@ private fun GridActivitySettingsDialog(
     onAwardChange: (GridActivityAward) -> Unit,
     onShowWorkedChange: (Boolean) -> Unit,
     onShowMarkedChange: (Boolean) -> Unit,
+    onShowRecentActiveCallsChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -2893,6 +2938,23 @@ private fun GridActivitySettingsDialog(
                         Switch(
                             checked = showMarked,
                             onCheckedChange = onShowMarkedChange
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_grid_activity_show_recent_calls),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f).clickable {
+                                onShowRecentActiveCallsChange(!showRecentActiveCalls)
+                            }
+                        )
+                        Switch(
+                            checked = showRecentActiveCalls,
+                            onCheckedChange = onShowRecentActiveCallsChange
                         )
                     }
                     when {
@@ -3094,6 +3156,8 @@ private fun setGridMode(
     showFirstCallLabels: Boolean = false,
     firstCallsByGrid: Map<String, String> = emptyMap(),
     markedGrids: Map<String, List<com.rtbishop.look4sat.core.domain.model.MarkedStation>> = emptyMap(),
+    latestCallLabelsByGrid: Map<String, String> = emptyMap(),
+    showRecentActiveCalls: Boolean = true,
     activityPercentages: Map<String, Int> = emptyMap(),
     showActivityOverlay: Boolean = false,
     activityFilterMin: Int = 0,
@@ -3111,6 +3175,8 @@ private fun setGridMode(
             gridOverlay.showFirstCallLabels = showFirstCallLabels
             gridOverlay.firstCallsByGrid = firstCallsByGrid
             gridOverlay.markedGrids = markedGrids
+            gridOverlay.latestCallLabelsByGrid = latestCallLabelsByGrid
+            gridOverlay.showRecentActiveCalls = showRecentActiveCalls
             gridOverlay.activityPercentages = activityPercentages
             gridOverlay.showActivityOverlay = gridMode && showActivityOverlay
             gridOverlay.activityFilterMin = activityFilterMin
@@ -3129,6 +3195,8 @@ private fun setGridMode(
                 this.showFirstCallLabels = showFirstCallLabels
                 this.firstCallsByGrid = firstCallsByGrid
                 this.markedGrids = markedGrids
+                this.latestCallLabelsByGrid = latestCallLabelsByGrid
+                this.showRecentActiveCalls = showRecentActiveCalls
                 this.activityPercentages = activityPercentages
                 this.showActivityOverlay = gridMode && showActivityOverlay
                 this.activityFilterMin = activityFilterMin
