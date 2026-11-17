@@ -72,6 +72,7 @@ data class SettingsState(
     val wavelogUploadProbeBusy: Boolean = false,
     /** Config-block feedback (probe failures, sync results); also shown inside the config dialog. */
     val wavelogUploadMessage: String? = null,
+    val wavelogUploadMessageIsError: Boolean = true,
     /** Wavelog sync (download of QSOs + grids). */
     val wavelogSyncing: Boolean = false,
     /** Epoch ms of the last successful Wavelog sync (0 = never). */
@@ -167,7 +168,11 @@ sealed interface SettingsAction {
     data class FetchWavelogUploadStations(val url: String, val apiKey: String) : SettingsAction
     data class SelectWavelogUploadStation(val station: com.rtbishop.look4sat.core.domain.repository.WavelogStationInfo) : SettingsAction
     /** Download QSOs (+ grids) from Wavelog. */
-    data class SyncWavelog(val mode: com.rtbishop.look4sat.core.domain.repository.WavelogSyncMode) : SettingsAction
+    data class SyncWavelog(
+        val mode: com.rtbishop.look4sat.core.domain.repository.WavelogSyncMode,
+        val url: String,
+        val apiKey: String
+    ) : SettingsAction
     /** Confirmed the LoTW→Wavelog mode switch warning. */
     data object ConfirmWavelogSwitch : SettingsAction
     /** Declined the switch warning — nothing changes. */
