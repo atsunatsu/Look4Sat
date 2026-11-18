@@ -26,6 +26,7 @@ import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 
 import com.rtbishop.look4sat.core.domain.model.WavelogUploadSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
+import com.rtbishop.look4sat.core.domain.predict.OrbitalData
 import kotlinx.coroutines.flow.StateFlow
 
 interface ISettingsRepo {
@@ -62,6 +63,9 @@ interface ISettingsRepo {
     fun getSatelliteTypesIds(types: List<String>): List<Int>
     fun setSatelliteTypeIds(type: String, ids: List<Int>)
     fun updateDatabaseState(state: DatabaseState)
+    /** Offline cache for ISS six-hour SupGP fits (not a replacement for ordinary GP). */
+    fun getIssSupGpSegments(): List<OrbitalData> = emptyList()
+    fun setIssSupGpSegments(segments: List<OrbitalData>) = Unit
     //endregion
 
     //region # RC settings
