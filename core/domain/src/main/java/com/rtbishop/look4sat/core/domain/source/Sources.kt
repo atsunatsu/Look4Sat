@@ -18,6 +18,17 @@
 package com.rtbishop.look4sat.core.domain.source
 
 object Sources {
+    const val ISS_CATNUM = 25544
+    /** NASA-OEM-derived 6-hour ISS fits; not an ordinary single-element TLE feed. */
+    const val ISS_SUPGP_URL =
+        "https://celestrak.org/NORAD/elements/supplemental/sup-gp.php?SOURCE=ISS-E&FORMAT=TLE"
+
+    fun isIssSupGpUrl(url: String): Boolean {
+        val trimmed = url.trim()
+        val normalized = if (trimmed.startsWith("http", ignoreCase = true)) trimmed else "https://$trimmed"
+        return normalized.equals(ISS_SUPGP_URL, ignoreCase = true)
+    }
+
     // Default TLE sources, aligned with upstream's "most specific to most generic" order:
     // the first source that knows a satellite gets to name it, with the full catalogue
     // (CelesTrak active) as the fallback. Upstream dropped the old CelesTrak category
@@ -28,6 +39,7 @@ object Sources {
     val satelliteDataUrls = mapOf(
         "LAPAN-A2" to "https://www.kaggle.com/api/v1/datasets/download/muazamnugroho/lapan-a2-satellite-two-line-element-tle-dataset/LAPAN-A2_TLE_latest.txt",
         "ARISS" to "https://live.ariss.org/iss.txt",
+        "ISS SupGP" to ISS_SUPGP_URL,
         "R4UAB" to "https://r4uab.ru/satonline.txt",
         "BI4PYM AutoTLE (GitHub)" to "https://raw.githubusercontent.com/BI4PYM/AutoTLE/refs/heads/master/AutoTLE.txt",
         "BI4PYM AutoTLE (Mirror)" to "https://autotle.bi4pym.cn/AutoTLE.txt",
