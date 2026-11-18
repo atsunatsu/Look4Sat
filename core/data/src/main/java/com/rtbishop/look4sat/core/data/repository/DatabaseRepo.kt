@@ -93,41 +93,16 @@ class DatabaseRepo(
         settingsRepo.updateDataSourcesStatus(
             (tleResults + radioResults).associate { (url, result) -> url to result.code }
         )
-        // SupGP is a time-ordered sequence of six-hour fits for ONE satellite, not
-        // an ordinary multi-satellite TLE feed. Never send its future elements to
-        // mergeEntries(), which deliberately keeps only the newest epoch per catnum.
+        // SupGP is not a normal single-epoch feed: preserve all six-hour fits
+        // separately, so mergeEntries() cannot collapse them to one future TLE.
         val supGpResult = tleResults.firstOrNull { (url, _) -> Sources.isIssSupGpUrl(url) }
-        val nowDaynum = OrbitalData.timeToDaynum(System.currentTimeMillis())
-        val parsedSupGp = supGpResult?.second?.takeIf { it.code in 200..299 }?.stream
-            ?.use { dataParser.parseTLEStream(it) }
-            .orEmpty()
-            .filter { it.catnum == Sources.ISS_CATNUM }
-            .distinctBy { it.epochDaynum }
-            .sortedBy { it.epochDaynum }
-        val isValidSupGp = parsedSupGp.size in 4..100 &&
-            parsedSupGp.first().epochDaynum <= nowDaynum &&
-            parsedSupGp.last().epochDaynum >= nowDaynum &&
-            parsedSupGp.all { it.meanmo > 0.0 && it.epochDaynum.isFinite() } &&
-            parsedSupGp.zipWithNext().all { (before, after) ->
-                val gap = after.epochDaynum - before.epochDaynum
-                gap > 0.0 && gap <= 0.30 // six-hour segments; reject truncated/corrupt feeds
-            }
-        // A stale upstream response must never roll back a newer cached prediction.
-        val previousSupGpLast = settingsRepo.getIssSupGpSegments().lastOrNull()?.epochDaynum
-        val acceptedSupGp = if (isValidSupGp &&
-            (previousSupGpLast == null || parsedSupGp.last().epochDaynum >= previousSupGpLast)
-        ) parsedSupGp else emptyList()
+        val acceptedSupGp = supGpResult?.let { (url, result) ->
+            processIssSupGp(url, result)
+        }.orEmpty()
         if (acceptedSupGp.isNotEmpty()) {
-            settingsRepo.setIssSupGpSegments(acceptedSupGp)
-        }
-        if (isValidSupGp) {
             importedTypeIds.getOrPut("ISS SupGP") { mutableListOf() }.add(Sources.ISS_CATNUM)
         }
-        if (supGpResult != null && supGpResult.second.code in 200..299 && !isValidSupGp) {
-            settingsRepo.updateDataSourcesStatus(
-                settingsRepo.dataSourcesStatus.value + (supGpResult.first to 422)
-            )
-        }
+        val nowDaynum = OrbitalData.timeToDaynum(System.currentTimeMillis())
         // Parse each ordinary source on its own for its type filter and GP merge.
         val parsedPerSource = tleResults.filterNot { (url, _) ->
             Sources.isIssSupGpUrl(url)
@@ -189,8 +164,94 @@ class DatabaseRepo(
         setUpdateSuccessful(if (hasFetchedData) System.currentTimeMillis() else previousTimestamp)
     }
 
+    /**
+     * Refresh only ISS SupGP (called at app launch when the dedicated 24-hour
+     * check is due). Never advance DatabaseState.updateTimestamp here: the
+     * existing TLE/OMM/transceiver refresh must remain on its 48-hour cycle.
+     */
+    override suspend fun updateIssSupGp() = withContext(dispatcher) {
+        val sources = settingsRepo.dataSourcesSettings.value
+        val rawUrl = sources.satelliteUrls.firstOrNull { url ->
+            val index = sources.satelliteUrls.indexOf(url)
+            sources.isSatelliteEnabled(index) && Sources.isIssSupGpUrl(url)
+        } ?: return@withContext
+
+        val response = remoteSource.getNetworkStream(normalizeUrl(rawUrl))
+        settingsRepo.updateDataSourcesStatus(
+            settingsRepo.dataSourcesStatus.value + (rawUrl to response.code)
+        )
+        val acceptedSupGp = processIssSupGp(rawUrl, response)
+        if (acceptedSupGp.isEmpty()) return@withContext
+
+        settingsRepo.setSatelliteTypeIds("ISS SupGP", listOf(Sources.ISS_CATNUM))
+        // When an install has only SupGP enabled, keep an ISS entry in the
+        // ordinary satellite table so selection and GP fallback still work.
+        val hasOtherSource = sources.satelliteUrls.indices.any { index ->
+            sources.isSatelliteEnabled(index) &&
+                !Sources.isIssSupGpUrl(sources.satelliteUrls[index])
+        }
+        val hasIss = localSource.getEntriesEpochs().containsKey(Sources.ISS_CATNUM)
+        if (!hasOtherSource || !hasIss) {
+            val now = OrbitalData.timeToDaynum(System.currentTimeMillis())
+            val current = acceptedSupGp.lastOrNull { it.epochDaynum <= now }
+            if (current != null) insertFresherEntries(listOf(current.copy(name = "ISS (ZARYA)")))
+        }
+        // setIssSupGpSegments() emits issSupGpCacheRevision so selected ISS
+        // objects, pass predictions and tracking refresh without touching GP time.
+    }
+
+    /**
+     * Validates a complete ISS prediction before committing to the offline
+     * cache. Failures preserve the last known good segments.
+     */
+    private suspend fun processIssSupGp(
+        rawUrl: String, result: NetworkResult
+    ): List<OrbitalData> {
+        // Limit automated retries even after a bad HTTP response. The manual
+        // Update button is unaffected and can force a check at any time.
+        settingsRepo.setIssSupGpLastCheckMillis(System.currentTimeMillis())
+        if (result.code !in 200..299) {
+            result.stream?.close()
+            return emptyList()
+        }
+        val parsed = try {
+            result.stream?.use { dataParser.parseTLEStream(it) }
+                .orEmpty()
+                .filter { it.catnum == Sources.ISS_CATNUM }
+                .distinctBy { it.epochDaynum }
+                .sortedBy { it.epochDaynum }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        val now = OrbitalData.timeToDaynum(System.currentTimeMillis())
+        val valid = parsed.size in 4..100 &&
+            parsed.first().epochDaynum <= now &&
+            parsed.last().epochDaynum >= now &&
+            parsed.all { it.meanmo > 0.0 && it.epochDaynum.isFinite() } &&
+            parsed.zipWithNext().all { (first, second) ->
+                val gap = second.epochDaynum - first.epochDaynum
+                gap > 0.0 && gap <= 0.30
+            }
+        if (!valid) {
+            settingsRepo.updateDataSourcesStatus(
+                settingsRepo.dataSourcesStatus.value + (rawUrl to 422)
+            )
+            return emptyList()
+        }
+        val previousLast = settingsRepo.getIssSupGpSegments().lastOrNull()?.epochDaynum
+        if (previousLast != null && parsed.last().epochDaynum < previousLast) {
+            return emptyList() // Do not roll back a newer offline prediction.
+        }
+        settingsRepo.setIssSupGpSegments(parsed)
+        return parsed
+    }
+
     override suspend fun clearAllData() = withContext(dispatcher) {
         settingsRepo.setIssSupGpSegments(emptyList())
+        settingsRepo.setIssSupGpLastCheckMillis(0L)
         localSource.deleteEntries()
         localSource.deleteRadios()
         setUpdateSuccessful(0L)
