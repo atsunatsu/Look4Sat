@@ -1138,7 +1138,7 @@ private fun MapScreen(
                             )
                             Text(
                                 "⚙️",
-                                fontSize = 12.sp,
+                                fontSize = 10.sp,
                                 modifier = Modifier.padding(end = 2.dp)
                             )
                             Switch(
@@ -2797,7 +2797,7 @@ private fun GridActivityToggle(
             )
             Text(
                 "⚙️",
-                fontSize = 12.sp,
+                fontSize = 10.sp,
                 modifier = Modifier.padding(end = 2.dp)
             )
             Switch(
