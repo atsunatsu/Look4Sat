@@ -1130,7 +1130,17 @@ private fun MapScreen(
                             modifier = Modifier.clickable { openElevationSettings() }
                                 .padding(start = 12.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
                         ) {
-                            Text(stringResource(R.string.map_elevation_circles), color = ComposeColor.White, fontSize = 12.sp, modifier = Modifier.padding(end = 2.dp))
+                            Text(
+                                stringResource(R.string.map_elevation_circles),
+                                color = ComposeColor.White,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                            Text(
+                                "⚙️",
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(end = 2.dp)
+                            )
                             Switch(
                                 checked = showElevationContours,
                                 // The switch itself only toggles visibility. Tapping the
@@ -2783,6 +2793,11 @@ private fun GridActivityToggle(
                 text = stringResource(R.string.map_grid_activity_toggle),
                 color = ComposeColor.White,
                 fontSize = 12.sp,
+                modifier = Modifier.padding(end = 4.dp)
+            )
+            Text(
+                "⚙️",
+                fontSize = 10.sp,
                 modifier = Modifier.padding(end = 2.dp)
             )
             Switch(
