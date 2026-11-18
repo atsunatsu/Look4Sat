@@ -124,6 +124,7 @@ class SettingsRepo(
     private val keyAutoTleSourceMigration = "autoTleSourceMigration"
     private val keyIssSupGpSourceMigration = "issSupGpSourceMigration"
     private val keyIssSupGpSegments = "issSupGpSegments"
+    private val keyIssSupGpLastCheckMillis = "issSupGpLastCheckMillis"
     private val separatorComma = ","
     private val separatorUrl = "\n"
     private val legacyCelestrakSatnogsUrl =
@@ -812,6 +813,16 @@ class SettingsRepo(
         preferences.edit { putString("type$type", typesString) }
     }
 
+    private val _issSupGpCacheRevision = MutableStateFlow(0L)
+    override val issSupGpCacheRevision: StateFlow<Long> = _issSupGpCacheRevision
+
+    override fun getIssSupGpLastCheckMillis(): Long =
+        preferences.getLong(keyIssSupGpLastCheckMillis, 0L)
+
+    override fun setIssSupGpLastCheckMillis(timestamp: Long) {
+        preferences.edit { putLong(keyIssSupGpLastCheckMillis, timestamp) }
+    }
+
     /** The ISS feed holds ~60 six-hour fits (only a few KB); cache it for offline predictions. */
     override fun getIssSupGpSegments(): List<OrbitalData> =
         preferences.getString(keyIssSupGpSegments, null).orEmpty()
@@ -841,6 +852,7 @@ class SettingsRepo(
                 ).joinToString(",")
             }
         preferences.edit { putString(keyIssSupGpSegments, serialized) }
+        _issSupGpCacheRevision.value += 1L
     }
 
     override fun updateDatabaseState(state: DatabaseState) = preferences.edit {
