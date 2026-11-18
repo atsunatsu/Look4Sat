@@ -852,7 +852,7 @@ class SettingsRepo(
                 ).joinToString(",")
             }
         preferences.edit { putString(keyIssSupGpSegments, serialized) }
-        _issSupGpCacheRevision.value += 1L
+        _issSupGpCacheRevision.update { it + 1L }
     }
 
     override fun updateDatabaseState(state: DatabaseState) = preferences.edit {
