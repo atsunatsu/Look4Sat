@@ -61,6 +61,17 @@ class IssSupGpSettingsTest {
     }
 
     @Test
+    fun `independent SupGP check timestamp persists without changing GP refresh time`() {
+        val settings = repo()
+        val lastGeneral = settings.databaseState.value.updateTimestamp
+        settings.setIssSupGpLastCheckMillis(1_732_000_000_000L)
+        assertEquals(1_732_000_000_000L, repo().getIssSupGpLastCheckMillis())
+        assertEquals(lastGeneral, repo().databaseState.value.updateTimestamp)
+        settings.setIssSupGpLastCheckMillis(0L)
+        assertEquals(0L, repo().getIssSupGpLastCheckMillis())
+    }
+
+    @Test
     fun `SupGP segments survive restart and can be cleared`() {
         val sample = OrbitalData(
             name = "ISS [Segment 01]", epoch = 26320.5, meanmo = 15.49,
