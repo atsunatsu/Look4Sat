@@ -389,17 +389,15 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21.9 — GridMaster grid activity time heatmap
-          - Add an optional grid activity time heatmap using GridMaster's bulk last-active dates.
-          - Show eight discrete age bands from 0–7 days to over 10 years with the agreed red-to-blue palette and the existing 110/255 map fill opacity.
-          - Reuse the existing cached bulk last.json data; no per-grid API requests are added.
-          - Keep the Most Wanted percentage heatmap available as the alternative mode, with existing worked/marked grid and recent callsign controls unchanged.
+          ## v21.10 — Map capsule settings shortcuts
+          - Add compact 10sp settings gear icons beside the Elevation Circles and Grid Activity capsule labels.
+          - Preserve the existing switches and capsule tap-to-open settings behavior.
+          - Verification: the android-usb-cat regression check passed; the release workflow runs unit tests (excluding RadioConfigurationSaveTest) and verifies the APK signing certificate and both ARM ABIs before publishing.
 
-          ## v21.9 — GridMaster 网格活跃时间热力图
-          - 新增「网格活跃时间热力图」，根据 GridMaster API 返回的最近活跃日期，将网格划分为八个离散时间区间并按约定的红蓝配色填色。
-          - 沿用地图原有 110/255 填充不透明度。
-          - 复用现有批量 last.json 缓存，不增加逐网格 API 请求。
-          - 保留原有 Most Wanted 百分比热力图，可在两种模式间切换；已通联、已标记网格及最近活跃呼号开关保持不变。
+          ## v21.10 — 地图胶囊设置入口
+          - 在「仰角圆」和「网格活跃度」胶囊文字右侧新增 10sp 设置齿轮图标。
+          - 保留原有开关行为，以及点击胶囊打开设置弹窗的交互。
+          - 验证：android-usb-cat 回归检查已通过；发布工作流将在发布前运行单元测试（排除 RadioConfigurationSaveTest），并校验 APK 签名证书及 armeabi-v7a、arm64-v8a 两种 ABI。
           RELEASE_NOTES
           )"
           fi
