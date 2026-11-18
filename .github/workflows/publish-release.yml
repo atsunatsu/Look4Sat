@@ -389,15 +389,18 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v21.10 — Map capsule settings shortcuts
-          - Add compact 10sp settings gear icons beside the Elevation Circles and Grid Activity capsule labels.
-          - Preserve the existing switches and capsule tap-to-open settings behavior.
-          - Verification: the android-usb-cat regression check passed; the release workflow runs unit tests (excluding RadioConfigurationSaveTest) and verifies the APK signing certificate and both ARM ABIs before publishing.
+          ## v21.11 — ISS SupGP orbit prediction
+          - Add CelesTrak ISS SupGP, derived from NASA OEM, selecting six-hour fitted elements by prediction time for passes, maps, radar, and Doppler.
+          - Preserve the existing ordinary ISS TLE/OMM in the satellite database as fallback when SupGP is disabled, unavailable, or outside its coverage; cache valid SupGP segments for offline use.
+          - Check ISS SupGP independently every 24 hours at app startup; retain the existing 48-hour automatic update for other TLE/OMM sources and transceivers, with manual updates unchanged.
+          - Verification: the PR #118 Android regression check passed; the release workflow runs unit tests (excluding RadioConfigurationSaveTest) and verifies the APK signing certificate and both ARM ABIs before publishing.
 
-          ## v21.10 — 地图胶囊设置入口
-          - 在「仰角圆」和「网格活跃度」胶囊文字右侧新增 10sp 设置齿轮图标。
-          - 保留原有开关行为，以及点击胶囊打开设置弹窗的交互。
-          - 验证：android-usb-cat 回归检查已通过；发布工作流将在发布前运行单元测试（排除 RadioConfigurationSaveTest），并校验 APK 签名证书及 armeabi-v7a、arm64-v8a 两种 ABI。
+          ## v21.11 — ISS SupGP 轨道预测
+          - 新增基于 NASA OEM 的 CelesTrak ISS SupGP，按预测时间选择六小时拟合轨道根数，供过境预测、地图、雷达和多普勒计算使用。
+          - 保留卫星数据库中原有的 ISS 普通 TLE/OMM，在 SupGP 被禁用、不可用或超出覆盖范围时回退使用；有效 SupGP 分段支持离线缓存。
+          - 应用启动时每隔 24 小时独立检查 ISS SupGP；其他 TLE/OMM 数据源及转发器仍按原有 48 小时周期自动更新，手动更新方式不变。
+          - 验证：PR #118 的 Android 回归检查已通过；发布工作流将在发布前运行单元测试（排除 RadioConfigurationSaveTest），并验证 APK 签名证书和两种 ARM ABI。
+
           RELEASE_NOTES
           )"
           fi
