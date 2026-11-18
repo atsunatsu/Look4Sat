@@ -21,5 +21,7 @@ interface IDatabaseRepo {
     suspend fun updateTLEFromFile(uri: String): Int
     suspend fun updateTransceiversFromFile(uri: String): Int
     suspend fun updateFromRemote()
+    /** Refresh ISS SupGP only; do not advance the ordinary 48-hour GP update timer. */
+    suspend fun updateIssSupGp() = Unit
     suspend fun clearAllData()
 }
