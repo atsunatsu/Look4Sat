@@ -171,10 +171,10 @@ class DatabaseRepo(
      */
     override suspend fun updateIssSupGp() = withContext(dispatcher) {
         val sources = settingsRepo.dataSourcesSettings.value
-        val rawUrl = sources.satelliteUrls.firstOrNull { url ->
-            val index = sources.satelliteUrls.indexOf(url)
-            sources.isSatelliteEnabled(index) && Sources.isIssSupGpUrl(url)
-        } ?: return@withContext
+        val rawUrl = sources.satelliteUrls.indices.firstOrNull { index ->
+            sources.isSatelliteEnabled(index) &&
+                Sources.isIssSupGpUrl(sources.satelliteUrls[index])
+        }?.let { sources.satelliteUrls[it] } ?: return@withContext
 
         val response = remoteSource.getNetworkStream(normalizeUrl(rawUrl))
         settingsRepo.updateDataSourcesStatus(
