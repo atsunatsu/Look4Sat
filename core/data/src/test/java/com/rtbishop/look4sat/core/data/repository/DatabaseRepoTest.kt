@@ -45,6 +45,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.InputStream
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.Locale
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DatabaseRepoTest {
@@ -55,6 +58,88 @@ class DatabaseRepoTest {
     // fixtures carry a current epoch: stale entries are pruned on every remote update
     private val todayEpoch = LocalDate.now().let { "%02d%03d".format(it.year % 100, it.dayOfYear) }
     private val fresherEpoch = "$todayEpoch.71955234".toDouble()
+
+    @Test
+    fun `ISS SupGP is cached as segments and never merged as one future TLE`() = runTest(dispatcher) {
+        val url = Sources.ISS_SUPGP_URL
+        val localSource = FakeLocalSource()
+        val remoteSource = FakeRemoteSource().apply {
+            networkStreams[url] = { issSupGpStream() }
+        }
+        val settings = FakeSettingsRepo(DataSourcesSettings(listOf(url), emptyList()))
+        val repository = DatabaseRepo(dispatcher, dataParser, localSource, remoteSource, settings)
+
+        repository.updateFromRemote()
+
+        val cached = settings.getIssSupGpSegments()
+        assertEquals(5, cached.size)
+        assertEquals(listOf(25544), settings.satelliteTypeIdsByType["ISS SupGP"])
+        assertEquals(1, localSource.insertedEntries.size)
+        assertTrue(localSource.insertedEntries.single().epochDaynum <=
+            OrbitalData.timeToDaynum(System.currentTimeMillis()))
+        // A new update with a malformed body must not discard offline predictions.
+        remoteSource.networkStreams[url] = { "broken payload".byteInputStream() }
+        repository.updateFromRemote()
+        assertEquals(cached, settings.getIssSupGpSegments())
+        assertEquals(422, settings.dataSourcesStatus.value[url])
+    }
+
+    private fun issSupGpStream(): InputStream {
+        val now = LocalDateTime.now(ZoneOffset.UTC).minusHours(12)
+        val start = now.withHour(now.hour / 6 * 6).withMinute(0).withSecond(0).withNano(0)
+        val tle1 = "1 25544C 98067A   26320.50000000  .00077894  00000+0  13883-2 0    11"
+        val tle2 = "2 25544  51.6326 266.3575 0007583  31.4086 350.5637 15.49405157    15"
+        return (0..4).joinToString("\n") { index ->
+            val epochTime = start.plusHours(index * 6L)
+            val fractionalDay = (epochTime.hour / 6) * 25_000_000
+            val epoch = "%02d%03d.%08d".format(
+                Locale.US, epochTime.year % 100, epochTime.dayOfYear, fractionalDay
+            )
+            "ISS [Segment %02d]".format(Locale.US, index + 1) +
+                "\n" + tle1.replaceRange(18, 32, epoch) + "\n" + tle2
+        }.byteInputStream()
+    }
+
+    @Test
+    fun `independent 24h SupGP check downloads no GP and preserves 48h timestamp`() = runTest(dispatcher) {
+        val ordinaryUrl = Sources.satelliteDataUrls.getValue("All")
+        val supGpUrl = Sources.ISS_SUPGP_URL
+        val local = FakeLocalSource()
+        val remote = FakeRemoteSource().apply {
+            networkStreams[supGpUrl] = { issSupGpStream() }
+            networkStreams[ordinaryUrl] = { validCsvStream() }
+        }
+        val settings = FakeSettingsRepo(
+            DataSourcesSettings(listOf(ordinaryUrl, supGpUrl), emptyList())
+        )
+        val savedUpdateTime = 1_000_000L
+        settings.updateDatabaseState(DatabaseState(0, 0, savedUpdateTime))
+        val repository = DatabaseRepo(dispatcher, dataParser, local, remote, settings)
+
+        repository.updateIssSupGp()
+
+        assertEquals(listOf(supGpUrl), remote.requestedUrls)
+        assertEquals(savedUpdateTime, settings.databaseState.value.updateTimestamp)
+        assertTrue(settings.getIssSupGpLastCheckMillis() > savedUpdateTime)
+        assertEquals(5, settings.getIssSupGpSegments().size)
+        assertEquals(listOf(25544), settings.satelliteTypeIdsByType["ISS SupGP"])
+    }
+
+    @Test
+    fun `daily SupGP check never downloads a disabled source`() = runTest(dispatcher) {
+        val remote = FakeRemoteSource().apply {
+            networkStreams[Sources.ISS_SUPGP_URL] = { issSupGpStream() }
+        }
+        val settings = FakeSettingsRepo(
+            DataSourcesSettings(
+                listOf(Sources.ISS_SUPGP_URL), emptyList(),
+                satelliteEnabled = listOf(false)
+            )
+        )
+        DatabaseRepo(dispatcher, dataParser, FakeLocalSource(), remote, settings).updateIssSupGp()
+        assertTrue(remote.requestedUrls.isEmpty())
+        assertEquals(0L, settings.getIssSupGpLastCheckMillis())
+    }
 
     @Test
     fun `manual satellite import parses csv stream from content uri`() = runTest(dispatcher) {
@@ -362,11 +447,14 @@ class DatabaseRepoTest {
 private class FakeRemoteSource : IRemoteSource {
     val fileStreams: MutableMap<String, () -> InputStream> = mutableMapOf()
     val networkStreams: MutableMap<String, () -> InputStream> = mutableMapOf()
+    val requestedUrls = mutableListOf<String>()
 
     override suspend fun getFileStream(uri: String): InputStream? = fileStreams[uri]?.invoke()
 
-    override suspend fun getNetworkStream(url: String): NetworkResult =
-        networkStreams[url]?.let { NetworkResult(200, it()) } ?: NetworkResult(404, null)
+    override suspend fun getNetworkStream(url: String): NetworkResult {
+        requestedUrls += url
+        return networkStreams[url]?.let { NetworkResult(200, it()) } ?: NetworkResult(404, null)
+    }
 
     override suspend fun getAmSatCatalog(): String? = null
 
@@ -467,6 +555,16 @@ private class FakeSettingsRepo(dataSources: DataSourcesSettings = defaultDataSou
     )
 
     val satelliteTypeIdsByType = mutableMapOf<String, List<Int>>()
+    private var issSupGp = emptyList<OrbitalData>()
+    private var issSupGpLastCheckMillis = 0L
+    override fun getIssSupGpSegments(): List<OrbitalData> = issSupGp
+    override fun setIssSupGpSegments(segments: List<OrbitalData>) {
+        issSupGp = segments
+    }
+    override fun getIssSupGpLastCheckMillis(): Long = issSupGpLastCheckMillis
+    override fun setIssSupGpLastCheckMillis(timestamp: Long) {
+        issSupGpLastCheckMillis = timestamp
+    }
 
     override fun setSelectedIds(ids: List<Int>) = Unit
 

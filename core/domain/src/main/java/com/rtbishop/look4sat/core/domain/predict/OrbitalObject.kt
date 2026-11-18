@@ -85,7 +85,7 @@ abstract class OrbitalObject(val data: OrbitalData) {
      * concurrently. See OrbitalObjectConcurrencyTest.
      */
     @Synchronized
-    fun getPosition(pos: GeoPos, time: Long): OrbitalPos {
+    open fun getPosition(pos: GeoPos, time: Long): OrbitalPos {
         orbitalPos = OrbitalPos()
         // Date/time at which the position and velocity were calculated
         julUTC = calcCurrentDaynum(time) + 2444238.5
@@ -111,7 +111,7 @@ abstract class OrbitalObject(val data: OrbitalData) {
      * horizon crossings.
      */
     @Synchronized
-    fun getElevation(pos: GeoPos, time: Long): Double {
+    open fun getElevation(pos: GeoPos, time: Long): Double {
         julUTC = calcCurrentDaynum(time) + 2444238.5
         val tsince = (julUTC - julEpoch) * MIN_PER_DAY
         calculateSDP4orSGP4(tsince)
@@ -126,7 +126,7 @@ abstract class OrbitalObject(val data: OrbitalData) {
      * Used when we need all fields (AOS/LOS refinement, track computation).
      */
     @Synchronized
-    fun getFullPosition(pos: GeoPos, time: Long): OrbitalPos {
+    open fun getFullPosition(pos: GeoPos, time: Long): OrbitalPos {
         orbitalPos = OrbitalPos()
         julUTC = calcCurrentDaynum(time) + 2444238.5
         val tsince = (julUTC - julEpoch) * MIN_PER_DAY

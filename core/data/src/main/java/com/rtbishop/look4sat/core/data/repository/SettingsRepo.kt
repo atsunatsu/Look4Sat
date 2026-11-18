@@ -35,6 +35,7 @@ import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 
 import com.rtbishop.look4sat.core.domain.model.WavelogUploadSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
+import com.rtbishop.look4sat.core.domain.predict.OrbitalData
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.utility.positionToQth
 import com.rtbishop.look4sat.core.domain.utility.qthToPosition
@@ -121,6 +122,9 @@ class SettingsRepo(
     private val keyTransceiversEnabled = "transceiversEnabled"
     private val keySatnogsTleSourceMigration = "satnogsTleSourceMigration"
     private val keyAutoTleSourceMigration = "autoTleSourceMigration"
+    private val keyIssSupGpSourceMigration = "issSupGpSourceMigration"
+    private val keyIssSupGpSegments = "issSupGpSegments"
+    private val keyIssSupGpLastCheckMillis = "issSupGpLastCheckMillis"
     private val separatorComma = ","
     private val separatorUrl = "\n"
     private val legacyCelestrakSatnogsUrl =
@@ -809,6 +813,48 @@ class SettingsRepo(
         preferences.edit { putString("type$type", typesString) }
     }
 
+    private val _issSupGpCacheRevision = MutableStateFlow(0L)
+    override val issSupGpCacheRevision: StateFlow<Long> = _issSupGpCacheRevision
+
+    override fun getIssSupGpLastCheckMillis(): Long =
+        preferences.getLong(keyIssSupGpLastCheckMillis, 0L)
+
+    override fun setIssSupGpLastCheckMillis(timestamp: Long) {
+        preferences.edit { putLong(keyIssSupGpLastCheckMillis, timestamp) }
+    }
+
+    /** The ISS feed holds ~60 six-hour fits (only a few KB); cache it for offline predictions. */
+    override fun getIssSupGpSegments(): List<OrbitalData> =
+        preferences.getString(keyIssSupGpSegments, null).orEmpty()
+            .lineSequence()
+            .mapNotNull { line ->
+                val fields = line.split(',')
+                if (fields.size != 9) return@mapNotNull null
+                val values = fields.map { it.toDoubleOrNull() ?: return@mapNotNull null }
+                if (values.any { !it.isFinite() } || values[1] <= 0.0 ||
+                    values[2] !in 0.0..1.0) return@mapNotNull null
+                OrbitalData(
+                    name = "ISS (ZARYA)",
+                    epoch = values[0], meanmo = values[1], eccn = values[2],
+                    incl = values[3], raan = values[4], argper = values[5],
+                    meanan = values[6], catnum = Sources.ISS_CATNUM,
+                    bstar = values[7], ndot = values[8]
+                )
+            }.toList()
+
+    override fun setIssSupGpSegments(segments: List<OrbitalData>) {
+        val serialized = segments.filter { it.catnum == Sources.ISS_CATNUM }
+            .sortedBy { it.epochDaynum }
+            .joinToString("\n") { data ->
+                listOf(
+                    data.epoch, data.meanmo, data.eccn, data.incl, data.raan,
+                    data.argper, data.meanan, data.bstar, data.ndot
+                ).joinToString(",")
+            }
+        preferences.edit { putString(keyIssSupGpSegments, serialized) }
+        _issSupGpCacheRevision.update { it + 1L }
+    }
+
     override fun updateDatabaseState(state: DatabaseState) = preferences.edit {
         putInt(keyNumberOfSatellites, state.numberOfSatellites)
         putInt(keyNumberOfRadios, state.numberOfRadios)
@@ -975,6 +1021,7 @@ class SettingsRepo(
             putString(keyTransceiversEnabled, normalized.transceiversEnabled.joinToString(separatorComma))
             putBoolean(keySatnogsTleSourceMigration, true)
             putBoolean(keyAutoTleSourceMigration, true)
+            putBoolean(keyIssSupGpSourceMigration, true)
         }
         _dataSourcesSettings.value = normalized
     }
@@ -985,7 +1032,7 @@ class SettingsRepo(
             defaultUrls = Sources.satelliteDataUrls.values.filter { it.isNotBlank() },
             legacyEnabledKey = keyUseCustomTle,
             legacyUrlKey = keyTleUrl
-        ).migrateSatnogsTleSource().migrateAutoTleSources(),
+        ).migrateSatnogsTleSource().migrateAutoTleSources().migrateIssSupGpSource(),
         transceiversUrls = getDataSourceUrls(
             key = keyTransceiversUrls,
             defaultUrls = Sources.transceiversDataUrls.values.filter { it.isNotBlank() },
@@ -1064,6 +1111,24 @@ class SettingsRepo(
             putString(keySatelliteUrls, migrated.joinToString(separatorUrl))
             putString(keySatelliteEnabled, enabled.joinToString(separatorComma))
             putBoolean(keyAutoTleSourceMigration, true)
+        }
+        return migrated
+    }
+
+    /** Add the new opt-in-able built-in without shifting existing source enabled flags. */
+    private fun List<String>.migrateIssSupGpSource(): List<String> {
+        if (preferences.getBoolean(keyIssSupGpSourceMigration, false)) return this
+        val url = Sources.ISS_SUPGP_URL
+        if (containsSourceUrl(url)) {
+            preferences.edit { putBoolean(keyIssSupGpSourceMigration, true) }
+            return this
+        }
+        val migrated = this + url
+        val flags = alignFlags(this, readEnabledFlags(keySatelliteEnabled)) + true
+        preferences.edit {
+            putString(keySatelliteUrls, migrated.joinToString(separatorUrl))
+            putString(keySatelliteEnabled, flags.joinToString(separatorComma))
+            putBoolean(keyIssSupGpSourceMigration, true)
         }
         return migrated
     }

@@ -26,6 +26,7 @@ import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
 
 import com.rtbishop.look4sat.core.domain.model.WavelogUploadSettings
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
+import com.rtbishop.look4sat.core.domain.predict.OrbitalData
 import kotlinx.coroutines.flow.StateFlow
 
 interface ISettingsRepo {
@@ -62,6 +63,15 @@ interface ISettingsRepo {
     fun getSatelliteTypesIds(types: List<String>): List<Int>
     fun setSatelliteTypeIds(type: String, ids: List<Int>)
     fun updateDatabaseState(state: DatabaseState)
+    /** Offline cache for ISS six-hour SupGP fits (not a replacement for ordinary GP). */
+    fun getIssSupGpSegments(): List<OrbitalData> = emptyList()
+    fun setIssSupGpSegments(segments: List<OrbitalData>) = Unit
+    /** Timestamp of the last SupGP HTTP attempt; independent from the normal 48-hour GP timer. */
+    fun getIssSupGpLastCheckMillis(): Long = 0L
+    fun setIssSupGpLastCheckMillis(timestamp: Long) = Unit
+    /** Bump on cache changes so satellite/passes/rotator views reload on SupGP-only refresh. */
+    val issSupGpCacheRevision: StateFlow<Long>
+        get() = kotlinx.coroutines.flow.MutableStateFlow(0L)
     //endregion
 
     //region # RC settings

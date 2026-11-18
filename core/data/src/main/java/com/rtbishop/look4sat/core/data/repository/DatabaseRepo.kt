@@ -93,9 +93,20 @@ class DatabaseRepo(
         settingsRepo.updateDataSourcesStatus(
             (tleResults + radioResults).associate { (url, result) -> url to result.code }
         )
-        // parse each source on its own: the type filters need every source's catnums, while the
-        // stored elements are merged across sources below by freshness.
-        val parsedPerSource = tleResults.map { (rawUrl, result) ->
+        // SupGP is not a normal single-epoch feed: preserve all six-hour fits
+        // separately, so mergeEntries() cannot collapse them to one future TLE.
+        val supGpResult = tleResults.firstOrNull { (url, _) -> Sources.isIssSupGpUrl(url) }
+        val acceptedSupGp = supGpResult?.let { (url, result) ->
+            processIssSupGp(url, result)
+        }.orEmpty()
+        if (acceptedSupGp.isNotEmpty()) {
+            importedTypeIds.getOrPut("ISS SupGP") { mutableListOf() }.add(Sources.ISS_CATNUM)
+        }
+        val nowDaynum = OrbitalData.timeToDaynum(System.currentTimeMillis())
+        // Parse each ordinary source on its own for its type filter and GP merge.
+        val parsedPerSource = tleResults.filterNot { (url, _) ->
+            Sources.isIssSupGpUrl(url)
+        }.map { (rawUrl, result) ->
             val normUrl = normalizeUrl(rawUrl)
             val entries = result.stream?.let { parseSatelliteStream(normUrl, unwrapIfZipped(normUrl, it)) }.orEmpty()
             // Keep the last good classification on HTTP errors and empty/invalid feeds.
@@ -106,6 +117,22 @@ class DatabaseRepo(
             }
             entries
         }
+        // Keep GP independent when it is available. On SupGP-only installs,
+        // refresh the minimal database ISS record too, so it never ages out
+        // while the supplemental cache is still being updated.
+        val gpWasDownloaded = parsedPerSource.any { entries ->
+            entries.any { it.catnum == Sources.ISS_CATNUM }
+        }
+        val hasOrdinarySource = tleUrls.any { (url, _) -> !Sources.isIssSupGpUrl(url) }
+        val storedIssEpoch = localSource.getEntriesEpochs()[Sources.ISS_CATNUM]
+            ?.let { OrbitalData.epochToDaynum(it) }
+        val hasRecentStoredFallback = storedIssEpoch != null &&
+            nowDaynum - storedIssEpoch <= 7.0
+        val useSupGpFallback = !gpWasDownloaded &&
+            (!hasOrdinarySource || !hasRecentStoredFallback)
+        val supGpFallback = if (useSupGpFallback)
+            acceptedSupGp.lastOrNull { it.epochDaynum <= nowDaynum }?.copy(name = "ISS (ZARYA)")
+        else null
         importedTypeIds.forEach { (type, ids) -> settingsRepo.setSatelliteTypeIds(type, ids.distinct()) }
         // A partial or invalid transceiver download is NOT a complete snapshot.
         // Upsert healthy feeds without deleting radios from the failed sources.
@@ -127,15 +154,104 @@ class DatabaseRepo(
         }
         // Elements always come from the freshest source for every satellite; only
         // elements newer than the stored ones are written back.
-        insertFresherEntries(mergeEntries(parsedPerSource))
+        insertFresherEntries(mergeEntries(parsedPerSource +
+            listOfNotNull(supGpFallback?.let { listOf(it) })))
         // keep the previous timestamp when every source failed, so the next launch retries
-        val hasFetchedData = parsedPerSource.any { entries -> entries.isNotEmpty() } || importedRadios.isNotEmpty()
+        val hasFetchedData = parsedPerSource.any { entries -> entries.isNotEmpty() } ||
+            importedRadios.isNotEmpty() || acceptedSupGp.isNotEmpty()
         val previousTimestamp = settingsRepo.databaseState.value.updateTimestamp
         if (hasFetchedData) pruneStaleEntries()
         setUpdateSuccessful(if (hasFetchedData) System.currentTimeMillis() else previousTimestamp)
     }
 
+    /**
+     * Refresh only ISS SupGP (called at app launch when the dedicated 24-hour
+     * check is due). Never advance DatabaseState.updateTimestamp here: the
+     * existing TLE/OMM/transceiver refresh must remain on its 48-hour cycle.
+     */
+    override suspend fun updateIssSupGp() = withContext(dispatcher) {
+        val sources = settingsRepo.dataSourcesSettings.value
+        val rawUrl = sources.satelliteUrls.indices.firstOrNull { index ->
+            sources.isSatelliteEnabled(index) &&
+                Sources.isIssSupGpUrl(sources.satelliteUrls[index])
+        }?.let { sources.satelliteUrls[it] } ?: return@withContext
+
+        val response = remoteSource.getNetworkStream(normalizeUrl(rawUrl))
+        settingsRepo.updateDataSourcesStatus(
+            settingsRepo.dataSourcesStatus.value + (rawUrl to response.code)
+        )
+        val acceptedSupGp = processIssSupGp(rawUrl, response)
+        if (acceptedSupGp.isEmpty()) return@withContext
+
+        settingsRepo.setSatelliteTypeIds("ISS SupGP", listOf(Sources.ISS_CATNUM))
+        // When an install has only SupGP enabled, keep an ISS entry in the
+        // ordinary satellite table so selection and GP fallback still work.
+        val hasOtherSource = sources.satelliteUrls.indices.any { index ->
+            sources.isSatelliteEnabled(index) &&
+                !Sources.isIssSupGpUrl(sources.satelliteUrls[index])
+        }
+        val hasIss = localSource.getEntriesEpochs().containsKey(Sources.ISS_CATNUM)
+        if (!hasOtherSource || !hasIss) {
+            val now = OrbitalData.timeToDaynum(System.currentTimeMillis())
+            val current = acceptedSupGp.lastOrNull { it.epochDaynum <= now }
+            if (current != null) insertFresherEntries(listOf(current.copy(name = "ISS (ZARYA)")))
+        }
+        // setIssSupGpSegments() emits issSupGpCacheRevision so selected ISS
+        // objects, pass predictions and tracking refresh without touching GP time.
+    }
+
+    /**
+     * Validates a complete ISS prediction before committing to the offline
+     * cache. Failures preserve the last known good segments.
+     */
+    private suspend fun processIssSupGp(
+        rawUrl: String, result: NetworkResult
+    ): List<OrbitalData> {
+        // Limit automated retries even after a bad HTTP response. The manual
+        // Update button is unaffected and can force a check at any time.
+        settingsRepo.setIssSupGpLastCheckMillis(System.currentTimeMillis())
+        if (result.code !in 200..299) {
+            result.stream?.close()
+            return emptyList()
+        }
+        val parsed = try {
+            result.stream?.use { dataParser.parseTLEStream(it) }
+                .orEmpty()
+                .filter { it.catnum == Sources.ISS_CATNUM }
+                .distinctBy { it.epochDaynum }
+                .sortedBy { it.epochDaynum }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        val now = OrbitalData.timeToDaynum(System.currentTimeMillis())
+        val valid = parsed.size in 4..100 &&
+            parsed.first().epochDaynum <= now &&
+            parsed.last().epochDaynum >= now &&
+            parsed.all { it.meanmo > 0.0 && it.epochDaynum.isFinite() } &&
+            parsed.zipWithNext().all { (first, second) ->
+                val gap = second.epochDaynum - first.epochDaynum
+                gap > 0.0 && gap <= 0.30
+            }
+        if (!valid) {
+            settingsRepo.updateDataSourcesStatus(
+                settingsRepo.dataSourcesStatus.value + (rawUrl to 422)
+            )
+            return emptyList()
+        }
+        val previousLast = settingsRepo.getIssSupGpSegments().lastOrNull()?.epochDaynum
+        if (previousLast != null && parsed.last().epochDaynum < previousLast) {
+            return emptyList() // Do not roll back a newer offline prediction.
+        }
+        settingsRepo.setIssSupGpSegments(parsed)
+        return parsed
+    }
+
     override suspend fun clearAllData() = withContext(dispatcher) {
+        settingsRepo.setIssSupGpSegments(emptyList())
+        settingsRepo.setIssSupGpLastCheckMillis(0L)
         localSource.deleteEntries()
         localSource.deleteRadios()
         setUpdateSuccessful(0L)
