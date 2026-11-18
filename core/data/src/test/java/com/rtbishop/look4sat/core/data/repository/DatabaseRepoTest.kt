@@ -101,6 +101,47 @@ class DatabaseRepoTest {
     }
 
     @Test
+    fun `independent 24h SupGP check downloads no GP and preserves 48h timestamp`() = runTest(dispatcher) {
+        val ordinaryUrl = Sources.satelliteDataUrls.getValue("All")
+        val supGpUrl = Sources.ISS_SUPGP_URL
+        val local = FakeLocalSource()
+        val remote = FakeRemoteSource().apply {
+            networkStreams[supGpUrl] = { issSupGpStream() }
+            networkStreams[ordinaryUrl] = { validCsvStream() }
+        }
+        val settings = FakeSettingsRepo(
+            DataSourcesSettings(listOf(ordinaryUrl, supGpUrl), emptyList())
+        )
+        val savedUpdateTime = 1_000_000L
+        settings.updateDatabaseState(DatabaseState(0, 0, savedUpdateTime))
+        val repository = DatabaseRepo(dispatcher, dataParser, local, remote, settings)
+
+        repository.updateIssSupGp()
+
+        assertEquals(listOf(supGpUrl), remote.requestedUrls)
+        assertEquals(savedUpdateTime, settings.databaseState.value.updateTimestamp)
+        assertTrue(settings.getIssSupGpLastCheckMillis() > savedUpdateTime)
+        assertEquals(5, settings.getIssSupGpSegments().size)
+        assertEquals(listOf(25544), settings.satelliteTypeIdsByType["ISS SupGP"])
+    }
+
+    @Test
+    fun `daily SupGP check never downloads a disabled source`() = runTest(dispatcher) {
+        val remote = FakeRemoteSource().apply {
+            networkStreams[Sources.ISS_SUPGP_URL] = { issSupGpStream() }
+        }
+        val settings = FakeSettingsRepo(
+            DataSourcesSettings(
+                listOf(Sources.ISS_SUPGP_URL), emptyList(),
+                satelliteEnabled = listOf(false)
+            )
+        )
+        DatabaseRepo(dispatcher, dataParser, FakeLocalSource(), remote, settings).updateIssSupGp()
+        assertTrue(remote.requestedUrls.isEmpty())
+        assertEquals(0L, settings.getIssSupGpLastCheckMillis())
+    }
+
+    @Test
     fun `manual satellite import parses csv stream from content uri`() = runTest(dispatcher) {
         val uri = "content://look4sat/import/satellites"
         val localSource = FakeLocalSource()
@@ -406,11 +447,14 @@ class DatabaseRepoTest {
 private class FakeRemoteSource : IRemoteSource {
     val fileStreams: MutableMap<String, () -> InputStream> = mutableMapOf()
     val networkStreams: MutableMap<String, () -> InputStream> = mutableMapOf()
+    val requestedUrls = mutableListOf<String>()
 
     override suspend fun getFileStream(uri: String): InputStream? = fileStreams[uri]?.invoke()
 
-    override suspend fun getNetworkStream(url: String): NetworkResult =
-        networkStreams[url]?.let { NetworkResult(200, it()) } ?: NetworkResult(404, null)
+    override suspend fun getNetworkStream(url: String): NetworkResult {
+        requestedUrls += url
+        return networkStreams[url]?.let { NetworkResult(200, it()) } ?: NetworkResult(404, null)
+    }
 
     override suspend fun getAmSatCatalog(): String? = null
 
@@ -512,9 +556,14 @@ private class FakeSettingsRepo(dataSources: DataSourcesSettings = defaultDataSou
 
     val satelliteTypeIdsByType = mutableMapOf<String, List<Int>>()
     private var issSupGp = emptyList<OrbitalData>()
+    private var issSupGpLastCheckMillis = 0L
     override fun getIssSupGpSegments(): List<OrbitalData> = issSupGp
     override fun setIssSupGpSegments(segments: List<OrbitalData>) {
         issSupGp = segments
+    }
+    override fun getIssSupGpLastCheckMillis(): Long = issSupGpLastCheckMillis
+    override fun setIssSupGpLastCheckMillis(timestamp: Long) {
+        issSupGpLastCheckMillis = timestamp
     }
 
     override fun setSelectedIds(ids: List<Int>) = Unit
