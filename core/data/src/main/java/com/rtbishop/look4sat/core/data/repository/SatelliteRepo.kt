@@ -22,6 +22,8 @@ import com.rtbishop.look4sat.core.domain.model.SatRadio
 import com.rtbishop.look4sat.core.domain.predict.GeoPos
 import com.rtbishop.look4sat.core.domain.predict.OrbitalObject
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPass
+import com.rtbishop.look4sat.core.domain.predict.SegmentedOrbitalObject
+import com.rtbishop.look4sat.core.domain.source.Sources
 import com.rtbishop.look4sat.core.domain.predict.OrbitalPos
 import com.rtbishop.look4sat.core.domain.repository.ISatelliteRepo
 import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
@@ -99,10 +101,24 @@ class SatelliteRepo(
             settingsRepo.databaseState,
             // Recalculate passes when the UTC display toggle changes, so an existing
             // AOS time window is reapplied in the newly selected timezone.
-            settingsRepo.otherSettings.map { it.stateOfUtc }.distinctUntilChanged()
-        ) { selectedIds, _, _, _ -> selectedIds }
-            .collect { selectedIds ->
-                _satellites.update { localStorage.getEntriesWithIds(selectedIds) }
+            settingsRepo.otherSettings.map { it.stateOfUtc }.distinctUntilChanged(),
+            // A source toggle must re-create the ISS orbit, even without a new download.
+            settingsRepo.dataSourcesSettings.map { sourceSettings ->
+                sourceSettings.satelliteUrls.indices.any { index ->
+                    sourceSettings.isSatelliteEnabled(index) &&
+                        Sources.isIssSupGpUrl(sourceSettings.satelliteUrls[index])
+                }
+            }.distinctUntilChanged()
+        ) { selectedIds, _, _, _, useIssSupGp -> selectedIds to useIssSupGp }
+            .collect { (selectedIds, useIssSupGp) ->
+                val supGp = if (useIssSupGp) settingsRepo.getIssSupGpSegments() else emptyList()
+                _satellites.update {
+                    localStorage.getEntriesWithIds(selectedIds).map { orbit ->
+                        if (orbit.data.catnum == Sources.ISS_CATNUM && supGp.size >= 2)
+                            SegmentedOrbitalObject(orbit, supGp)
+                        else orbit
+                    }
+                }
                 val settings = settingsRepo.passesSettings.value
                 val now = System.currentTimeMillis()
                 // 历史过境: 回看窗口 hoursBefore 小时, 过境列表从更早时间开始计算.
