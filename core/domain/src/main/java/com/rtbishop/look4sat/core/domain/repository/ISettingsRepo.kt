@@ -66,6 +66,12 @@ interface ISettingsRepo {
     /** Offline cache for ISS six-hour SupGP fits (not a replacement for ordinary GP). */
     fun getIssSupGpSegments(): List<OrbitalData> = emptyList()
     fun setIssSupGpSegments(segments: List<OrbitalData>) = Unit
+    /** Timestamp of the last SupGP HTTP attempt; independent from the normal 48-hour GP timer. */
+    fun getIssSupGpLastCheckMillis(): Long = 0L
+    fun setIssSupGpLastCheckMillis(timestamp: Long) = Unit
+    /** Bump on cache changes so satellite/passes/rotator views reload on SupGP-only refresh. */
+    val issSupGpCacheRevision: StateFlow<Long>
+        get() = kotlinx.coroutines.flow.MutableStateFlow(0L)
     //endregion
 
     //region # RC settings
