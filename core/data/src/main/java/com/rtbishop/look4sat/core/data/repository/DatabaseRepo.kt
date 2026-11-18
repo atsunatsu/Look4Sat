@@ -142,14 +142,22 @@ class DatabaseRepo(
             }
             entries
         }
-        // Do not replace a real GP entry with SupGP: toggling the source off must
-        // restore the ordinary ISS propagation. A current segment is persisted as
-        // a minimal fallback only on a SupGP-only install that has no ISS entry.
-        val ordinaryIssAvailable = parsedPerSource.any { entries ->
+        // Keep GP independent when it is available. On SupGP-only installs,
+        // refresh the minimal database ISS record too, so it never ages out
+        // while the supplemental cache is still being updated.
+        val gpWasDownloaded = parsedPerSource.any { entries ->
             entries.any { it.catnum == Sources.ISS_CATNUM }
-        } || localSource.getEntriesEpochs().containsKey(Sources.ISS_CATNUM)
-        val supGpFallback = if (ordinaryIssAvailable) null else
+        }
+        val hasOrdinarySource = tleUrls.any { (url, _) -> !Sources.isIssSupGpUrl(url) }
+        val storedIssEpoch = localSource.getEntriesEpochs()[Sources.ISS_CATNUM]
+            ?.let { OrbitalData.epochToDaynum(it) }
+        val hasRecentStoredFallback = storedIssEpoch != null &&
+            nowDaynum - storedIssEpoch <= 7.0
+        val useSupGpFallback = !gpWasDownloaded &&
+            (!hasOrdinarySource || !hasRecentStoredFallback)
+        val supGpFallback = if (useSupGpFallback)
             acceptedSupGp.lastOrNull { it.epochDaynum <= nowDaynum }?.copy(name = "ISS (ZARYA)")
+        else null
         importedTypeIds.forEach { (type, ids) -> settingsRepo.setSatelliteTypeIds(type, ids.distinct()) }
         // A partial or invalid transceiver download is NOT a complete snapshot.
         // Upsert healthy feeds without deleting radios from the failed sources.
