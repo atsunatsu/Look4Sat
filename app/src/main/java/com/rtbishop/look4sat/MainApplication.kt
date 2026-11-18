@@ -39,6 +39,7 @@ import com.rtbishop.look4sat.core.domain.repository.LoTWForegroundSyncStatus
 import android.os.Bundle
 import com.rtbishop.look4sat.core.data.injection.MainContainer
 import com.rtbishop.look4sat.core.domain.repository.IContainerProvider
+import com.rtbishop.look4sat.core.domain.source.Sources
 import com.rtbishop.look4sat.core.domain.repository.IMainContainer
 import com.rtbishop.look4sat.core.domain.repository.LoTWSyncMode
 import com.rtbishop.look4sat.core.domain.repository.LoTWResult
@@ -97,7 +98,7 @@ class MainApplication : Application(), IContainerProvider, ILoTWForegroundSyncLa
         container = MainContainer(this)
         observeL4sUsbAttachments()
         clearAmSatCacheOnAppBackground()
-        // trigger automatic update every 48 hours
+        // Check ordinary TLE every 48 hours and ISS SupGP independently every 24 hours.
         container.appScope.launch { checkAutoUpdate() }
         // LoTW foreground data-sync starts from the first visible Activity,
         // not Application.onCreate, to respect Android 12+ FGS launch limits.
@@ -184,13 +185,29 @@ class MainApplication : Application(), IContainerProvider, ILoTWForegroundSyncLa
     }
 
     private suspend fun checkAutoUpdate(timeNow: Long = System.currentTimeMillis()) {
-        if (container.settingsRepo.otherSettings.value.stateOfAutoUpdate) {
-            val timeDelta = timeNow - container.settingsRepo.databaseState.value.updateTimestamp
-            if (timeDelta > 172_800_000L) { // 48 hours in ms
-                val sdf = SimpleDateFormat("d MMM yyyy - HH:mm:ss", Locale.getDefault())
-                println("Started periodic data update on ${sdf.format(Date())}")
-                container.databaseRepo.updateFromRemote()
-            }
+        val settings = container.settingsRepo
+        if (!settings.otherSettings.value.stateOfAutoUpdate) return
+
+        // Keep the regular TLE/OMM and transceiver update on its original
+        // 48-hour cadence. A full update already includes an enabled ISS SupGP.
+        if (timeNow - settings.databaseState.value.updateTimestamp > 172_800_000L) {
+            val sdf = SimpleDateFormat("d MMM yyyy - HH:mm:ss", Locale.getDefault())
+            println("Started periodic data update on ${sdf.format(Date())}")
+            container.databaseRepo.updateFromRemote()
+            return
+        }
+
+        // Check SupGP independently on startup, at most once per 24 hours.
+        // A single-source refresh must not postpone the ordinary GP download.
+        val sources = settings.dataSourcesSettings.value
+        val supGpEnabled = sources.satelliteUrls.indices.any { index ->
+            sources.isSatelliteEnabled(index) &&
+                Sources.isIssSupGpUrl(sources.satelliteUrls[index])
+        }
+        if (supGpEnabled &&
+            timeNow - settings.getIssSupGpLastCheckMillis() > 86_400_000L
+        ) {
+            container.databaseRepo.updateIssSupGp()
         }
     }
 
