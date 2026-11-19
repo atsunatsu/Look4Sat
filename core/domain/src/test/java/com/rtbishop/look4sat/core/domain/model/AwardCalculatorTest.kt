@@ -248,11 +248,14 @@ class AwardCalculatorTest {
     }
 
     @Test
-    fun `waipa trusts PI59 operating geography over YE9RAS West Papua home allocation`() {
+    fun `waipa shares West Papua callsign allocations with Southwest Papua and uses PI59 to resolve`() {
         val station = qso("YE9RAS", dxcc = 327)
-        // The IIHG prefix/suffix home allocation puts YE9RAS in PB, but the
-        // actual QSO's PI59 operating locator has Indonesian land only in PD.
-        assertEquals("PB", WaipaCallsignLookup.province("YE9RAS"))
+        assertEquals(setOf("PB", "PD"), WaipaCallsignLookup.candidates(station.call))
+        assertEquals(null, AwardCalculator.awardKey(AwardType.WAIPA, station))
+        val unassigned = AwardCalculator.waipaUnassignedQsos(
+            mapOf(GRIDLESS_QSO_BUCKET to listOf(station)), { null }, { emptySet() }
+        )
+        assertEquals(listOf(WaipaAmbiguousQso(station, setOf("PB", "PD"))), unassigned)
         val provinceForGrid: (String) -> String? = { if (it == "PI59") "PD" else null }
         assertEquals("PD", AwardCalculator.awardKey(
             AwardType.WAIPA, station, provinceForGrid, workedGrid = "PI59"
@@ -439,6 +442,71 @@ class AwardCalculatorTest {
             AwardCalculator.regionQsos(
                 store, AwardType.WAIPA, "KI", provinceForGrid, candidatesForGrid, overrides
             ).isEmpty()
+        )
+    }
+
+    @Test
+    fun `waipa only uses compatible IOTA to resolve a fine grid across provinces`() {
+        val boundary = qso("YB0ABC", dxcc = 327, fineGrids = listOf("OI33AA"), iota = "OC-186")
+        val provinceForGrid: (String) -> String? = { if (it == "OI33") "BA" else null }
+        val candidatesForGrid: (String) -> Set<String> = {
+            if (it == "OI33AA") setOf("JK", "JT") else emptySet()
+        }
+        val compatible = mapOf("OI33" to listOf(boundary))
+        assertEquals(setOf("JT"), AwardCalculator.calculate(compatible, provinceForGrid, candidatesForGrid)
+            .first { it.type == AwardType.WAIPA }.workedKeys)
+        assertEquals(listOf(boundary), AwardCalculator.regionQsos(
+            compatible, AwardType.WAIPA, "JT", provinceForGrid, candidatesForGrid
+        ))
+        assertTrue(AwardCalculator.waipaUnassignedQsos(
+            compatible, provinceForGrid, candidatesForGrid
+        ).isEmpty())
+
+        val conflicting = boundary.copy(iota = "OC-022")
+        val store = mapOf("OI33" to listOf(conflicting))
+        val pending = WaipaAmbiguousQso(conflicting, setOf("JK", "JT"), recommendedProvinceCode = "JK")
+        assertTrue(AwardCalculator.calculate(store, provinceForGrid, candidatesForGrid)
+            .first { it.type == AwardType.WAIPA }.workedKeys.isEmpty())
+        assertEquals(listOf(pending), AwardCalculator.waipaAmbiguousQsos(
+            store, provinceForGrid, candidatesForGrid
+        ))
+        assertEquals(listOf(pending), AwardCalculator.waipaUnassignedQsos(
+            store, provinceForGrid, candidatesForGrid
+        ))
+    }
+
+    @Test
+    fun `waipa keeps grid candidates when callsign yields several or no matching provinces`() {
+        val sharedCallsign = qso("YE9RAS", dxcc = 327, fineGrids = listOf("PI59PC"))
+        val uniqueIntersection = sharedCallsign.copy(epochMs = 1L, theirFineGrids = listOf("PI59PD"))
+        val outside = qso("YB0ABC", dxcc = 327)
+        val portable = qso("YB0ABC/P", dxcc = 327)
+        val supportsOne = qso("YB0XYZ", dxcc = 327)
+        val store = linkedMapOf(
+            "PI59" to listOf(sharedCallsign, uniqueIntersection),
+            "OI33" to listOf(outside, portable),
+            "OI34" to listOf(supportsOne)
+        )
+        val candidatesForGrid: (String) -> Set<String> = {
+            when (it) {
+                "PI59PC" -> setOf("PB", "PD")
+                "PI59PD" -> setOf("PB", "PT")
+                "OI33" -> setOf("BA", "JT")
+                "OI34" -> setOf("JK", "JT")
+                else -> emptySet()
+            }
+        }
+
+        val pending = AwardCalculator.waipaAmbiguousQsos(store, { null }, candidatesForGrid)
+        assertEquals(
+            listOf(
+                WaipaAmbiguousQso(sharedCallsign, setOf("PB", "PD")),
+                WaipaAmbiguousQso(outside, setOf("BA", "JT")),
+                WaipaAmbiguousQso(portable, setOf("BA", "JT")),
+                WaipaAmbiguousQso(supportsOne, setOf("JK", "JT"), "JK"),
+                WaipaAmbiguousQso(uniqueIntersection, setOf("PB", "PT"), "PB")
+            ),
+            pending
         )
     }
 

@@ -1949,13 +1949,22 @@ private fun WaipaPendingQsoRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            pending.candidateProvinceCodes.sorted().forEach { code ->
+            pending.candidateProvinceCodes.sortedWith(
+                compareBy<String> { it != pending.recommendedProvinceCode }.thenBy { it }
+            ).forEach { code ->
                 val candidate = regions.firstOrNull { it.code == code }
+                val label = candidate?.let { "${regionDisplayName(it)} ($code)" } ?: code
                 TextButton(
                     onClick = { onSelectProvince(code) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(candidate?.let { "${regionDisplayName(it)} ($code)" } ?: code)
+                    Text(
+                        when {
+                            code != pending.recommendedProvinceCode -> label
+                            useEnglish -> "$label · Recommended"
+                            else -> "$label · 推荐"
+                        }
+                    )
                 }
             }
         }
