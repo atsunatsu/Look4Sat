@@ -385,6 +385,8 @@ class LoTWGridSyncTest {
         override fun setLastWavelogSyncEpochMs(value: Long) { lastWavelogSyncEpochMs = value }
         override fun getLastWavelogFullSyncEpochMs(): Long = 0L
         override fun setLastWavelogFullSyncEpochMs(value: Long) = Unit
+        override fun getLastWavelogConfirmationSyncEpochMs(): Long = 0L
+        override fun setLastWavelogConfirmationSyncEpochMs(value: Long) = Unit
 
         override fun setSelectedIds(ids: List<Int>) = TODO()
         override fun setSelectedTypes(types: List<String>) = TODO()

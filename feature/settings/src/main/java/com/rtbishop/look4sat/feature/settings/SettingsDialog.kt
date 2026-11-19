@@ -181,12 +181,16 @@ fun WavelogUploadDialog(
     onSave: (com.rtbishop.look4sat.core.domain.model.WavelogUploadSettings) -> Unit,
     onFetchStations: (url: String, apiKey: String) -> Unit,
     onSelectStation: (com.rtbishop.look4sat.core.domain.repository.WavelogStationInfo) -> Unit,
-    onSyncIncremental: (String, String) -> Unit,
-    onSyncFull: (String, String) -> Unit,
+    onSyncIncremental: (String, String, String) -> Unit,
+    onSyncFull: (String, String, String) -> Unit,
     onClear: () -> Unit
 ) {
     val url = rememberSaveable { mutableStateOf(initialSettings.url) }
     val apiKey = rememberSaveable { mutableStateOf(initialSettings.apiKey) }
+    var confirmationToken by rememberSaveable { mutableStateOf(initialSettings.confirmationToken) }
+    LaunchedEffect(initialSettings.confirmationToken) {
+        confirmationToken = initialSettings.confirmationToken
+    }
     // A successful probe, or Clear, changes the stored connection while the dialog stays open.
     LaunchedEffect(initialSettings.url, initialSettings.apiKey) {
         url.value = initialSettings.url
@@ -198,13 +202,17 @@ fun WavelogUploadDialog(
         title = stringResource(R.string.prefs_wavelog_upload_title),
         onCancel = dismiss,
         onAccept = {
-            onSave(initialSettings.copy(url = url.value, apiKey = apiKey.value))
+            onSave(initialSettings.copy(url = url.value, apiKey = apiKey.value, confirmationToken = confirmationToken))
             dismiss()
-        }
+        },
+        acceptEnabled = !isSyncing
     ) {
         OutlinedTextField(
             value = url.value,
-            onValueChange = { url.value = it },
+            onValueChange = {
+                if (url.value.trim().trimEnd('/') != it.trim().trimEnd('/')) confirmationToken = ""
+                url.value = it
+            },
             label = { Text(text = stringResource(id = R.string.prefs_wavelog_url)) },
             placeholder = { Text(text = "http://100.x.x.x/wavelog") },
             singleLine = true,
@@ -218,11 +226,21 @@ fun WavelogUploadDialog(
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large),
         )
+        OutlinedTextField(
+            value = confirmationToken,
+            onValueChange = { confirmationToken = it },
+            label = { Text(stringResource(R.string.prefs_wavelog_confirmation_token)) },
+            placeholder = { Text("wl2_…") },
+            supportingText = { Text(stringResource(R.string.prefs_wavelog_confirmation_token_help)) },
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large)
+        )
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large)
         ) {
-            TextButton(onClick = { onFetchStations(url.value, apiKey.value) }, enabled = !probeBusy) {
+            TextButton(onClick = { onFetchStations(url.value, apiKey.value) }, enabled = !probeBusy && !isSyncing) {
                 Text(
                     text = if (probeBusy) stringResource(R.string.prefs_wavelog_upload_probing)
                     else stringResource(R.string.prefs_wavelog_upload_fetch)
@@ -309,12 +327,12 @@ fun WavelogUploadDialog(
             modifier = Modifier.fillMaxWidth().padding(horizontal = LocalSpacing.current.large)
         ) {
             CardButton(
-                onClick = { onSyncFull(url.value, apiKey.value) },
+                onClick = { onSyncFull(url.value, apiKey.value, confirmationToken) },
                 text = stringResource(R.string.prefs_wavelog_sync_full),
                 isEnabled = !isSyncing && !probeBusy
             )
             CardButton(
-                onClick = { onSyncIncremental(url.value, apiKey.value) },
+                onClick = { onSyncIncremental(url.value, apiKey.value, confirmationToken) },
                 text = stringResource(R.string.prefs_wavelog_sync_incremental),
                 isEnabled = !isSyncing && !probeBusy
             )
@@ -342,6 +360,7 @@ fun WavelogUploadDialog(
         )
         TextButton(
             onClick = { showClearConfirm = true },
+            enabled = !isSyncing,
             modifier = Modifier.padding(horizontal = LocalSpacing.current.large)
         ) {
             Text(text = stringResource(R.string.prefs_wavelog_clear), color = MaterialTheme.colorScheme.error)

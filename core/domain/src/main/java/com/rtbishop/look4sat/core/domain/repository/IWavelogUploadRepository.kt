@@ -120,6 +120,10 @@ fun WavelogUploadSettings.withVerifiedWavelogConnection(
     val sameServer = normalizeWavelogUrl(this.url) == normalizedUrl
     val selected = (if (sameServer) stations.firstOrNull { it.id == stationId } else null)
         ?: stations.singleOrNull()
-    return WavelogUploadSettings(url = normalizedUrl, apiKey = apiKey.trim())
+    return WavelogUploadSettings(
+        url = normalizedUrl,
+        apiKey = apiKey.trim(),
+        confirmationToken = if (hasWavelogConnection(url, apiKey)) confirmationToken else ""
+    )
         .let { if (selected != null) it.withStationProfile(selected) else it }
 }

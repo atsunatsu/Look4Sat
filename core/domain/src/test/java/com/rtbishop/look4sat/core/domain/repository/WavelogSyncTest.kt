@@ -377,6 +377,8 @@ class WavelogSyncTest {
         override fun setLastWavelogSyncEpochMs(value: Long) { lastSync = value }
         override fun getLastWavelogFullSyncEpochMs(): Long = lastFullSync
         override fun setLastWavelogFullSyncEpochMs(value: Long) { lastFullSync = value }
+        override fun getLastWavelogConfirmationSyncEpochMs(): Long = 0L
+        override fun setLastWavelogConfirmationSyncEpochMs(value: Long) = Unit
 
         override val appVersionName: String get() = TODO()
         override val selectedIds: StateFlow<List<Int>> get() = TODO()

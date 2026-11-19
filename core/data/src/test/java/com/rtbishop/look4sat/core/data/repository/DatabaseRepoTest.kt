@@ -651,6 +651,8 @@ private class FakeSettingsRepo(dataSources: DataSourcesSettings = defaultDataSou
     override fun setLastWavelogSyncEpochMs(value: Long) = Unit
     override fun getLastWavelogFullSyncEpochMs(): Long = 0L
     override fun setLastWavelogFullSyncEpochMs(value: Long) = Unit
+    override fun getLastWavelogConfirmationSyncEpochMs(): Long = 0L
+    override fun setLastWavelogConfirmationSyncEpochMs(value: Long) = Unit
 
     override fun getWorkedGridQsos(): Map<String, List<com.rtbishop.look4sat.core.domain.model.GridQso>> = emptyMap()
 

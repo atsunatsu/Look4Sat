@@ -171,7 +171,8 @@ sealed interface SettingsAction {
     data class SyncWavelog(
         val mode: com.rtbishop.look4sat.core.domain.repository.WavelogSyncMode,
         val url: String,
-        val apiKey: String
+        val apiKey: String,
+        val confirmationToken: String
     ) : SettingsAction
     /** Confirmed the LoTW→Wavelog mode switch warning. */
     data object ConfirmWavelogSwitch : SettingsAction

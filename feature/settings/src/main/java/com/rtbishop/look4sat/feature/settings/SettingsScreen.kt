@@ -455,8 +455,12 @@ private fun SettingsScreen(
             onSave = { onAction(SettingsAction.UpdateWavelogUpload(it)) },
             onFetchStations = { url, apiKey -> onAction(SettingsAction.FetchWavelogUploadStations(url, apiKey)) },
             onSelectStation = { onAction(SettingsAction.SelectWavelogUploadStation(it)) },
-            onSyncIncremental = { url, key -> onAction(SettingsAction.SyncWavelog(WavelogSyncMode.Incremental, url, key)) },
-            onSyncFull = { url, key -> onAction(SettingsAction.SyncWavelog(WavelogSyncMode.Full, url, key)) },
+            onSyncIncremental = { url, key, token ->
+                onAction(SettingsAction.SyncWavelog(WavelogSyncMode.Incremental, url, key, token))
+            },
+            onSyncFull = { url, key, token ->
+                onAction(SettingsAction.SyncWavelog(WavelogSyncMode.Full, url, key, token))
+            },
             onClear = { onAction(SettingsAction.ClearWavelogConfig) }
         )
     }

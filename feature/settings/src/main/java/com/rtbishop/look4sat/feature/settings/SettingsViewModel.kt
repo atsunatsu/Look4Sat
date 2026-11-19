@@ -35,6 +35,7 @@ import com.rtbishop.look4sat.core.domain.repository.ISettingsRepo
 import com.rtbishop.look4sat.core.domain.repository.IUpdateRepository
 import com.rtbishop.look4sat.core.domain.repository.LoTWUploadIssueKind
 import com.rtbishop.look4sat.core.domain.repository.lotwCursorEpochMs
+import com.rtbishop.look4sat.core.domain.repository.lotwSyncCursor
 import com.rtbishop.look4sat.core.domain.repository.positionWarning
 import com.rtbishop.look4sat.core.domain.repository.IWavelogUploadRepository
 import com.rtbishop.look4sat.core.domain.repository.IWavelogSyncRepository
@@ -268,7 +269,7 @@ class SettingsViewModel(
             is SettingsAction.UpdateWavelogUpload -> applyWavelogUploadSettings(action.settings)
             is SettingsAction.FetchWavelogUploadStations -> fetchWavelogUploadStations(action.url, action.apiKey)
             is SettingsAction.SelectWavelogUploadStation -> applyWavelogUploadStation(action.station)
-            is SettingsAction.SyncWavelog -> syncWavelogWithInput(action.mode, action.url, action.apiKey)
+            is SettingsAction.SyncWavelog -> syncWavelogWithInput(action.mode, action.url, action.apiKey, action.confirmationToken)
             SettingsAction.ConfirmWavelogSwitch -> confirmWavelogSwitch()
             SettingsAction.CancelWavelogSwitch -> cancelWavelogSwitch()
             SettingsAction.ClearWavelogConfig -> clearWavelogConfig()
@@ -323,6 +324,7 @@ class SettingsViewModel(
         val current = settingsRepo.wavelogUploadSettings.value
         val changed = !current.hasWavelogConnection(settings.url, settings.apiKey)
         val updated = current.withUnverifiedWavelogConnection(settings.url, settings.apiKey)
+            .copy(confirmationToken = settings.confirmationToken.trim())
         if (changed) {
             settingsRepo.setWavelogStations(emptyList())
             _uiState.update {
@@ -395,7 +397,8 @@ class SettingsViewModel(
     private fun fetchWavelogUploadStations(
         url: String,
         apiKey: String,
-        syncAfter: WavelogSyncMode? = null
+        syncAfter: WavelogSyncMode? = null,
+        confirmationToken: String? = null
     ) {
         if (_uiState.value.wavelogUploadProbeBusy || _uiState.value.wavelogSyncing ||
             _uiState.value.wavelogSwitchWarning
@@ -430,7 +433,9 @@ class SettingsViewModel(
             }
 
             val current = settingsRepo.wavelogUploadSettings.value
-            val verified = current.withVerifiedWavelogConnection(base, key, probe.stations)
+            val verifiedConnection = current.withVerifiedWavelogConnection(base, key, probe.stations)
+            val verified = confirmationToken?.let { verifiedConnection.copy(confirmationToken = it) }
+                ?: verifiedConnection
             val commitVerifiedConnection: () -> Unit = {
                 settingsRepo.updateWavelogUploadSettings(verified)
                 settingsRepo.setWavelogStations(probe.stations)
@@ -475,7 +480,7 @@ class SettingsViewModel(
     }
 
     /** Use the edited fields, not an earlier saved URL/key or cached station list. */
-    private fun syncWavelogWithInput(mode: WavelogSyncMode, url: String, apiKey: String) {
+    private fun syncWavelogWithInput(mode: WavelogSyncMode, url: String, apiKey: String, confirmationToken: String) {
         if (_uiState.value.wavelogUploadProbeBusy || _uiState.value.wavelogSyncing ||
             _uiState.value.wavelogSwitchWarning
         ) return
@@ -483,8 +488,10 @@ class SettingsViewModel(
         if (!current.hasWavelogConnection(url, apiKey) ||
             settingsRepo.getWavelogStations().isEmpty()
         ) {
-            fetchWavelogUploadStations(url, apiKey, syncAfter = mode)
+            fetchWavelogUploadStations(url, apiKey, syncAfter = mode, confirmationToken = confirmationToken.trim())
         } else {
+            val updated = current.copy(confirmationToken = confirmationToken.trim())
+            if (updated != current) settingsRepo.updateWavelogUploadSettings(updated)
             syncWavelog(mode)
         }
     }
@@ -517,14 +524,18 @@ class SettingsViewModel(
             return
         }
         val mode = resolveWavelogSyncMode(settingsRepo.getWavelogSyncUrl(), settings.url, requested)
-        // Late confirmations can only be picked up by a full pull (Wavelog's incremental
-        // cursor is a row id), so promote a stale incremental request to a full re-scan.
-        val promoted = mode == WavelogSyncMode.Incremental &&
-            shouldPromoteWavelogFullSync(settingsRepo.getLastWavelogFullSyncEpochMs())
+        val hasConfirmationToken = settings.confirmationToken.isNotBlank()
+        val lastConfirmationSync = settingsRepo.getLastWavelogConfirmationSyncEpochMs()
+        // A first full pull is the baseline for confirmation deltas. Legacy servers
+        // continue to recover late confirmations through regular full rescans.
+        val needsFullSync = if (hasConfirmationToken) lastConfirmationSync == 0L
+            else shouldPromoteWavelogFullSync(settingsRepo.getLastWavelogFullSyncEpochMs())
+        val promoted = mode == WavelogSyncMode.Incremental && needsFullSync
         val actualMode = if (promoted) WavelogSyncMode.Full else mode
         _uiState.update { it.copy(wavelogSyncing = true, wavelogUploadMessage = null) }
         viewModelScope.launch {
             try {
+                val startedAt = System.currentTimeMillis()
                 val fetch = wavelogSyncRepository.fetchNewRecords(
                     settings.url,
                     settings.apiKey,
@@ -538,12 +549,20 @@ class SettingsViewModel(
                     }
                     return@launch
                 }
+                val pullConfirmations = hasConfirmationToken && actualMode == WavelogSyncMode.Incremental
+                // Keep a one-day overlap for date-only queries and delayed Wavelog imports.
+                val confirmations = if (pullConfirmations) wavelogSyncRepository.fetchLoTWConfirmations(
+                    settings.url, settings.apiKey, settings.confirmationToken, stations,
+                    since = lotwSyncCursor(lastConfirmationSync - 86_400_000L).take(10)
+                ) else null
+                val confirmationFailed = pullConfirmations && confirmations == null
+                val records = confirmations.orEmpty() + fetch.records
                 // Full re-scan replaces the previous downloaded rows only if
                 // every Wavelog station finished; otherwise preserve old records.
                 // The Room transaction writes new rows and deletes old source rows
                 // atomically, after the network response is complete.
                 val merge = qsoRepository.mergeWavelog(
-                    fetch.records, settings.url,
+                    records, settings.url,
                     replaceExisting = actualMode == WavelogSyncMode.Full &&
                         fetch.failedStations.isEmpty()
                 )
@@ -551,12 +570,16 @@ class SettingsViewModel(
                 val cursors = settingsRepo.getWavelogSyncCursors() + fetch.cursors
                 applyWavelogSyncResult(
                     settingsRepo,
-                    fetch.records,
+                    records,
                     cursors,
                     settings.url,
                     actualMode,
                     failedStations = fetch.failedStations.toSet()
                 )
+                val fullSyncComplete = actualMode == WavelogSyncMode.Full && fetch.failedStations.isEmpty()
+                if (hasConfirmationToken && (confirmations != null || fullSyncComplete)) {
+                    settingsRepo.setLastWavelogConfirmationSyncEpochMs(startedAt)
+                }
                 // Take a fresh snapshot after the Room transaction so the settings
                 // logbook card/dialog reflects the completed sync immediately.
                 val syncedRecords = qsoRepository.records.first()
@@ -566,8 +589,10 @@ class SettingsViewModel(
                         logbookRecords = syncedRecords,
                         workedGridsCount = settingsRepo.getWorkedGrids().size,
                         wavelogLastSyncEpochMs = settingsRepo.getLastWavelogSyncEpochMs(),
-                        wavelogUploadMessage = wavelogSyncSummary(actualMode, fetch, merge, stations.size, promoted),
-                        wavelogUploadMessageIsError = fetch.failedStations.isNotEmpty()
+                        wavelogUploadMessage = wavelogSyncSummary(
+                            actualMode, fetch, merge, stations.size, promoted, confirmationFailed
+                        ),
+                        wavelogUploadMessageIsError = fetch.failedStations.isNotEmpty() || confirmationFailed
                     )
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -585,16 +610,20 @@ class SettingsViewModel(
         fetch: WavelogSyncFetch,
         merge: com.rtbishop.look4sat.core.domain.logbook.AdifImportResult,
         totalStations: Int,
-        promoted: Boolean = false
+        promoted: Boolean,
+        confirmationFailed: Boolean
     ): String {
         val head = when {
             promoted -> "Full Wavelog sync (auto re-scan)"
             mode == WavelogSyncMode.Full -> "Full Wavelog sync"
             else -> "Incremental Wavelog sync"
         }
-        val base = "$head — ${merge.imported} new, ${merge.skipped} already there"
-        return if (fetch.failedStations.isEmpty()) base
-        else "$base · ${fetch.failedStations.size}/$totalStations station(s) failed"
+        val base = "$head — ${merge.imported} new, ${merge.updated} updated, ${merge.skipped} already there"
+        val stationsFailure = if (fetch.failedStations.isEmpty()) ""
+            else " · ${fetch.failedStations.size}/$totalStations station(s) failed"
+        val confirmationFailure = if (confirmationFailed)
+            " · LoTW confirmation sync failed — check Wavelog v2, token permissions or network" else ""
+        return base + stationsFailure + confirmationFailure
     }
 
     /**

@@ -18,6 +18,13 @@
  */
 package com.rtbishop.look4sat.core.data.repository
 
+import com.rtbishop.look4sat.core.domain.repository.WavelogStationInfo
+import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -67,6 +74,50 @@ class WavelogSyncRepositoryTest {
 
         assertEquals(145_850_000L, page.records.single().txFrequencyHz)
         assertEquals(436_795_000L, page.records.single().rxFrequencyHz)
+    }
+
+    @Test
+    fun fetchLoTWConfirmationsFollowsPagesAndFetchesAnOldQsoByExactId() = runBlocking {
+        val confirmedAdif = "<EOH><QSO_DATE:8>20260916<TIME_ON:4>0745<CALL:6>BG5JSB" +
+            "<LOTW_QSL_RCVD:1>Y<LOTW_QSLRDATE:8>20261119<EOR>"
+        var hydrationRequests = 0
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            val request = chain.request()
+            val body = if (request.url.encodedPath.endsWith("/confirmation")) {
+                assertEquals("Bearer wl2_test", request.header("Authorization"))
+                assertEquals("lotw", request.url.queryParameter("type"))
+                assertEquals("2026-11-18", request.url.queryParameter("since"))
+                assertEquals("2", request.url.queryParameter("station_id"))
+                val first = request.url.queryParameter("page") == "1"
+                """{"data":[{"qso_id":42}],"meta":{"has_more":$first}}"""
+            } else {
+                hydrationRequests++
+                val buffer = Buffer()
+                request.body!!.writeTo(buffer)
+                val payload = JSONObject(buffer.readUtf8())
+                assertEquals(41L, payload.getLong("fetchfromid"))
+                assertEquals(1, payload.getInt("limit"))
+                assertEquals("2", payload.getJSONArray("station_id").getString(0))
+                JSONObject().put("status", "successful").put("lastfetchedid", 42)
+                    .put("exported_qsos", 1).put("adif", confirmedAdif).toString()
+            }
+            Response.Builder()
+                .request(request).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+                .body(body.toResponseBody())
+                .build()
+        }.build()
+
+        val records = WavelogSyncRepository(client).fetchLoTWConfirmations(
+            "https://radio.example", "wl_test", "wl2_test",
+            listOf(WavelogStationInfo(id = "2", name = "Station", callsign = "BA7OPF", grid = "OL62", active = true)),
+            "2026-11-18"
+        )
+
+        assertEquals(1, hydrationRequests)
+        val record = records!!.single()
+        assertEquals("2", record.wavelogStation)
+        assertTrue(record.lotwConfirmed)
+        assertEquals("20261119", record.lotwQslDate)
     }
 
     @Test

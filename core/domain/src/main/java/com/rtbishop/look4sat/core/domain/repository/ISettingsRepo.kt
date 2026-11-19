@@ -183,6 +183,9 @@ interface ISettingsRepo {
      *  confirmation arriving for an already-pulled row is invisible to the incremental cursor. */
     fun getLastWavelogFullSyncEpochMs(): Long
     fun setLastWavelogFullSyncEpochMs(value: Long)
+
+    fun getLastWavelogConfirmationSyncEpochMs(): Long
+    fun setLastWavelogConfirmationSyncEpochMs(value: Long)
     //endregion
 
     //region # LoTW confirmed-grids settings

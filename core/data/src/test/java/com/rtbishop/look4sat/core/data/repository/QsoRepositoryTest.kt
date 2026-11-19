@@ -487,6 +487,23 @@ class QsoRepositoryTest {
     }
 
     @Test
+    fun mergeWavelog_backfillsLateLoTWConfirmationOnExistingRow() = runBlocking {
+        val local = loggedInApp("SO-50", lotwUploaded = false).copy(wavelogUploaded = true)
+        val id = dao.save(local.toEntity())
+        val confirmation = local.copy(lotwConfirmed = true, lotwReceived = true, lotwQslDate = "20261119")
+
+        val result = repository.mergeWavelog(listOf(confirmation))
+        repository.mergeWavelog(listOf(local))
+
+        assertEquals(1, result.updated)
+        val row = dao.getAll().single()
+        assertEquals(id, row.id)
+        assertTrue(row.lotwConfirmed)
+        assertTrue(row.lotwReceived)
+        assertEquals("20261119", row.lotwQslDate)
+    }
+
+    @Test
     fun mergeLoTW_updatesExistingOwnGridOnMatchedConfirmation() = runBlocking {
         val id = dao.save(loggedInApp("SO-50", lotwUploaded = true)
             .copy(myGrid = "OL62").toEntity())

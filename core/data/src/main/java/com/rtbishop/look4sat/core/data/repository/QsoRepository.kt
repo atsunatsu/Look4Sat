@@ -338,6 +338,12 @@ class QsoRepository(
                     syncOrigin = sharedOrigin(previous.syncOrigin, origin),
                     wavelogUploaded = true,
                     wavelogStation = remote.wavelogStation.ifBlank { previous.wavelogStation },
+                    lotwConfirmed = previous.lotwConfirmed || remote.lotwConfirmed,
+                    lotwReceived = previous.lotwReceived || remote.lotwReceived,
+                    lotwQslDate = remote.lotwQslDate.takeIf { remote.lotwConfirmed && it.isNotBlank() }
+                        ?: previous.lotwQslDate,
+                    qslConfirmed = previous.qslConfirmed || remote.qslConfirmed,
+                    eqslConfirmed = previous.eqslConfirmed || remote.eqslConfirmed,
                     // Fill missing numeric frequencies, but never clear or overwrite
                     // frequencies already stored locally.
                     txFrequencyHz = previous.txFrequencyHz ?: remote.txFrequencyHz,
