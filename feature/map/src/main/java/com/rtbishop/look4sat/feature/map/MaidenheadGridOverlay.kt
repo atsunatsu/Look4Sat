@@ -156,6 +156,8 @@ class MaidenheadGridOverlay : Overlay() {
     var showActivityOverlay: Boolean = false
     /** When enabled, replace percentage colors with last-active-date bands. */
     var showRecentActivityTime: Boolean = false
+    /** Highest age band included by the recent-activity heatmap. */
+    var recentActivityMaxBand: Int = RECENT_ACTIVITY_LAST_BAND
     var activityFilterMin: Int = 0
     var activityFilterMax: Int = 100
     /** Whether personal green worked fills remain visible over the activity heatmap. */
@@ -305,7 +307,10 @@ class MaidenheadGridOverlay : Overlay() {
                 val markedVisible = drawMarkedFills && entry.grid in markedGrids &&
                     (entry.grid !in workedGrids || !drawWorkedFills)
                 if (workedVisible || markedVisible) continue
-                if (!showRecentActivityTime) {
+                if (showRecentActivityTime) {
+                    val band = recentActivityBands[entry.grid] ?: continue
+                    if (!isRecentActivityBandVisible(band, recentActivityMaxBand)) continue
+                } else {
                     val percentage = activityPercentages[entry.grid] ?: continue
                     if (percentage !in activityFilterMin..activityFilterMax) continue
                 }
@@ -621,7 +626,9 @@ class MaidenheadGridOverlay : Overlay() {
                         activityPercentages[label]?.takeIf { it in activityFilterMin..activityFilterMax }
                     } else null
                     val isInActivityRange = if (showRecentActivityTime) {
-                        label in recentActivityBands
+                        recentActivityBands[label]?.let {
+                            isRecentActivityBandVisible(it, recentActivityMaxBand)
+                        } == true
                     } else percent != null
                     val mainLabel = if (showFirstCallLabels) {
                         // Worked grids show latest or local first-QSO depending on the
