@@ -150,7 +150,7 @@
     <string name="map_copyright_tianditu" translatable="false">© Tianditu</string>
     <string name="map_grid_mode">Grid mode</string>
     <string name="map_satellite_mode">Satellite mode</string>
-    <string name="map_first_call_mode">First call</string>
+    <string name="map_first_call_mode">Callsign</string>
     <string name="map_time_reset">Reset</string>
     <string name="map_azimuth">Azimuth: %.1f°</string>
     <string name="map_elevation">Elevation: %.1f°</string>
