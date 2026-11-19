@@ -389,14 +389,14 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v4.4.8-ba7opf.22
-          - Add incremental LoTW confirmation sync for Wavelog 3.1.0 and later. An optional v2 token with confirmation:read lets Look4Sat pull recent confirmations after the initial full sync and update existing QSOs and worked grids.
-          - Rename the grid-mode map switch to “Callsign” in English and “呼号显示” in Chinese.
+          ## v4.4.8-ba7opf.22.1
+          - When a WAIPA callsign matches the West Papua (PB) allocation, include Southwest Papua (PD) as a second candidate.
+          - For grids spanning multiple provinces, assign the province if a uniquely mapped IOTA matches a fine-grid candidate. If only the callsign points to one of the grid candidates, show that province first for manual confirmation.
           - Verification passed for the release unit-test suite (excluding RadioConfigurationSaveTest), the APK signing certificate, and the armeabi-v7a and arm64-v8a ABIs.
 
-          ## v4.4.8-ba7opf.22
-          - 为 Wavelog 3.1.0 及更新版本新增 LoTW 确认增量同步。首次全量同步后，填写带 confirmation:read 权限的可选 v2 令牌，Look4Sat 即可拉取近期确认并更新已有 QSO 和已通联网格。
-          - 网格模式的地图开关在英文中改为「Callsign」，中文改为「呼号显示」。
+          ## v4.4.8-ba7opf.22.1
+          - WAIPA 呼号匹配西巴布亚（PB）分配范围时，同时将西南巴布亚（PD）列为候选。
+          - 网格跨省时，若 IOTA 唯一对应到精细网格候选中的一个省，则自动归属。若只有呼号与网格候选唯一匹配，则将该省置顶，供用户确认。
           - 已通过发布单元测试（排除 RadioConfigurationSaveTest）、APK 签名证书校验，以及 armeabi-v7a 和 arm64-v8a 两种 ABI 校验。
           RELEASE_NOTES
           )"
