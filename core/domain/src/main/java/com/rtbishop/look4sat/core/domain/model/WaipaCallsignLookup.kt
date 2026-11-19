@@ -22,7 +22,8 @@ import java.util.Locale
  *
  * Some IIHG ranges overlap (e.g. KI/KU, PA/PP/PS/PT). Only a UNIQUE matching
  * province is accepted; no guessed province is added to the 38-province award.
- * The table itself is 37 provinces; PD has no distinct callsign allocation.
+ * The IIHG table has no separate allocation for Southwest Papua (PD).
+ * WAIPA therefore treats West Papua (PB) allocations as candidates for both provinces.
  */
 object WaipaCallsignLookup {
 
@@ -98,12 +99,13 @@ object WaipaCallsignLookup {
             normalized[2] !in '0'..'9' || !normalized.drop(3).all { it in 'A'..'Z' }
         ) return emptySet()
         val suffix = normalized.substring(3)
-        return rules.asSequence()
+        val provinces = rules.asSequence()
             .filter { it.matches(normalized[1], normalized[2], suffix) }
             .map { it.code }
             .toSet()
+        return if ("PB" in provinces) provinces + "PD" else provinces
     }
 
-    /** Returns a province only when exactly one IIHG rule matches the whole call. */
+    /** Returns a province only when the complete callsign has one candidate. */
     fun province(call: String): String? = candidates(call).singleOrNull()
 }
