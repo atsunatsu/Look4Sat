@@ -54,4 +54,13 @@ interface IWavelogSyncRepository {
         cursors: Map<String, Long>,
         full: Boolean
     ): WavelogSyncFetch?
+
+    /** Fetches the current ADIF rows for LoTW confirmations dated [since] or later. */
+    suspend fun fetchLoTWConfirmations(
+        url: String,
+        apiKey: String,
+        token: String,
+        stations: List<WavelogStationInfo>,
+        since: String
+    ): List<QsoRecord>?
 }

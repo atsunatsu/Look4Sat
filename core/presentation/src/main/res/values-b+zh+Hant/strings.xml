@@ -200,6 +200,8 @@
     <string name="prefs_wavelog_syncing">同步中…</string>
     <string name="prefs_wavelog_upload_title">Wavelog 配置</string>
     <string name="prefs_wavelog_exclusive">与 LoTW 二选一配置，两者不兼容。</string>
+    <string name="prefs_wavelog_confirmation_token">Wavelog v2 權杖（選填）</string>
+    <string name="prefs_wavelog_confirmation_token_help">用於增量同步 LoTW 確認。需要 Wavelog 3.1.0 或更新版本及 confirmation:read 權限。</string>
     <string name="prefs_wavelog_sync_incremental">增量同步</string>
     <string name="prefs_wavelog_sync_full">全量同步</string>
     <string name="prefs_wavelog_clear">清除配置</string>

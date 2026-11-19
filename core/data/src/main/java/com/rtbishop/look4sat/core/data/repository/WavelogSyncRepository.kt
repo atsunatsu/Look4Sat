@@ -25,6 +25,7 @@ import com.rtbishop.look4sat.core.domain.repository.WavelogStationInfo
 import com.rtbishop.look4sat.core.domain.repository.WavelogSyncFetch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -105,14 +106,80 @@ class WavelogSyncRepository internal constructor(
         WavelogSyncFetch(records, newCursors, failed)
     }
 
+    override suspend fun fetchLoTWConfirmations(
+        url: String,
+        apiKey: String,
+        token: String,
+        stations: List<WavelogStationInfo>,
+        since: String
+    ): List<QsoRecord>? = withContext(Dispatchers.IO) {
+        val base = url.trim().trimEnd('/')
+        try {
+            val records = mutableListOf<QsoRecord>()
+            for (station in stations) {
+                val ids = fetchLoTWConfirmationIds(base, token, station.id, since)
+                for (id in ids) {
+                    // The confirmation list omits station locators and other ADIF fields
+                    // used by the logbook and awards. Read the confirmed QSO by its exact ID.
+                    val page = fetchPage(base, apiKey, station.id, id - 1, limit = 1)
+                        ?: return@withContext null
+                    // A QSO deleted or moved after the list was read will no longer be here.
+                    if (page.exported == 0 || page.cursor > id) continue
+                    val record = page.records.singleOrNull() ?: return@withContext null
+                    if (page.cursor != id) return@withContext null
+                    if (record.lotwConfirmed) records += record.copy(wavelogStation = station.id)
+                }
+            }
+            records
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun fetchLoTWConfirmationIds(base: String, token: String, stationId: String, since: String): Set<Long> {
+        val endpoint = "$base/index.php/api/v2/confirmation".toHttpUrl().newBuilder()
+            .addQueryParameter("type", "lotw")
+            .addQueryParameter("since", since)
+            .addQueryParameter("station_id", stationId)
+            .addQueryParameter("per_page", "1000")
+            .build()
+        val ids = linkedSetOf<Long>()
+        for (pageNumber in 1..MAX_CHUNKS_PER_STATION) {
+            val request = Request.Builder()
+                .url(endpoint.newBuilder().addQueryParameter("page", pageNumber.toString()).build())
+                .header("Authorization", "Bearer $token")
+                .build()
+            val page = client.newCall(request).execute().use { response ->
+                check(response.isSuccessful)
+                parseConfirmationPage(response.body.string())
+            }
+            ids += page.ids
+            if (!page.hasMore) return ids
+        }
+        error("Incomplete Wavelog confirmation export")
+    }
+
+    internal data class ConfirmationPage(val ids: List<Long>, val hasMore: Boolean)
+
+    internal fun parseConfirmationPage(text: String): ConfirmationPage {
+        val json = JSONObject(text)
+        val rows = json.getJSONArray("data")
+        val ids = List(rows.length()) { index ->
+            rows.getJSONObject(index).getLong("qso_id").also { check(it > 0) }
+        }
+        return ConfirmationPage(ids, json.getJSONObject("meta").getBoolean("has_more"))
+    }
+
     internal data class Page(val records: List<QsoRecord>, val cursor: Long, val exported: Int)
 
-    private fun fetchPage(base: String, key: String, stationId: String, fromId: Long): Page? {
+    private fun fetchPage(base: String, key: String, stationId: String, fromId: Long, limit: Int = CHUNK_LIMIT): Page? {
         val body = JSONObject().apply {
             put("key", key)
             put("station_id", JSONArray().put(stationId))
             put("fetchfromid", fromId)
-            put("limit", CHUNK_LIMIT)
+            put("limit", limit)
         }.toString()
         val request = Request.Builder()
             .url("$base/index.php/api/get_contacts_adif")

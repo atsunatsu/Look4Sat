@@ -219,6 +219,8 @@
     <string name="prefs_wavelog_syncing">Syncing…</string>
     <string name="prefs_wavelog_upload_title">Wavelog configuration</string>
     <string name="prefs_wavelog_exclusive">Configure either LoTW or Wavelog — the two cannot be used together.</string>
+    <string name="prefs_wavelog_confirmation_token">Wavelog v2 token (optional)</string>
+    <string name="prefs_wavelog_confirmation_token_help">Requires Wavelog 3.1.0+ and confirmation:read to sync recent LoTW confirmations.</string>
     <string name="prefs_wavelog_sync_incremental">Incremental sync</string>
     <string name="prefs_wavelog_sync_full">Full sync</string>
     <string name="prefs_wavelog_clear">Clear configuration</string>

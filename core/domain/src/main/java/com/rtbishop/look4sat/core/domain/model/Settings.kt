@@ -111,7 +111,8 @@ data class WavelogUploadSettings(
     val stationId: String = "",
     val stationName: String = "",
     val stationCallsign: String = "",
-    val stationGrid: String = ""
+    val stationGrid: String = "",
+    val confirmationToken: String = ""
 ) {
     val isConfigured: Boolean get() = url.isNotBlank() && apiKey.isNotBlank()
     val isReady: Boolean get() = isConfigured && stationId.isNotBlank()

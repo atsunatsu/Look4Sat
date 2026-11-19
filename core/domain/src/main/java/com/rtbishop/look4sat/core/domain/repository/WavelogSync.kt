@@ -62,9 +62,9 @@ fun QsoRecord.isQslConfirmed(): Boolean = lotwConfirmed || qslConfirmed || eqslC
  * How stale the last full pull may get before an incremental request is promoted to a full
  * one. Wavelog's pull API filters by row id only, so a confirmation that arrives for a row
  * pulled earlier (LoTW confirmations land on the same row, keeping its id) can never be seen
- * by the incremental cursor — the record was already fetched and is not fetched again. A full
- * pull re-reads every row with its current confirmation flags, which is the only way to pick
- * such confirmations up; it also rebuilds the stored grid set from scratch, so a square that
+ * by the legacy incremental cursor. For installations without a v2 confirmation token,
+ * a full pull re-reads every row with its current confirmation flags. It also rebuilds the
+ * stored grid set from scratch, so a square that
  * only ever existed because an unconfirmed QSO carried a looked-up grid drops out on its own.
  */
 const val WAVELOG_FULL_RESCAN_INTERVAL_MS: Long = 3L * 24 * 60 * 60 * 1000
@@ -168,14 +168,14 @@ suspend fun applyWavelogSyncResult(
     val mergedGrids = if (replace) data.grids else existingGrids + data.grids
     val mergedQsos = if (replace) data.gridQsos else mergeGridQsos(existingQsos, data.gridQsos)
     val mergedRoamed = if (replace) data.roamedGrids else existingRoamed + data.roamedGrids
-    settingsRepo.setWavelogSyncCursors(cursors)
-    settingsRepo.setWavelogSyncUrl(normalizeWavelogUrl(url))
-    settingsRepo.setLastWavelogSyncEpochMs(now)
-    if (replace) settingsRepo.setLastWavelogFullSyncEpochMs(now)
     withContext(Dispatchers.IO) {
         settingsRepo.setWorkedGrids(mergedGrids)
         settingsRepo.setWorkedGridQsos(mergedQsos)
         settingsRepo.setRoamedGrids(mergedRoamed)
+        settingsRepo.setWavelogSyncCursors(cursors)
+        settingsRepo.setWavelogSyncUrl(normalizeWavelogUrl(url))
+        settingsRepo.setLastWavelogSyncEpochMs(now)
+        if (replace) settingsRepo.setLastWavelogFullSyncEpochMs(now)
     }
     return mergedGrids.size
 }
