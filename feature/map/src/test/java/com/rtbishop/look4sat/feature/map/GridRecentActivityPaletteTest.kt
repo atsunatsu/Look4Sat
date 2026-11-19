@@ -62,4 +62,24 @@ class GridRecentActivityPaletteTest {
     fun mapFillOpacityMatchesExistingGridActivityOverlay() {
         assertEquals(110, GRID_ACTIVITY_FILL_ALPHA)
     }
+
+    @Test
+    fun selectedAgeBandIncludesMoreRecentBandsAndExcludesOlderBands() {
+        assertEquals(true, isRecentActivityBandVisible(0, 5))
+        assertEquals(true, isRecentActivityBandVisible(5, 5))
+        assertEquals(false, isRecentActivityBandVisible(6, 5))
+        assertEquals(false, isRecentActivityBandVisible(7, 5))
+    }
+
+    @Test
+    fun tappingCurrentCutoffAgainRestoresAllBands() {
+        assertEquals(RECENT_ACTIVITY_LAST_BAND, nextRecentActivityMaxBand(5, 5))
+        assertEquals(RECENT_ACTIVITY_LAST_BAND, nextRecentActivityMaxBand(7, 7))
+    }
+
+    @Test
+    fun selectingAnotherAgeBandMovesTheCutoff() {
+        assertEquals(6, nextRecentActivityMaxBand(5, 6))
+        assertEquals(3, nextRecentActivityMaxBand(7, 3))
+    }
 }

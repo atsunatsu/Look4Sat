@@ -38,6 +38,22 @@ internal fun gridActivityPaletteColor(percentage: Int): Int = when (percentage.c
 
 /** Shared fill opacity for GridMaster map heatmaps (110/255 = 43.1%). */
 internal const val GRID_ACTIVITY_FILL_ALPHA = 110
+internal const val RECENT_ACTIVITY_LAST_BAND = 7
+
+/** True when a date band is within the currently selected age cutoff. */
+internal fun isRecentActivityBandVisible(band: Int, maxVisibleBand: Int): Boolean =
+    band in 0..maxVisibleBand.coerceIn(0, RECENT_ACTIVITY_LAST_BAND)
+
+/** Tapping the active cutoff again clears it and restores all eight bands. */
+internal fun nextRecentActivityMaxBand(currentMaxBand: Int, selectedBand: Int): Int {
+    val current = currentMaxBand.coerceIn(0, RECENT_ACTIVITY_LAST_BAND)
+    val selected = selectedBand.coerceIn(0, RECENT_ACTIVITY_LAST_BAND)
+    return if (current == selected && selected < RECENT_ACTIVITY_LAST_BAND) {
+        RECENT_ACTIVITY_LAST_BAND
+    } else {
+        selected
+    }
+}
 
 private const val MILLIS_PER_UTC_DAY = 24L * 60L * 60L * 1000L
 private val UTC_TIME_ZONE: TimeZone = TimeZone.getTimeZone("UTC")
