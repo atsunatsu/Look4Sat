@@ -391,12 +391,12 @@ jobs:
             NOTES="$(cat <<'RELEASE_NOTES'
           ## v4.4.8-ba7opf.22
           - Add incremental LoTW confirmation sync for Wavelog 3.1.0 and later. An optional v2 token with confirmation:read lets Look4Sat pull recent confirmations after the initial full sync and update existing QSOs and worked grids.
-          - Rename the grid-mode map switch to “Callsign” in English and “呼号显示” in Simplified Chinese. The Traditional Chinese label is “呼號顯示”.
+          - Rename the grid-mode map switch to “Callsign” in English and “呼号显示” in Chinese.
           - Verification passed for the release unit-test suite (excluding RadioConfigurationSaveTest), the APK signing certificate, and the armeabi-v7a and arm64-v8a ABIs.
 
           ## v4.4.8-ba7opf.22
           - 为 Wavelog 3.1.0 及更新版本新增 LoTW 确认增量同步。首次全量同步后，填写带 confirmation:read 权限的可选 v2 令牌，Look4Sat 即可拉取近期确认并更新已有 QSO 和已通联网格。
-          - 网格模式的地图开关在英文中改为「Callsign」，简体中文改为「呼号显示」，繁体中文为「呼號顯示」。
+          - 网格模式的地图开关在英文中改为「Callsign」，中文改为「呼号显示」。
           - 已通过发布单元测试（排除 RadioConfigurationSaveTest）、APK 签名证书校验，以及 armeabi-v7a 和 arm64-v8a 两种 ABI 校验。
           RELEASE_NOTES
           )"
