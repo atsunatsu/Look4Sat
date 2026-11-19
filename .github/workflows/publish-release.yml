@@ -389,14 +389,16 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v4.4.8-ba7opf.22.1
-          - When a WAIPA callsign matches the West Papua (PB) allocation, include Southwest Papua (PD) as a second candidate.
-          - For grids spanning multiple provinces, assign the province if a uniquely mapped IOTA matches a fine-grid candidate. If only the callsign points to one of the grid candidates, show that province first for manual confirmation.
+          ## v4.4.8-ba7opf.22.2
+          - Make the Grid Activity Time Heatmap legend interactive: tap an age band to show that band and all more recent bands, while excluding older grids and graying out their legend swatches.
+          - Tap the selected cutoff again to show all eight bands. Remember the filter across restarts and apply it to heatmap fills and recent callsign labels.
+          - Fix the USB CAT CI build's Kotlin Gradle plugin dependency lookup by adding Maven Central to the included build's plugin repositories.
           - Verification passed for the release unit-test suite (excluding RadioConfigurationSaveTest), the APK signing certificate, and the armeabi-v7a and arm64-v8a ABIs.
 
-          ## v4.4.8-ba7opf.22.1
-          - WAIPA 呼号匹配西巴布亚（PB）分配范围时，同时将西南巴布亚（PD）列为候选。
-          - 网格跨省时，若 IOTA 唯一对应到精细网格候选中的一个省，则自动归属。若只有呼号与网格候选唯一匹配，则将该省置顶，供用户确认。
+          ## v4.4.8-ba7opf.22.2
+          - 网格活跃时间热力图图例支持点击：选择一个时间等级后，仅显示该等级及更近期的网格，隐藏更久远的网格并将对应图例色块置灰。
+          - 再次点击当前选中的等级恢复全部八档。筛选条件重启后保留，同时作用于热力图填色及最近活跃呼号显示。
+          - 为包含式构建的插件仓库添加 Maven Central，修复 USB CAT CI 的 Kotlin Gradle 插件依赖解析问题。
           - 已通过发布单元测试（排除 RadioConfigurationSaveTest）、APK 签名证书校验，以及 armeabi-v7a 和 arm64-v8a 两种 ABI 校验。
           RELEASE_NOTES
           )"
