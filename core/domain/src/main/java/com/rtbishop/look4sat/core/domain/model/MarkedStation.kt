@@ -32,18 +32,19 @@ data class MarkedStation(
 )
 
 /**
- * Keep station-specific reminders inside the station scope where they were
- * created. All (empty selection) only shows unscoped legacy/All reminders,
- * preventing a red reminder from being painted over another station's green
- * worked cell.
+ * Keep station-specific reminders inside their station scope when a specific
+ * operated station is selected. All (empty selection) aggregates reminders from
+ * every station, but never paints a red reminder over a globally worked (green)
+ * grid. Those hidden reminders are still kept for their individual stations.
  */
 fun Map<String, List<MarkedStation>>.visibleInStationScope(
-    selectedStationIds: Set<String>
+    selectedStationIds: Set<String>,
+    workedGrids: Set<String> = emptySet()
 ): Map<String, List<MarkedStation>> =
     mapNotNull { (grid, marks) ->
-        val visible = marks.filter { mark ->
-            mark.stationIds.isEmpty() ||
-                (selectedStationIds.isNotEmpty() && mark.stationIds == selectedStationIds)
+        if (selectedStationIds.isEmpty() && grid in workedGrids) return@mapNotNull null
+        val visible = if (selectedStationIds.isEmpty()) marks else marks.filter { mark ->
+            mark.stationIds.isEmpty() || mark.stationIds == selectedStationIds
         }
         if (visible.isEmpty()) null else grid to visible
     }.toMap()

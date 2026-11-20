@@ -23,14 +23,42 @@ import org.junit.Test
 class MarkedStationScopeTest {
 
     @Test
-    fun allSelectionHidesStationSpecificMarksButKeepsUnscopedLegacyMarks() {
+    fun allSelectionShowsMarksFromEveryStationIncludingLegacyMarks() {
         val global = MarkedStation(call = "BG7XYZ", epochMs = 1L)
         val ol62 = MarkedStation(call = "BA4ABC", epochMs = 2L, stationIds = setOf("OL62"))
-        val marks = mapOf("FN31" to listOf(global, ol62))
+        val ol63 = MarkedStation(call = "BD4DEF", epochMs = 3L, stationIds = setOf("OL63"))
+        val marks = mapOf("FN31" to listOf(global, ol62, ol63))
 
         assertEquals(
-            mapOf("FN31" to listOf(global)),
+            marks,
             marks.visibleInStationScope(emptySet())
+        )
+    }
+
+    @Test
+    fun allSelectionPrioritizesWorkedGreenButPreservesMarksForIndividualStations() {
+        val ol62 = MarkedStation(call = "BA4ABC", epochMs = 1L, stationIds = setOf("OL62"))
+        val ol63 = MarkedStation(call = "BD4DEF", epochMs = 2L, stationIds = setOf("OL63"))
+        val global = MarkedStation(call = "BG7XYZ", epochMs = 3L)
+        val marks = mapOf(
+            "FN31" to listOf(ol62, ol63),
+            "FN32" to listOf(ol63),
+            "FN33" to listOf(global)
+        )
+        val globallyWorked = setOf("FN31", "FN33")
+
+        assertEquals(
+            mapOf("FN32" to listOf(ol63)),
+            marks.visibleInStationScope(emptySet(), globallyWorked)
+        )
+        // FN31 was worked at some station, but the OL62 reminder stays scoped.
+        assertEquals(
+            mapOf("FN31" to listOf(ol62), "FN33" to listOf(global)),
+            marks.visibleInStationScope(setOf("OL62"), globallyWorked)
+        )
+        assertEquals(
+            mapOf("FN31" to listOf(ol63), "FN32" to listOf(ol63), "FN33" to listOf(global)),
+            marks.visibleInStationScope(setOf("OL63"), globallyWorked)
         )
     }
 
