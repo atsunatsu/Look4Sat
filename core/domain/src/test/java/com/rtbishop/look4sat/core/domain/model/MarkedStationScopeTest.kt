@@ -53,7 +53,7 @@ class MarkedStationScopeTest {
         )
         // FN31 was worked at some station, but the OL62 reminder stays scoped.
         assertEquals(
-            mapOf("FN31" to listOf(ol62)),
+            mapOf("FN31" to listOf(ol62), "FN33" to listOf(global)),
             marks.visibleInStationScope(setOf("OL62"), globallyWorked)
         )
         assertEquals(
