@@ -718,10 +718,10 @@ private fun MapScreen(
             .flatMap { it.worked.asSequence() }
             .toSet()
     }
-    // A station-specific red reminder is visible only in that exact station
-    // selection. All shows the aggregate worked cells without red/green blending.
-    val visibleMarkedGrids = remember(uiState.markedGrids, selectedStationIds) {
-        uiState.markedGrids.visibleInStationScope(selectedStationIds)
+    // All combines marks from every station but shows green worked cells instead
+    // of red reminders. Specific station selections retain their own marks.
+    val visibleMarkedGrids = remember(uiState.markedGrids, selectedStationIds, workedGrids) {
+        uiState.markedGrids.visibleInStationScope(selectedStationIds, workedGrids)
     }
     // The same cached WAIPA boundary polygons drive map fill and award
     // geolocation. Resolves saved QSOs locally, without a new LoTW/Wavelog sync.
