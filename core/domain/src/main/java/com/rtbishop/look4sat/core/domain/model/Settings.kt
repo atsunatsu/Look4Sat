@@ -160,6 +160,26 @@ data class RadioControlSettings(
     val catDtr: Boolean = false
 ) {
     companion object {
+        const val MODEL_YAESU_FT847 = "Yaesu FT-847"
+        const val MODEL_YAESU_FT991 = "Yaesu FT-991/991A"
+        const val MODEL_ICOM_IC821 = "Icom IC-821H"
+        const val MODEL_ICOM_IC9100 = "Icom IC-9100"
+        const val MODEL_ICOM_IC7300 = "Icom IC-7300"
+        const val MODEL_ICOM_IC905 = "Icom IC-905"
+        const val MODEL_ICOM_IC7100 = "Icom IC-7100"
+        const val MODEL_ICOM_IC706 = "Icom IC-706"
+        const val MODEL_ICOM_IC706MKII = "Icom IC-706MKII"
+        const val MODEL_ICOM_IC706MKIIG = "Icom IC-706MKIIG"
+        const val MODEL_SDR_RIGCTLD = "SDR (rigctld)"
+        const val MODEL_KENWOOD_TH_D74 = "Kenwood TH-D74"
+        const val MODEL_KENWOOD_TH_D75 = "Kenwood TH-D75"
+        const val MODEL_KENWOOD_TS_2000 = "Kenwood TS-2000"
+        const val MODEL_KENWOOD_TS_790 = "Kenwood TS-790A/E"
+        const val MODEL_KENWOOD_TS_990 = "Kenwood TS-990S"
+        const val MODEL_KENWOOD_TS_890 = "Kenwood TS-890S"
+        const val MODEL_KENWOOD_TS_590 = "Kenwood TS-590S"
+        const val MODEL_KENWOOD_TS_590SG = "Kenwood TS-590SG"
+        const val MODEL_FLEX_SMARTSDR = "FlexRadio SmartSDR"
         const val MODEL_YAESU_FT817 = "Yaesu FT-817/818"
         const val MODEL_YAESU_FT857 = "Yaesu FT-857/897"
         const val MODEL_YAESU_FTX1 = "Yaesu FTX-1"
@@ -188,6 +208,10 @@ data class RadioControlSettings(
 }
 
 fun supportedRadioBaudRates(model: String): List<Int> = radioModelDescriptor(model).baudRates
+
+data class RadioLanLogin(val username: String, val password: String, val administrator: Boolean = false) {
+    override fun toString(): String = "RadioLanLogin(redacted)"
+}
 
 data class RadioTcpEndpoint(val host: String, val port: Int)
 

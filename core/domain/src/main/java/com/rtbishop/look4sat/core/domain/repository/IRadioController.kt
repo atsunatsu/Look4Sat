@@ -21,13 +21,24 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 interface IRadioController {
+    suspend fun captureAudioState(split: Boolean): RadioTransmitAudioSnapshot? = null
+    suspend fun setAudioInput(wlan: Boolean): Boolean = false
+    suspend fun restoreAudioState(snapshot: RadioTransmitAudioSnapshot): Boolean = false
     val commandTimeoutMillis: Long get() = 3_000L
 
     val remoteState: kotlinx.coroutines.flow.StateFlow<RemoteRadioState>? get() = null
     val supportsAtomicPair: Boolean get() = false
+    val supportsFrequencyControl: Boolean get() = true
     /** Align physical MAIN/SUB roles to TX/RX bands before preset-mode configuration. */
     suspend fun prepareSatelliteBands(rxHz: Long, txHz: Long): Boolean = true
     suspend fun setTrackingFrequencies(rxHz: Long, txHz: Long?): FrequencyPairResult = FrequencyPairResult.UNSUPPORTED
+    /** Tune and verify the final pair without releasing the controller transaction. */
+    suspend fun tuneAndReadTrackingFrequencies(rxHz: Long, txHz: Long?): RadioBaseFrequencies? {
+        if (setTrackingFrequencies(rxHz, txHz) != FrequencyPairResult.APPLIED) return null
+        return readTrackingFrequencies()?.takeIf { it.rxHz == rxHz && (txHz == null || it.txHz == txHz) }
+    }
+    /** A background read may opt out of physically exchanging the MAIN and SUB bands. */
+    suspend fun readTrackingFrequencies(allowBandExchange: Boolean = true): RadioBaseFrequencies? = null
     suspend fun startCw(text: String, wpm: Int): Boolean = false
     suspend fun updateTrackingDisplay(display: RadioTrackingDisplay): Boolean = true
     suspend fun prepareTrackingContext(contextKey: String): Boolean = true
@@ -79,6 +90,9 @@ interface IRadioController {
     /** Rejects PTT-ON if an emergency stop invalidated the captured generation. */
     suspend fun pttOnIfGeneration(expectedGeneration: Long): Boolean =
         expectedGeneration == pttSafetyGeneration() && pttOn()
+
+    suspend fun pttOnIfGeneration(expectedGeneration: Long, isOnTime: () -> Boolean): Boolean =
+        isOnTime() && pttOnIfGeneration(expectedGeneration)
 
     /** Invalidates queued PTT-ON work before an emergency PTT-OFF is enqueued. */
     fun invalidatePendingPttOn() = Unit
@@ -161,3 +175,5 @@ interface IRadioController {
      */
     suspend fun readTxVfoFrequency(): Long? = readWorkingFrequency()
 }
+
+data class RadioTransmitAudioSnapshot(val selected: Boolean, val mode: String, val dataEnabled: Boolean, val modulationInput: Int)

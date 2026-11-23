@@ -194,14 +194,26 @@ class SerialRadioController(
     private val actor: RadioCommandActor
 ) : IRadioController {
     override val commandTimeoutMillis get() = delegate.commandTimeoutMillis
-    private suspend fun <T> execute(operation: suspend () -> T): T =
-        actor.execute(delegate.commandTimeoutMillis, operation)
+    private suspend fun <T> execute(operation: suspend () -> T): T {
+        val budget = kotlinx.coroutines.currentCoroutineContext()[Ft4CatBudget]
+        budget?.checkBeforeCommand()
+        return actor.execute(delegate.commandTimeoutMillis) {
+            budget?.checkBeforeCommand()
+            if (budget == null) operation() else kotlinx.coroutines.withContext(budget) {
+                operation().also { budget.checkBeforeCommand() }
+            }
+        }
+    }
     override val remoteState get() = delegate.remoteState
     override val supportsAtomicPair get() = delegate.supportsAtomicPair
     override suspend fun prepareSatelliteBands(rxHz: Long, txHz: Long) =
         execute { delegate.prepareSatelliteBands(rxHz, txHz) }
     override suspend fun setTrackingFrequencies(rxHz: Long, txHz: Long?) =
         execute { delegate.setTrackingFrequencies(rxHz, txHz) }
+    override suspend fun tuneAndReadTrackingFrequencies(rxHz: Long, txHz: Long?) =
+        execute { delegate.tuneAndReadTrackingFrequencies(rxHz, txHz) }
+    override suspend fun readTrackingFrequencies(allowBandExchange: Boolean) =
+        execute { delegate.readTrackingFrequencies(allowBandExchange) }
     override suspend fun startCw(text: String, wpm: Int) =
         actor.executePttOn { delegate.startCw(text, wpm) }
     override suspend fun updateTrackingDisplay(display: com.rtbishop.look4sat.core.domain.repository.RadioTrackingDisplay) =

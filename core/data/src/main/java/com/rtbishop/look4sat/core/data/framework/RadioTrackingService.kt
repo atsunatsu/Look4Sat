@@ -245,10 +245,6 @@ class RadioTrackingService(
             _state.update { it.copy(errorMessage = "N76 requires Bluetooth") }
             return
         }
-        if (profile.isFtx1 && rcSettings.catTransport != RadioControlSettings.TRANSPORT_USB) {
-            _state.update { it.copy(errorMessage = "FTX-1 requires USB CAT") }
-            return
-        }
         if (rcSettings.catTransport == RadioControlSettings.TRANSPORT_BLUETOOTH &&
             rcSettings.radioModel !in com.rtbishop.look4sat.core.domain.model.RadioModelCatalog.bluetoothModels) {
             _state.update { it.copy(errorMessage = "Select USB or TCP for this radio") }
@@ -473,6 +469,14 @@ class RadioTrackingService(
                 correctionStepHz={settingsRepo.radioControlSettings.value.l4sCorrectionEditStepHz})
         } else if (profile.isFtx1) {
             Ftx1Controller(checkNotNull(transport) { "FTX-1 USB transport is unavailable" }, diagnostics)
+        } else if (!usesHamlib && profile.isFt847) {
+            Ft847Controller(checkNotNull(transport), satelliteLayout = dedicatedSatelliteMode)
+        } else if (!usesHamlib && profile.isFt991) {
+            Ftx1Controller(checkNotNull(transport), diagnostics, ft991 = true)
+        } else if (!usesHamlib && profile.kenwood != null) {
+            KenwoodController(checkNotNull(transport), checkNotNull(profile.kenwood), satelliteLayout = dedicatedSatelliteMode)
+        } else if (!usesHamlib && profile.isFlex) {
+            FlexRadioController(checkNotNull(transport))
         } else if (usesHamlib) {
             HamlibRigctldController(
                 endpoint = address,
