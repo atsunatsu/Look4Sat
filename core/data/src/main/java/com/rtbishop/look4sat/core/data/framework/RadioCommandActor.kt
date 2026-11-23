@@ -197,11 +197,16 @@ class SerialRadioController(
     private suspend fun <T> execute(operation: suspend () -> T): T =
         actor.execute(delegate.commandTimeoutMillis, operation)
     override val remoteState get() = delegate.remoteState
+    override val externalUsbPtt get() = delegate.externalUsbPtt
     override val supportsAtomicPair get() = delegate.supportsAtomicPair
     override suspend fun prepareSatelliteBands(rxHz: Long, txHz: Long) =
         execute { delegate.prepareSatelliteBands(rxHz, txHz) }
     override suspend fun setTrackingFrequencies(rxHz: Long, txHz: Long?) =
         execute { delegate.setTrackingFrequencies(rxHz, txHz) }
+    override suspend fun tuneAndReadTrackingFrequencies(rxHz: Long, txHz: Long?) =
+        execute { delegate.tuneAndReadTrackingFrequencies(rxHz, txHz) }
+    override suspend fun readTrackingFrequencies(allowBandExchange: Boolean) =
+        execute { delegate.readTrackingFrequencies(allowBandExchange) }
     override suspend fun startCw(text: String, wpm: Int) =
         actor.executePttOn { delegate.startCw(text, wpm) }
     override suspend fun updateTrackingDisplay(display: com.rtbishop.look4sat.core.domain.repository.RadioTrackingDisplay) =
@@ -238,7 +243,10 @@ class SerialRadioController(
     override suspend fun pttOnIfGeneration(expectedGeneration: Long) =
         actor.executePttOn(expectedGeneration, delegate::pttOn)
     override suspend fun pttOff() = actor.executePttOff(delegate::pttOff)
-    override fun invalidatePendingPttOn() = actor.invalidatePendingPttOn()
+    override fun invalidatePendingPttOn() {
+        actor.invalidatePendingPttOn()
+        delegate.invalidatePendingPttOn()
+    }
     override suspend fun setBand(frequencyHz: Long) = execute { delegate.setBand(frequencyHz) }
     override suspend fun setVfo(vfoA: Boolean) = execute { delegate.setVfo(vfoA) }
     override suspend fun setSplitMode(enabled: Boolean) = execute { delegate.setSplitMode(enabled) }

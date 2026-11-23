@@ -358,6 +358,7 @@ class RadarViewModel(
                             remoteRadio = svc.remoteRadio,
                             transmitOwner = svc.transmitOwner,
                             pttState = svc.pttState,
+                            externalUsbPtt = svc.externalUsbPtt,
                             targetTxHz = svc.targetTxFrequencyHz,
                             targetRxHz = svc.targetRxFrequencyHz,
                             referenceRxHz=svc.nominalRxFrequencyHz,

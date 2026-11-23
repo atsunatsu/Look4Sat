@@ -20,6 +20,8 @@ package com.rtbishop.look4sat.core.data.framework
 import android.bluetooth.BluetoothManager
 import android.util.Log
 import com.rtbishop.look4sat.core.domain.model.RadioControlSettings
+import com.rtbishop.look4sat.core.domain.model.UsbPttPort
+import com.rtbishop.look4sat.core.domain.model.usbPttConfigurationError
 import com.rtbishop.look4sat.core.domain.model.SatRadio
 import com.rtbishop.look4sat.core.domain.model.parseRadioTcpEndpoint
 import com.rtbishop.look4sat.core.domain.control.ControlDiagnosticSeverity
@@ -179,7 +181,7 @@ class RadioTrackingService(
             reconnectRequired=old.radioModel!=settings.radioModel || old.catTransport!=settings.catTransport ||
                 old.txRadioAddress!=settings.txRadioAddress || old.rxRadioAddress!=settings.rxRadioAddress ||
                 old.baudRate!=settings.baudRate || old.civAddress!=settings.civAddress ||
-                old.catRts!=settings.catRts || old.catDtr!=settings.catDtr ||
+                old.catRts!=settings.catRts || old.catDtr!=settings.catDtr || old.usbPtt!=settings.usbPtt ||
                 old.splitMode!=settings.splitMode || old.duplexMode!=settings.duplexMode || old.tcpProtocol!=settings.tcpProtocol ||
                 settings.radioModel==RadioControlSettings.MODEL_VERO_N76 && old.n76BluetoothAudio!=settings.n76BluetoothAudio
             if(reconnectRequired) {
@@ -238,15 +240,22 @@ class RadioTrackingService(
             catTransmitting=false, catTransmitStateKnown=true) }
 
         val rcSettings = settingsRepo.radioControlSettings.value
+        rcSettings.usbPttConfigurationError()?.let { reason ->
+            val message = when (reason) {
+                "CAT_NOT_USB" -> "Select USB CAT or a separate USB PTT port"
+                "HANDSHAKE" -> "L4S reserves DTR for its connection handshake; select RTS or a separate USB PTT port"
+                "LINE_RESERVED" -> "The selected PTT line is reserved by CAT; select another line or port"
+                "PORT_IN_USE" -> "The USB PTT port is already used by CAT; select another port or same-port PTT"
+                else -> "Select an available USB PTT port"
+            }
+            _state.update { it.copy(errorMessage = message, externalUsbPtt = false) }
+            return
+        }
         val txAddr     = rcSettings.txRadioAddress
         val rxAddr     = rcSettings.rxRadioAddress
         val profile    = radioProfile(rcSettings.radioModel, rcSettings.civAddress)
         if (profile.isN76 && rcSettings.catTransport != RadioControlSettings.TRANSPORT_BLUETOOTH) {
             _state.update { it.copy(errorMessage = "N76 requires Bluetooth") }
-            return
-        }
-        if (profile.isFtx1 && rcSettings.catTransport != RadioControlSettings.TRANSPORT_USB) {
-            _state.update { it.copy(errorMessage = "FTX-1 requires USB CAT") }
             return
         }
         if (rcSettings.catTransport == RadioControlSettings.TRANSPORT_BLUETOOTH &&
@@ -258,7 +267,7 @@ class RadioTrackingService(
             _state.update { it.copy(errorMessage = "L4S radios require USB CDC/OTG") }
             return
         }
-        connectedCatPttSupported = profile.capabilities.ptt || (profile.isN76 && rcSettings.n76BluetoothAudio)
+        connectedCatPttSupported = rcSettings.usbPtt.enabled || profile.capabilities.ptt || (profile.isN76 && rcSettings.n76BluetoothAudio)
         if (profile.icomVariant == IcomCivVariant.IC820 && !rcSettings.splitMode && txAddr.isNotBlank() && txAddr == rxAddr) {
             _state.update { it.copy(errorMessage = "IC-820 needs separate TX/RX radios; for receive-only tracking configure RX only") }
             return
@@ -290,6 +299,7 @@ class RadioTrackingService(
                 rxConnected = false,
                 physicalConnectionCount = 0,
                 pttState = PttState.OFF,
+                externalUsbPtt = rcSettings.usbPtt.enabled,
                 lastCommandError = null,
                 remoteRadio = null,
                 transmitOwner = RadioTransmitOwner.NONE
@@ -384,7 +394,8 @@ class RadioTrackingService(
                         ctcssTone=if(remote.isN76 && current.isActive) remote.txCtcssHz else if(settingsChanged && pendingControls.get()==0 && current.trackingPhase!=TrackingPhase.INITIALIZING &&
                             (current.isActive || !ctcssExplicit || matchingProfile))
                             (if(!current.isActive && matchingProfile) remote.nativeSavedTxCtcssHz else remote.txCtcssHz) else current.ctcssTone,
-                        pttState = if (remote.txSource != 0) PttState.ON else if (current.pttState == PttState.ERROR) PttState.ERROR else PttState.OFF,
+                        pttState = if (txController?.externalUsbPtt == true && manualOwner == RadioTransmitOwner.VOICE)
+                            current.pttState else if (remote.txSource != 0) PttState.ON else if (current.pttState == PttState.ERROR) PttState.ERROR else PttState.OFF,
                         lastCommandError = remote.error ?: current.lastCommandError.takeUnless { previousRemoteError != null && it == previousRemoteError },
                         isActive = current.isActive && remote.connected,
                         trackingPhase = if (!remote.connected && current.isActive) TrackingPhase.ERROR else current.trackingPhase,
@@ -473,6 +484,14 @@ class RadioTrackingService(
                 correctionStepHz={settingsRepo.radioControlSettings.value.l4sCorrectionEditStepHz})
         } else if (profile.isFtx1) {
             Ftx1Controller(checkNotNull(transport) { "FTX-1 USB transport is unavailable" }, diagnostics)
+        } else if (!usesHamlib && profile.isFt847) {
+            Ft847Controller(checkNotNull(transport), satelliteLayout = dedicatedSatelliteMode)
+        } else if (!usesHamlib && profile.isFt991) {
+            Ftx1Controller(checkNotNull(transport), diagnostics, ft991 = true)
+        } else if (!usesHamlib && profile.kenwood != null) {
+            KenwoodController(checkNotNull(transport), checkNotNull(profile.kenwood), satelliteLayout = dedicatedSatelliteMode)
+        } else if (!usesHamlib && profile.isFlex) {
+            FlexRadioController(checkNotNull(transport))
         } else if (usesHamlib) {
             HamlibRigctldController(
                 endpoint = address,
@@ -516,7 +535,24 @@ class RadioTrackingService(
                 )
             }
         }
-        return SerialRadioController(controller, commandActor)
+        val selected = if (settings.usbPtt.enabled && address == settings.txRadioAddress) {
+            val shared = settings.usbPtt.port == UsbPttPort.CAT
+            val line = if (shared) checkNotNull(transport) { "USB CAT port is unavailable" } else
+                checkNotNull(transportFactory?.invoke(RadioControlSettings.TRANSPORT_USB,
+                    settings.usbPtt.address, 9_600, 1)) { "USB PTT port is unavailable" }
+            UsbPttRadioController(controller, line, settings.usbPtt, shared) {
+                val pttPort = line.usbPortIdentity
+                val rxPort = if (!settings.splitMode && settings.catTransport == RadioControlSettings.TRANSPORT_USB && settings.rxRadioAddress.isNotBlank())
+                    transportFactory?.invoke(RadioControlSettings.TRANSPORT_USB, settings.rxRadioAddress,
+                        settings.baudRate, profile.serialStopBits)?.usbPortIdentity else null
+                val conflict = !shared && pttPort != null && listOfNotNull(transport?.usbPortIdentity, rxPort).any {
+                    com.rtbishop.look4sat.core.domain.model.usbSerialPortsOverlap(it, pttPort)
+                }
+                if (conflict) diagnose("connect/usb-ptt", "PTT port is already used by CAT", ControlDiagnosticSeverity.ERROR)
+                !conflict
+            }
+        } else controller
+        return SerialRadioController(selected, commandActor)
     }
 
     private suspend fun connectController(controller: IRadioController, leg: String): Boolean = try {
@@ -597,7 +633,17 @@ class RadioTrackingService(
         val rx = calculated?.rxHz ?: position.getDownlinkFreq(nominalRx)
         check(controller.updateTrackingBases(com.rtbishop.look4sat.core.domain.repository.RadioBaseFrequencies(
             calculated?.nominalRxHz ?: nominalRx,calculated?.nominalTxHz ?: base))) { "Radio base settings changed; retry after synchronization" }
-        check(controller.setTrackingFrequencies(rx, tx) == FrequencyPairResult.APPLIED) {
+        if (controller.externalUsbPtt && settingsRepo.radioControlSettings.value.radioModel == RadioControlSettings.MODEL_ICOM_IC820) {
+            check(controller.tuneAndReadTrackingFrequencies(rx, tx) != null) { "IC-820 final frequencies were not confirmed before USB PTT" }
+        } else if (controller.externalUsbPtt && !controller.supportsAtomicPair) {
+            val written = if (current.splitMode) {
+                controller.setTxVfoFrequency(tx) && controller.setWorkingFrequency(rx) &&
+                    controller.readTxVfoFrequency() == tx && controller.readWorkingFrequency() == rx
+            } else {
+                controller.setFrequency(tx) && controller.readFrequencyAndMode()?.first == tx
+            }
+            check(written) { "Frequency readback did not match before USB PTT" }
+        } else check(controller.setTrackingFrequencies(rx, tx) == FrequencyPairResult.APPLIED) {
             controller.remoteState?.value?.error ?: "RX/TX pair was not applied before TX"
         }
         _state.update { it.copy(targetTxFrequencyHz = trackingTarget(controller,tx,false), targetRxFrequencyHz = trackingTarget(controller,rx,true)) }
@@ -615,8 +661,8 @@ class RadioTrackingService(
                     check(manualEpoch.get() == epoch) { "PTT request cancelled" }
                     check(!hasTransmitClaim && _state.value.pttState == PttState.OFF) { "Another transmission is active" }
                     val controller = checkNotNull(txController) { "Radio is not connected" }
-                    check(controller.remoteState?.value?.capabilities?.voicePtt == true) { "Radio has no remote voice PTT" }
-                    check(_state.value.txMode.isFmMode()) { "Voice PTT requires FM; use CW text for linear satellites" }
+                    check(controller.externalUsbPtt || controller.remoteState?.value?.capabilities?.voicePtt == true) { "Radio has no remote voice PTT" }
+                    check(controller.externalUsbPtt || _state.value.txMode.isFmMode()) { "Voice PTT requires FM; use CW text for linear satellites" }
                     val generation = controller.pttSafetyGeneration()
                     manualOwner = RadioTransmitOwner.VOICE
                     _state.update { it.copy(transmitOwner = manualOwner, pttState = PttState.ARMING, lastCommandError = null) }
@@ -625,6 +671,17 @@ class RadioTrackingService(
                         controller.remoteState?.value?.error ?: "PTT ON was not confirmed"
                     }
                     _state.update { it.copy(pttState = PttState.ON) }
+                }
+                if (txController?.externalUsbPtt == true) {
+                    var elapsed = 0L
+                    while (elapsed < 30_000L && txController?.isConnected == true) {
+                        delay(250L)
+                        elapsed += 250L
+                    }
+                    withContext(NonCancellable) { transmitMutex.withLock {
+                        if (manualEpoch.get() == epoch) forcePttOffLocked(
+                            if (elapsed < 30_000L) "USB PTT disconnected" else "USB PTT watchdog expired")
+                    } }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {
@@ -784,7 +841,7 @@ class RadioTrackingService(
         // Reach the actor's urgent lane before waiting for a possibly suspended tracking cycle.
         return withContext(NonCancellable) {
             val controller = txController
-            if (controller?.isConnected == true) {
+            if (controller != null && (controller.isConnected || controller.externalUsbPtt)) {
                 withTimeoutOrNull(PTT_COMMAND_TIMEOUT_MILLIS) { controller.pttOff() } == true
             } else manualOwner == RadioTransmitOwner.NONE
         }
@@ -798,7 +855,7 @@ class RadioTrackingService(
         val controller = txController
         val controllerWasConnected = controller?.isConnected == true
         val acknowledged = priorAcknowledged ?: withContext(NonCancellable) {
-            if (controller?.isConnected == true) {
+            if (controller != null && (controller.isConnected || controller.externalUsbPtt)) {
                 withTimeoutOrNull(PTT_COMMAND_TIMEOUT_MILLIS) { controller.pttOff() } == true
             } else {
                 !hadTransmission

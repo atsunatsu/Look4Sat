@@ -125,6 +125,41 @@ data class LoTWSettings(
     val isConfigured: Boolean get() = callsign.isNotBlank() && password.isNotBlank()
 }
 
+enum class UsbPttPort { CAT, SEPARATE }
+enum class UsbPttLine { RTS, DTR }
+
+data class UsbPttSettings(
+    val enabled: Boolean = false,
+    val port: UsbPttPort = UsbPttPort.SEPARATE,
+    val address: String = "",
+    val name: String = "",
+    val line: UsbPttLine = UsbPttLine.RTS,
+    val activeHigh: Boolean = true
+)
+
+fun RadioControlSettings.usbPttConfigurationError(): String? {
+    if (!usbPtt.enabled) return null
+    if (usbPtt.port == UsbPttPort.CAT) {
+        if (catTransport != RadioControlSettings.TRANSPORT_USB) return "CAT_NOT_USB"
+        if (usbPtt.line == UsbPttLine.DTR && radioModel in setOf(RadioControlSettings.MODEL_QUANSHENG_UVK1, RadioControlSettings.MODEL_QUANSHENG_UVK5V3)) return "HANDSHAKE"
+        if (if (usbPtt.line == UsbPttLine.RTS) catRts else catDtr) return "LINE_RESERVED"
+    } else {
+        if (usbPtt.address.isBlank()) return "PORT_REQUIRED"
+        if (catTransport == RadioControlSettings.TRANSPORT_USB &&
+            (usbSerialPortsOverlap(usbPtt.address, txRadioAddress) ||
+                !splitMode && usbSerialPortsOverlap(usbPtt.address, rxRadioAddress))) return "PORT_IN_USE"
+    }
+    return null
+}
+
+/** Interface identity keeps separate ports on one multi-port adapter usable. */
+fun usbSerialPortsOverlap(first: String, second: String): Boolean {
+    val a = first.split(':')
+    val b = second.split(':')
+    if (a.size < 3 || b.size < 3 || a[0] != b[0]) return false
+    return a.subList(1, 3).any { it in b.subList(1, 3) }
+}
+
 data class RadioControlSettings(
     val enabled: Boolean,
     val radioModel: String,
@@ -157,9 +192,30 @@ data class RadioControlSettings(
     val n76Options: N76ControlOptions = N76ControlOptions(),
     /** Independently configurable physical USB CAT control lines (not PTT). */
     val catRts: Boolean = false,
-    val catDtr: Boolean = false
+    val catDtr: Boolean = false,
+    val usbPtt: UsbPttSettings = UsbPttSettings()
 ) {
     companion object {
+        const val MODEL_YAESU_FT847 = "Yaesu FT-847"
+        const val MODEL_YAESU_FT991 = "Yaesu FT-991/991A"
+        const val MODEL_ICOM_IC821 = "Icom IC-821H"
+        const val MODEL_ICOM_IC9100 = "Icom IC-9100"
+        const val MODEL_ICOM_IC7300 = "Icom IC-7300"
+        const val MODEL_ICOM_IC905 = "Icom IC-905"
+        const val MODEL_ICOM_IC7100 = "Icom IC-7100"
+        const val MODEL_ICOM_IC706 = "Icom IC-706"
+        const val MODEL_ICOM_IC706MKII = "Icom IC-706MKII"
+        const val MODEL_ICOM_IC706MKIIG = "Icom IC-706MKIIG"
+        const val MODEL_SDR_RIGCTLD = "SDR (rigctld)"
+        const val MODEL_KENWOOD_TH_D74 = "Kenwood TH-D74"
+        const val MODEL_KENWOOD_TH_D75 = "Kenwood TH-D75"
+        const val MODEL_KENWOOD_TS_2000 = "Kenwood TS-2000"
+        const val MODEL_KENWOOD_TS_790 = "Kenwood TS-790A/E"
+        const val MODEL_KENWOOD_TS_990 = "Kenwood TS-990S"
+        const val MODEL_KENWOOD_TS_890 = "Kenwood TS-890S"
+        const val MODEL_KENWOOD_TS_590 = "Kenwood TS-590S"
+        const val MODEL_KENWOOD_TS_590SG = "Kenwood TS-590SG"
+        const val MODEL_FLEX_SMARTSDR = "FlexRadio SmartSDR"
         const val MODEL_YAESU_FT817 = "Yaesu FT-817/818"
         const val MODEL_YAESU_FT857 = "Yaesu FT-857/897"
         const val MODEL_YAESU_FTX1 = "Yaesu FTX-1"
@@ -188,6 +244,10 @@ data class RadioControlSettings(
 }
 
 fun supportedRadioBaudRates(model: String): List<Int> = radioModelDescriptor(model).baudRates
+
+data class RadioLanLogin(val username: String, val password: String, val administrator: Boolean = false) {
+    override fun toString(): String = "RadioLanLogin(redacted)"
+}
 
 data class RadioTcpEndpoint(val host: String, val port: Int)
 

@@ -19,36 +19,58 @@ import kotlinx.coroutines.withTimeoutOrNull
 class Ftx1Controller(
     private val transport: RadioTransport,
     private val diagnostics: IControlDiagnostics = NoOpControlDiagnostics,
-    private val replyTimeoutMillis: Long = 1_000L
+    private val replyTimeoutMillis: Long = 1_000L,
+    private val ft991: Boolean = false
 ) : IRadioController {
     private val mutex=Mutex()
     private val decoder=Ftx1CatProtocol.Decoder()
     @Volatile private var connected=false
+    private var identifying=false
     private var selectedSide=0
     private var split=false
     override val isConnected get()=connected && transport.isConnected
+    private val linkOpen get()=(connected || identifying) && transport.isConnected
     override val commandTimeoutMillis get()=12_000L
     override val supportsPttReadback get()=true
 
     override suspend fun connect(): Boolean = try { io(false) {
         if (isConnected) return@io true
-        connected=transport.connect(); selectedSide=0; split=false; decoder.clear()
-        if (!isConnected) { report("connect/transport",transport.lastIoFailure ?: "USB open failed"); return@io false }
-        // No writes to frequency, mode, power, VFO or TX during identification.
-        var ready=false
-        for(attempt in 1..3) {
-            if(query("ID;","ID") == "ID0840;" && readFrequency(0)!=null) { ready=true; break }
-            if(!isConnected) break
-            delay(100L)
+        connected=false; selectedSide=0; split=false; decoder.clear()
+        identifying=true
+        try {
+            if (!transport.connect()) {
+                transport.disconnect()
+                report("connect/transport",transport.lastIoFailure ?: "${transport.connectionDescription} open failed")
+                return@io false
+            }
+            var ready: Boolean
+            do {
+                ready=probeReadOnlyConnection()
+                if(ready || !transport.canTryAlternativeConnection) break
+                diagnostics.record(ControlDiagnosticSource.RADIO,"ftx1/connect/fallback",
+                    "Read-only handshake failed; trying remaining RFCOMM mode",ControlDiagnosticSeverity.WARNING)
+            } while(transport.connectAlternative())
+            if(ready && !ft991) {
+                val version=query("VE0;","VE0")
+                val number=version?.takeIf { it.matches(Regex("VE0[0-9]{4};")) }?.substring(3,7)?.toIntOrNull()
+                if(number!=null && number<108) {
+                    report("connect/firmware","FTX-1 MAIN firmware 1.08 or later is required")
+                    ready=false
+                }
+            }
+            connected=ready && transport.isConnected
+            if(!connected) {
+                transport.disconnect()
+                decoder.clear()
+                report("connect/failed","FTX-1 read-only handshake failed")
+            } else {
+                diagnostics.record(ControlDiagnosticSource.RADIO,"ftx1/connect/ready",
+                    "${if (ft991) "FT-991/991A" else "FTX-1"} ${transport.connectionDescription} CAT verified")
+            }
+            connected
+        } finally {
+            identifying=false
         }
-        if(ready) {
-            val version=query("VE0;","VE0")
-            val number=version?.takeIf { it.matches(Regex("VE0[0-9]{4};")) }?.substring(3,7)?.toIntOrNull()
-            if(number!=null && number<108) { report("connect/firmware","FTX-1 MAIN firmware 1.08 or later is required"); ready=false }
-        }
-        if(!ready) { transport.disconnect(); connected=false; report("connect/failed","FTX-1 read-only handshake failed") }
-        else diagnostics.record(ControlDiagnosticSource.RADIO,"ftx1/connect/ready","ID0840; USB CAT verified")
-        ready
     } } catch(cancelled: CancellationException) {
         withContext(NonCancellable) { mutex.withLock {
             runCatching { transport.disconnect() }; connected=false; decoder.clear()
@@ -79,10 +101,12 @@ class Ftx1Controller(
         frequency to mode
     }
     override suspend fun setVfo(vfoA: Boolean) = io(false) {
+        if (ft991) return@io vfoA
         val side=if(vfoA) 0 else 1
         verify("VS$side;","VS;","VS","VS$side;").also { if(it) selectedSide=side }
     }
     override suspend fun setSplitMode(enabled: Boolean) = io(false) {
+        if (ft991) return@io !enabled && verify("FT2;", "FT;", "FT", "FT0;")
         // Hamlib's FTX-1 backend routes TX with FT, avoiding ST1's SUB tuning lock.
         val side=if(enabled) 1 else 0
         val applied=verify("ST0;","ST;","ST","ST0;") && verify("FT$side;","FT;","FT","FT$side;")
@@ -120,6 +144,7 @@ class Ftx1Controller(
         return verify(command,"$prefix;",prefix,command)
     }
     private suspend fun ensureVfoMode(side: Int): Boolean {
+        if (ft991) return side == 0
         val value=query("VM$side;","VM$side") ?: return false
         return value=="VM${side}00;" || verify("VM${side}00;","VM$side;","VM$side","VM${side}00;")
     }
@@ -128,6 +153,10 @@ class Ftx1Controller(
         return ensureVfoMode(side) && verify(command,"MD$side;","MD$side",command)
     }
     private suspend fun setToneMode(side: Int, enabled: Boolean): Boolean {
+        if (ft991) {
+            val command = if (enabled) "CT02;" else "CT00;"
+            return verify(command, "CT0;", "CT0", command)
+        }
         val command="CT$side${if(enabled) 1 else 0};"
         return verify(command,"CT$side;","CT$side",command)
     }
@@ -137,6 +166,18 @@ class Ftx1Controller(
     }
     private suspend fun readFrequency(side: Int): Long? =
         query(if(side==0) "FA;" else "FB;",if(side==0) "FA" else "FB")?.let { Ftx1CatProtocol.parseFrequency(it,side) }
+
+    private suspend fun probeReadOnlyConnection(): Boolean {
+        decoder.clear()
+        // Identification must not change frequency, mode, power, VFO or TX.
+        for(attempt in 1..3) {
+            val expectedId = if (ft991) "ID0670;" else "ID0840;"
+            if(query("ID;","ID") == expectedId && readFrequency(0)!=null) return true
+            if(!linkOpen) break
+            if(attempt<3) delay(100L)
+        }
+        return false
+    }
 
     private suspend fun verify(set: String, read: String, prefix: String, expected: String): Boolean {
         if(!isConnected) return false
@@ -151,18 +192,18 @@ class Ftx1Controller(
         return true
     }
     private suspend fun query(command: String, prefix: String): String? {
-        if(!isConnected) return null
+        if(!linkOpen) return null
         discardInput()
         write(command)
         val deadline=System.nanoTime()+replyTimeoutMillis*1_000_000L
-        while(System.nanoTime()<deadline && isConnected) {
+        while(System.nanoTime()<deadline && linkOpen) {
             for(frame in decoder.feed(transport.readAvailable(512))) {
                 if(frame=="?;" || frame=="E;") { report("reply/rejected",command); return null }
                 if(frame.startsWith(prefix) && frame!=command) return frame
             }
             delay(5L)
         }
-        report(if(isConnected) "reply/timeout" else "reply/disconnected",command)
+        report(if(linkOpen) "reply/timeout" else "reply/disconnected",command)
         return null
     }
     private suspend fun discardInput() {
@@ -171,7 +212,9 @@ class Ftx1Controller(
         throw IOException("FTX-1 input did not become quiet")
     }
     private suspend fun write(command: String) {
-        if(!transport.write(command.toByteArray(Charsets.US_ASCII))) throw IOException(transport.lastIoFailure ?: "USB write failed")
+        if(!transport.write(command.toByteArray(Charsets.US_ASCII))) {
+            throw IOException(transport.lastIoFailure ?: "${transport.connectionDescription} write failed")
+        }
     }
     private suspend fun <T> io(fallback: T, block: suspend ()->T): T = withContext(Dispatchers.IO) {
         mutex.withLock {

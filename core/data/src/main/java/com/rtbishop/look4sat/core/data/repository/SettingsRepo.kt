@@ -1233,6 +1233,7 @@ class SettingsRepo(
             putInt(keyRadioBaudRate, normalized.baudRate)
             putBoolean(keyRadioCatRts, normalized.catRts)
             putBoolean(keyRadioCatDtr, normalized.catDtr)
+            writeUsbPttSettings(this, normalized.usbPtt)
             putBoolean(keyRadioSplitMode, normalized.splitMode)
             putString(keyRadioCatTransport, normalized.catTransport)
             putString(keyRadioDuplexMode, normalized.duplexMode)
@@ -1264,6 +1265,7 @@ class SettingsRepo(
                 .takeIf { it in supportedBaudRates } ?: supportedBaudRates.first(),
             catRts = preferences.getBoolean(keyRadioCatRts, false),
             catDtr = preferences.getBoolean(keyRadioCatDtr, false),
+            usbPtt = readUsbPttSettings(preferences),
             splitMode = preferences.getBoolean(keyRadioSplitMode, false),
             catTransport = preferences.getString(keyRadioCatTransport, null)
                 ?: RadioControlSettings.TRANSPORT_BLUETOOTH,

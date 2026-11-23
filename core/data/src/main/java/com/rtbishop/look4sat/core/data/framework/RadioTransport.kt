@@ -33,6 +33,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /** Backward-compatible CAT specialization of the shared station-control transport. */
 interface RadioTransport : ControlTransport {
+    val usbPortIdentity: String? get() = null
     val lastIoFailure: String? get() = null
     val connectionDescription: String get() = "transport"
     val canTryAlternativeConnection: Boolean get() = false
@@ -42,6 +43,8 @@ interface RadioTransport : ControlTransport {
     fun setCdcDtrOnConnect(enabled: Boolean) = Unit
     /** Configure physical USB CAT modem-control lines before connect; not CAT PTT. */
     fun setCatSerialControlLines(rts: Boolean, dtr: Boolean) = Unit
+    fun reserveUsbPtt(settings: com.rtbishop.look4sat.core.domain.model.UsbPttSettings): Boolean = false
+    suspend fun setUsbPtt(active: Boolean): Boolean = false
 }
 
 class TcpRadioTransport(
@@ -155,6 +158,41 @@ class UsbSerialRadioTransport(
 ) : RadioTransport {
     private var cdcDtrOnConnect = false
     private var catRtsOnConnect = false
+    private var ptt: com.rtbishop.look4sat.core.domain.model.UsbPttSettings? = null
+    override fun reserveUsbPtt(settings: com.rtbishop.look4sat.core.domain.model.UsbPttSettings): Boolean {
+        if (isConnected) return false
+        ptt = settings
+        if (settings.line == com.rtbishop.look4sat.core.domain.model.UsbPttLine.RTS)
+            catRtsOnConnect = !settings.activeHigh else cdcDtrOnConnect = !settings.activeHigh
+        return true
+    }
+
+    override suspend fun setUsbPtt(active: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val config = ptt ?: return@withContext false
+        val current = connection ?: return@withContext false
+        val port = selectedPort ?: return@withContext false
+        val high = if (active) config.activeHigh else !config.activeHigh
+        val rts = if (config.line == com.rtbishop.look4sat.core.domain.model.UsbPttLine.RTS) high else catRtsOnConnect
+        val dtr = if (config.line == com.rtbishop.look4sat.core.domain.model.UsbPttLine.DTR) high else cdcDtrOnConnect
+        val result = try {
+            when (port.driver) {
+                UsbSerialDriverKind.CDC_ACM, UsbSerialDriverKind.PROLIFIC -> current.controlTransfer(
+                    CDC_REQUEST_TYPE, CDC_SET_CONTROL_LINE_STATE, cdcControlLineState(dtr, rts),
+                    if (port.driver == UsbSerialDriverKind.CDC_ACM) port.control.id else 0, null, 0, IO_TIMEOUT_MILLIS)
+                UsbSerialDriverKind.CP210X -> current.controlTransfer(USB_VENDOR_OUT_INTERFACE,
+                    CP210X_SET_MHS, cp210xModemControl(rts, dtr), port.portIndex, null, 0, IO_TIMEOUT_MILLIS)
+                UsbSerialDriverKind.FTDI -> vendorOut(current, FTDI_MODEM_CONTROL, ftdiModemControl(rts, dtr), port.portIndex + 1)
+                UsbSerialDriverKind.CH34X -> vendorOut(current, CH34X_MODEM_CTRL, ch34xModemControl(rts, dtr), 0)
+            }
+        } catch (error: Exception) {
+            lastIoFailure = "USB PTT control failed: ${error.javaClass.simpleName}"
+            return@withContext false
+        }
+        if (result != 0) return@withContext false
+        catRtsOnConnect = rts
+        cdcDtrOnConnect = dtr
+        true
+    }
     private var nativeCdcFastWrites = false
     @Volatile override var lastIoFailure: String? = null
         private set
@@ -170,6 +208,12 @@ class UsbSerialRadioTransport(
     }
     private val manager = context.applicationContext.getSystemService(UsbManager::class.java)
     private val selector = parseUsbSerialSelector(deviceSelector)
+    override val usbPortIdentity: String?
+        get() = selector?.let { selected ->
+            resolveUsbDevice(manager.deviceList.values, selected)?.let { device ->
+                "${device.deviceId}:${selected.controlInterfaceId}:${selected.dataInterfaceId}"
+            }
+        }
     private var connection: UsbDeviceConnection? = null
     private var claimedInterfaces: List<UsbInterface> = emptyList()
     private var selectedPort: UsbSerialPortCandidate? = null
@@ -180,7 +224,8 @@ class UsbSerialRadioTransport(
     override val connectionDescription get() = "usb driver=${selectedPort?.driver ?: "unopened"} " +
         "control=${selector?.controlInterfaceId} data=${selector?.dataInterfaceId} baud=$baudRate stopBits=$stopBits RTS=$catRtsOnConnect DTR=$cdcDtrOnConnect"
     override val isConnected: Boolean
-        get() = connection != null && claimedInterfaces.isNotEmpty() && input != null && output != null
+        get() = connection != null && claimedInterfaces.isNotEmpty() && input != null && output != null &&
+            connectedDevice?.let { device -> manager.deviceList.values.any { it.deviceId == device.deviceId } } == true
 
     override suspend fun connect(): Boolean = withContext(Dispatchers.IO) {
         disconnect()
@@ -270,6 +315,7 @@ class UsbSerialRadioTransport(
     }
 
     override suspend fun disconnect() = withContext(Dispatchers.IO) {
+        if (ptt != null && connection != null) runCatching { setUsbPtt(false) }
         val opened = connection
         val port = selectedPort
         if (opened != null) diagnostics.record(ControlDiagnosticSource.RADIO, "usb/close", "origin=app $connectionDescription disconnect requested by caller")
@@ -278,7 +324,7 @@ class UsbSerialRadioTransport(
                 UsbSerialDriverKind.CDC_ACM -> opened.controlTransfer(
                     CDC_REQUEST_TYPE,
                     CDC_SET_CONTROL_LINE_STATE,
-                    0,
+                    cdcControlLineState(cdcDtrOnConnect, catRtsOnConnect),
                     port.control.id,
                     null,
                     0,

@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package com.rtbishop.look4sat.feature.settings
+import com.rtbishop.look4sat.core.domain.model.usbPttConfigurationError
 
 import android.Manifest
 import android.bluetooth.BluetoothManager
@@ -103,6 +104,12 @@ fun RadioControlDialog(
     val splitMode  = rememberSaveable { mutableStateOf(initialSettings.splitMode) }
     val catRts = rememberSaveable { mutableStateOf(initialSettings.catRts) }
     val catDtr = rememberSaveable { mutableStateOf(initialSettings.catDtr) }
+    val usbPttEnabled = rememberSaveable { mutableStateOf(initialSettings.usbPtt.enabled) }
+    val usbPttPort = rememberSaveable { mutableStateOf(initialSettings.usbPtt.port.name) }
+    val usbPttAddress = rememberSaveable { mutableStateOf(initialSettings.usbPtt.address) }
+    val usbPttName = rememberSaveable { mutableStateOf(initialSettings.usbPtt.name) }
+    val usbPttLine = rememberSaveable { mutableStateOf(initialSettings.usbPtt.line.name) }
+    val usbPttHigh = rememberSaveable { mutableStateOf(initialSettings.usbPtt.activeHigh) }
     val duplexMode = rememberSaveable { mutableStateOf(initialSettings.duplexMode) }
     val catTransport = rememberSaveable { mutableStateOf(initialSettings.catTransport) }
     val tcpProtocol = rememberSaveable { mutableStateOf(initialSettings.tcpProtocol) }
@@ -179,7 +186,10 @@ fun RadioControlDialog(
     }
 
     val applyUsbSelection: (PendingUsbSelection) -> Unit = { selection ->
-        if (selection.target == "tx") {
+        if (selection.target == "ptt") {
+            usbPttAddress.value = selection.address
+            usbPttName.value = selection.name
+        } else if (selection.target == "tx") {
             txAddress.value = selection.address
             txName.value = selection.name
             txUsbError.value = null
@@ -201,7 +211,7 @@ fun RadioControlDialog(
                         val selection = pendingUsbSelection.value ?: return
                         if (intent.data?.lastPathSegment != selection.token) return
                         if (!selection.accepts(intent.data?.lastPathSegment, selectingFor.value,
-                                radioModel.value, catTransport.value == RadioControlSettings.TRANSPORT_USB)) {
+                                radioModel.value, catTransport.value == RadioControlSettings.TRANSPORT_USB || selectingFor.value == "ptt")) {
                             pendingUsbSelection.value = null
                             return
                         }
@@ -248,7 +258,7 @@ fun RadioControlDialog(
         usbDevicesRevision.intValue++
         pendingUsbSelection.value?.let { selection ->
             if (!selection.accepts(selection.token, selectingFor.value, radioModel.value,
-                    catTransport.value == RadioControlSettings.TRANSPORT_USB)) {
+                    catTransport.value == RadioControlSettings.TRANSPORT_USB || selectingFor.value == "ptt")) {
                 pendingUsbSelection.value = null
             } else if (authorizedUsbDevice(usbManager, selection) != null) {
                 applyUsbSelection(selection)
@@ -261,7 +271,7 @@ fun RadioControlDialog(
         selectingFor.value = target
         usbPermissionDenied.value = false
         if (
-            catTransport.value == RadioControlSettings.TRANSPORT_BLUETOOTH &&
+            target != "ptt" && catTransport.value == RadioControlSettings.TRANSPORT_BLUETOOTH &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             ContextCompat.checkSelfPermission(
                 context,
@@ -301,11 +311,12 @@ fun RadioControlDialog(
         radioModel.value,
         usbSerialDeviceFormat,
         bluetoothDevicesRevision.intValue,
-        usbDevicesRevision.intValue
+        usbDevicesRevision.intValue,
+        selectingFor.value
     ) {
         buildList {
             try {
-                if (catTransport.value == RadioControlSettings.TRANSPORT_USB) {
+                if (catTransport.value == RadioControlSettings.TRANSPORT_USB || selectingFor.value == "ptt") {
                     usbManager.deviceList.values.forEach { device ->
                         device.usbSerialPorts().forEach { port ->
                             val product = runCatching { device.productName }.getOrNull() ?: "USB"
@@ -331,7 +342,7 @@ fun RadioControlDialog(
                                     hasUsbPermission = usbManager.hasPermission(device),
                                     isSupported = port.supportsLineConfiguration(
                                         interfaceCount = device.interfaceCount,
-                                        stopBits = requiredStopBits
+                                        stopBits = if (selectingFor.value == "ptt") 1 else requiredStopBits
                                     )
                                 )
                             )
@@ -435,6 +446,11 @@ fun RadioControlDialog(
                 baudRate       = baudRate.intValue,
                 catRts         = catRts.value,
                 catDtr         = catDtr.value,
+                usbPtt = com.rtbishop.look4sat.core.domain.model.UsbPttSettings(
+                    usbPttEnabled.value,
+                    com.rtbishop.look4sat.core.domain.model.UsbPttPort.valueOf(usbPttPort.value),
+                    usbPttAddress.value, usbPttName.value,
+                    com.rtbishop.look4sat.core.domain.model.UsbPttLine.valueOf(usbPttLine.value), usbPttHigh.value),
                 splitMode      = splitMode.value,
                 catTransport   = catTransport.value,
                 duplexMode     = if (supportsSatelliteMode) {
@@ -453,6 +469,10 @@ fun RadioControlDialog(
                 n76BluetoothAudio = n76BluetoothAudio.value,
                 n76Options = n76Options
             )
+        if (draft.usbPttConfigurationError() != null)
+            issues += context.getString(R.string.rc_usb_ptt_invalid)
+        if (draft.usbPtt.enabled && draft.usbPtt.port == com.rtbishop.look4sat.core.domain.model.UsbPttPort.SEPARATE)
+            validateUsbSelection(usbManager, draft.usbPtt.address, 1)?.let { issues += context.getString(it.messageResource) }
         if (issues.isEmpty()) {
             onSave(draft)
             onDismiss()
@@ -578,7 +598,8 @@ fun RadioControlDialog(
                             if (radioModelDescriptor(model).protocolFamily == RadioProtocolFamily.L4S ||
                                 model == RadioControlSettings.MODEL_YAESU_FTX1) {
                                 splitMode.value = true
-                                if (catTransport.value != RadioControlSettings.TRANSPORT_USB) {
+                                if (radioModelDescriptor(model).protocolFamily == RadioProtocolFamily.L4S &&
+                                    catTransport.value != RadioControlSettings.TRANSPORT_USB) {
                                     txAddressByTransport[catTransport.value] = txAddress.value
                                     txNameByTransport[catTransport.value] = txName.value
                                     catTransport.value = RadioControlSettings.TRANSPORT_USB
@@ -611,7 +632,8 @@ fun RadioControlDialog(
             }
             Spacer(modifier = Modifier.height(6.dp))
 
-            if (isFtx1) Text(stringResource(R.string.rc_ftx1_usb_hint),style=MaterialTheme.typography.bodySmall)
+            if (isFtx1 && catTransport.value == RadioControlSettings.TRANSPORT_USB)
+                Text(stringResource(R.string.rc_ftx1_usb_hint),style=MaterialTheme.typography.bodySmall)
             if (isN76) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically) {
@@ -821,7 +843,7 @@ fun RadioControlDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable(enabled = entry.isSupported) {
-                                    if (catTransport.value == RadioControlSettings.TRANSPORT_USB) {
+                                    if (catTransport.value == RadioControlSettings.TRANSPORT_USB || selectingFor.value == "ptt") {
                                         val device = usbManager.deviceList.values.firstOrNull {
                                             it.deviceId == entry.usbDeviceId
                                         }
@@ -903,7 +925,7 @@ fun RadioControlDialog(
                     }
                 }
                 if (
-                    catTransport.value == RadioControlSettings.TRANSPORT_USB &&
+                    (catTransport.value == RadioControlSettings.TRANSPORT_USB || selectingFor.value == "ptt") &&
                     usbPermissionDenied.value
                 ) {
                     Text(
@@ -944,6 +966,28 @@ fun RadioControlDialog(
                         label = { Text("DTR") }, enabled = enabled.value)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
+            }
+            Text(stringResource(R.string.rc_usb_ptt_title), fontWeight = FontWeight.Medium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !usbPttEnabled.value, onClick = { usbPttEnabled.value = false }, label = { Text("CAT PTT") })
+                com.rtbishop.look4sat.core.domain.model.UsbPttPort.entries.forEach { port ->
+                    FilterChip(selected = usbPttEnabled.value && usbPttPort.value == port.name,
+                        onClick = { usbPttEnabled.value = true; usbPttPort.value = port.name },
+                        label = { Text(stringResource(if (port == com.rtbishop.look4sat.core.domain.model.UsbPttPort.CAT)
+                            R.string.rc_usb_ptt_same else R.string.rc_usb_ptt_separate)) })
+                }
+            }
+            if (usbPttEnabled.value) {
+                if (usbPttPort.value == "SEPARATE") OutlinedButton(onClick = { selectDevice("ptt") }, modifier = Modifier.fillMaxWidth()) {
+                    Text(usbPttName.value.ifBlank { stringResource(R.string.rc_usb_ptt_select) })
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("RTS", "DTR").forEach { line ->
+                        FilterChip(selected = usbPttLine.value == line, onClick = { usbPttLine.value = line }, label = { Text(line) })
+                    }
+                    FilterChip(selected = usbPttHigh.value, onClick = { usbPttHigh.value = true }, label = { Text(stringResource(R.string.rc_usb_ptt_high)) })
+                    FilterChip(selected = !usbPttHigh.value, onClick = { usbPttHigh.value = false }, label = { Text(stringResource(R.string.rc_usb_ptt_low)) })
+                }
             }
             Text(stringResource(R.string.rc_dial_follow), fontWeight = FontWeight.Medium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

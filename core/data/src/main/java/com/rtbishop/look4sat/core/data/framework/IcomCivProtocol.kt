@@ -198,6 +198,11 @@ object IcomCivProtocol {
     }
 
     /** Set operating frequency via CMD 0x05 (main VFO). */
+    fun buildDataModInput(value: Int? = null): ByteArray {
+        require(value==null || value in 0..3)
+        return if(value==null) frame(0x1a,0x05,0x01,0x19) else frame(0x1a,0x05,0x01,0x19,value.toByte())
+    }
+
     fun buildSetFreqCommand(frequencyHz: Long): ByteArray {
         return frame(CMD_SET_FREQ, *encodeFrequencyBcd(frequencyHz))
     }

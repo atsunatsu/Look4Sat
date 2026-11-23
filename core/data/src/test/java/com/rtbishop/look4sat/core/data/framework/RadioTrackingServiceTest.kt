@@ -59,6 +59,46 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RadioTrackingServiceTest {
+    @Test fun separateUsbPttKeepsCatTrackingAndStopsOnReleaseAndDetach() = runTest {
+        val levels = mutableListOf<Boolean>()
+        val line = object : RadioTransport {
+            override var isConnected = false
+            override fun reserveUsbPtt(settings: com.rtbishop.look4sat.core.domain.model.UsbPttSettings) = true
+            override suspend fun connect(): Boolean { isConnected = true; return true }
+            override suspend fun disconnect() { isConnected = false }
+            override suspend fun setUsbPtt(active: Boolean): Boolean { levels += active; return isConnected }
+            override suspend fun write(bytes: ByteArray) = true
+            override suspend fun readAvailable(maxBytes: Int) = byteArrayOf()
+        }
+        val tx = FakeRadioController()
+        val fixture = Fixture(backgroundScope, tx, FakeRadioController(), nowProvider = { testScheduler.currentTime },
+            transportFactory = { _, _, _, _ -> line })
+        fixture.settings.radioControlSettings.value = fixture.settings.radioControlSettings.value.copy(
+            usbPtt = com.rtbishop.look4sat.core.domain.model.UsbPttSettings(true, address = "PTT"))
+        fixture.service.connectRadios()
+        fixture.startTracking()
+        runCurrent()
+        assertTrue(fixture.service.state.value.externalUsbPtt)
+        fixture.service.setVoicePtt(true)
+        runCurrent()
+        assertTrue(levels.last())
+        assertEquals(PttState.ON, fixture.service.state.value.pttState)
+        assertFalse(fixture.service.applyRadioControlSettings(fixture.settings.radioControlSettings.value))
+        fixture.service.setVoicePtt(false)
+        runCurrent()
+        assertFalse(levels.last())
+        assertEquals(PttState.OFF, fixture.service.state.value.pttState)
+        fixture.service.setVoicePtt(true)
+        runCurrent()
+        assertTrue(levels.last())
+        line.disconnect()
+        advanceTimeBy(251L)
+        runCurrent()
+        assertFalse(levels.last())
+        assertEquals(PttState.ERROR, fixture.service.state.value.pttState)
+        assertTrue(tx.isConnected)
+        fixture.close()
+    }
     @Test fun n76UsesAtomicNativeTrackingAndDoesNotApplyTheL4s250HzQuantizer() = runTest {
         val remote = remoteFixtureState().also { flow ->
             flow.value = flow.value.copy(capabilities = flow.value.capabilities!!.copy(
@@ -1011,7 +1051,8 @@ class RadioTrackingServiceTest {
         splitMode: Boolean = false,
         duplexMode: String = RadioControlSettings.DUPLEX_MODE_SPLIT,
         transport: String = RadioControlSettings.TRANSPORT_USB,
-        diagnostics: IControlDiagnostics = NoOpControlDiagnostics
+        diagnostics: IControlDiagnostics = NoOpControlDiagnostics,
+        transportFactory: ((String, String, Int, Int) -> RadioTransport)? = null
     ) {
         val nominalTxHz = 145_900_000L
         val position = OrbitalPos(elevation = 0.5, distanceRate = 1.2, aboveHorizon = true)
@@ -1056,6 +1097,7 @@ class RadioTrackingServiceTest {
             settingsRepo = settings,
             nowMillis = nowProvider,
             controllerFactory = { _, address -> if (address == "TX") tx else rx },
+            transportFactory = transportFactory,
             diagnostics = diagnostics
         )
 

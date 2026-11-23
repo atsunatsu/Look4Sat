@@ -169,4 +169,13 @@
 
     <string name="cw_console_increase_offset">Aumentar el desplazamiento</string>
     <string name="cw_console_decrease_offset">Reducir el desplazamiento</string>
+    <string name="rc_usb_ptt_title">Control PTT</string>
+    <string name="rc_usb_ptt_same">Puerto USB CAT</string>
+    <string name="rc_usb_ptt_separate">Puerto USB separado</string>
+    <string name="rc_usb_ptt_select">Seleccionar puerto PTT</string>
+    <string name="rc_usb_ptt_high">Activo en alto</string>
+    <string name="rc_usb_ptt_low">Activo en bajo</string>
+    <string name="rc_usb_ptt_invalid">Seleccione un puerto PTT disponible o una línea RTS/DTR libre en USB CAT.</string>
+    <string name="rc_usb_ptt_keyed">Línea USB PTT activa</string>
+    <string name="rc_usb_ptt_hold">Mantener USB PTT</string>
 </resources>
