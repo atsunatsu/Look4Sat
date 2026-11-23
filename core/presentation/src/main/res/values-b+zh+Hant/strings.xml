@@ -686,4 +686,13 @@
     <string name="update_source_moeyy">github.moeyy.xyz（代理）</string>
     <string name="update_source_trying">正在尝试：%s</string>
     <string name="update_source_served">使用的更新源：%s</string>
+    <string name="rc_usb_ptt_title">PTT 控制</string>
+    <string name="rc_usb_ptt_same">USB CAT 同埠</string>
+    <string name="rc_usb_ptt_separate">獨立 USB 埠</string>
+    <string name="rc_usb_ptt_select">選擇 PTT 埠</string>
+    <string name="rc_usb_ptt_high">高電位有效</string>
+    <string name="rc_usb_ptt_low">低電位有效</string>
+    <string name="rc_usb_ptt_invalid">請選擇可用的 PTT 埠，或 USB CAT 埠上未占用的 RTS/DTR 線。</string>
+    <string name="rc_usb_ptt_keyed">USB PTT 控制線已啟用</string>
+    <string name="rc_usb_ptt_hold">按住 USB PTT</string>
 </resources>

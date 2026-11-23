@@ -194,17 +194,10 @@ class SerialRadioController(
     private val actor: RadioCommandActor
 ) : IRadioController {
     override val commandTimeoutMillis get() = delegate.commandTimeoutMillis
-    private suspend fun <T> execute(operation: suspend () -> T): T {
-        val budget = kotlinx.coroutines.currentCoroutineContext()[Ft4CatBudget]
-        budget?.checkBeforeCommand()
-        return actor.execute(delegate.commandTimeoutMillis) {
-            budget?.checkBeforeCommand()
-            if (budget == null) operation() else kotlinx.coroutines.withContext(budget) {
-                operation().also { budget.checkBeforeCommand() }
-            }
-        }
-    }
+    private suspend fun <T> execute(operation: suspend () -> T): T =
+        actor.execute(delegate.commandTimeoutMillis, operation)
     override val remoteState get() = delegate.remoteState
+    override val externalUsbPtt get() = delegate.externalUsbPtt
     override val supportsAtomicPair get() = delegate.supportsAtomicPair
     override suspend fun prepareSatelliteBands(rxHz: Long, txHz: Long) =
         execute { delegate.prepareSatelliteBands(rxHz, txHz) }
@@ -250,7 +243,10 @@ class SerialRadioController(
     override suspend fun pttOnIfGeneration(expectedGeneration: Long) =
         actor.executePttOn(expectedGeneration, delegate::pttOn)
     override suspend fun pttOff() = actor.executePttOff(delegate::pttOff)
-    override fun invalidatePendingPttOn() = actor.invalidatePendingPttOn()
+    override fun invalidatePendingPttOn() {
+        actor.invalidatePendingPttOn()
+        delegate.invalidatePendingPttOn()
+    }
     override suspend fun setBand(frequencyHz: Long) = execute { delegate.setBand(frequencyHz) }
     override suspend fun setVfo(vfoA: Boolean) = execute { delegate.setVfo(vfoA) }
     override suspend fun setSplitMode(enabled: Boolean) = execute { delegate.setSplitMode(enabled) }

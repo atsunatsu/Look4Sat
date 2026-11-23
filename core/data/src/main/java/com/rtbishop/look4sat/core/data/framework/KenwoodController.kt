@@ -130,7 +130,7 @@ internal class KenwoodController(
         try {
             result = operation()
         } finally {
-            restored = withContext(NonCancellable + Ft4CatBudget.cleanup) { setVfo(!rx) }
+            restored = withContext(NonCancellable) { setVfo(!rx) }
         }
         return result.takeIf { restored }
     }

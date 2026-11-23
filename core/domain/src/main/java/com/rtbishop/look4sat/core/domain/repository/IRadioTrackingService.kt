@@ -38,6 +38,7 @@ enum class TrackingPhase {
 }
 
 data class RadioTrackingState(
+    val externalUsbPtt: Boolean = false,
     val isActive: Boolean = false,
     val trackingPhase: TrackingPhase = TrackingPhase.IDLE,
     val txConnected: Boolean = false,

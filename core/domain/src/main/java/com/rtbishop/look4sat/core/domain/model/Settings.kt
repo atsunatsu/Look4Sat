@@ -125,6 +125,41 @@ data class LoTWSettings(
     val isConfigured: Boolean get() = callsign.isNotBlank() && password.isNotBlank()
 }
 
+enum class UsbPttPort { CAT, SEPARATE }
+enum class UsbPttLine { RTS, DTR }
+
+data class UsbPttSettings(
+    val enabled: Boolean = false,
+    val port: UsbPttPort = UsbPttPort.SEPARATE,
+    val address: String = "",
+    val name: String = "",
+    val line: UsbPttLine = UsbPttLine.RTS,
+    val activeHigh: Boolean = true
+)
+
+fun RadioControlSettings.usbPttConfigurationError(): String? {
+    if (!usbPtt.enabled) return null
+    if (usbPtt.port == UsbPttPort.CAT) {
+        if (catTransport != RadioControlSettings.TRANSPORT_USB) return "CAT_NOT_USB"
+        if (usbPtt.line == UsbPttLine.DTR && radioModel in setOf(RadioControlSettings.MODEL_QUANSHENG_UVK1, RadioControlSettings.MODEL_QUANSHENG_UVK5V3)) return "HANDSHAKE"
+        if (if (usbPtt.line == UsbPttLine.RTS) catRts else catDtr) return "LINE_RESERVED"
+    } else {
+        if (usbPtt.address.isBlank()) return "PORT_REQUIRED"
+        if (catTransport == RadioControlSettings.TRANSPORT_USB &&
+            (usbSerialPortsOverlap(usbPtt.address, txRadioAddress) ||
+                !splitMode && usbSerialPortsOverlap(usbPtt.address, rxRadioAddress))) return "PORT_IN_USE"
+    }
+    return null
+}
+
+/** Interface identity keeps separate ports on one multi-port adapter usable. */
+fun usbSerialPortsOverlap(first: String, second: String): Boolean {
+    val a = first.split(':')
+    val b = second.split(':')
+    if (a.size < 3 || b.size < 3 || a[0] != b[0]) return false
+    return a.subList(1, 3).any { it in b.subList(1, 3) }
+}
+
 data class RadioControlSettings(
     val enabled: Boolean,
     val radioModel: String,
@@ -157,7 +192,8 @@ data class RadioControlSettings(
     val n76Options: N76ControlOptions = N76ControlOptions(),
     /** Independently configurable physical USB CAT control lines (not PTT). */
     val catRts: Boolean = false,
-    val catDtr: Boolean = false
+    val catDtr: Boolean = false,
+    val usbPtt: UsbPttSettings = UsbPttSettings()
 ) {
     companion object {
         const val MODEL_YAESU_FT847 = "Yaesu FT-847"

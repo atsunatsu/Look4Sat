@@ -21,6 +21,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 interface IRadioController {
+    val externalUsbPtt: Boolean get() = false
     suspend fun captureAudioState(split: Boolean): RadioTransmitAudioSnapshot? = null
     suspend fun setAudioInput(wlan: Boolean): Boolean = false
     suspend fun restoreAudioState(snapshot: RadioTransmitAudioSnapshot): Boolean = false

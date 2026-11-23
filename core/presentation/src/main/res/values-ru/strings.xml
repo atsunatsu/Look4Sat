@@ -168,4 +168,13 @@
 
     <string name="cw_console_increase_offset">Увеличить смещение</string>
     <string name="cw_console_decrease_offset">Уменьшить смещение</string>
+    <string name="rc_usb_ptt_title">Управление PTT</string>
+    <string name="rc_usb_ptt_same">Порт USB CAT</string>
+    <string name="rc_usb_ptt_separate">Отдельный порт USB</string>
+    <string name="rc_usb_ptt_select">Выбрать порт PTT</string>
+    <string name="rc_usb_ptt_high">Активный высокий</string>
+    <string name="rc_usb_ptt_low">Активный низкий</string>
+    <string name="rc_usb_ptt_invalid">Выберите доступный порт PTT или свободную линию RTS/DTR порта USB CAT.</string>
+    <string name="rc_usb_ptt_keyed">Линия USB PTT активна</string>
+    <string name="rc_usb_ptt_hold">Удерживать USB PTT</string>
 </resources>

@@ -20,44 +20,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class Ic705ControllerTest {
-    @Test fun ic820ExpiredSubWriteRestoresMainAndNextSlotCanVerifyAgain() = runTest {
-        var now = 6_000L
-        var slowWrite = false
-        val clock = com.rtbishop.look4sat.core.domain.time.SystemDisciplinedClock(
-            object : com.rtbishop.look4sat.core.domain.time.MonotonicTimeSource {
-                override fun elapsedRealtimeNanos() = now * 1_000_000L
-                override fun wallClockMillis() = now
-            })
-        val base = ScriptedCivTransport(civAddress = 0x42, trackFrequencyWrites = true, ic820BandAccess = true)
-        val link = TimedRadioTransport(object : RadioTransport by base {
-            override suspend fun write(bytes: ByteArray): Boolean {
-                val written = base.write(bytes)
-                if (slowWrite && bytes[4] == 0x05.toByte()) {
-                    slowWrite = false
-                    now = 7_400L
-                }
-                return written
-            }
-        })
-        val radio = Ic705Controller(null, "USB", 0x42, link, IcomCivVariant.IC820)
-        assertTrue(radio.connect())
-        assertTrue(radio.prepareSatelliteBands(435_100_000L, 145_900_000L))
-        slowWrite = true
-        val expired = runCatching {
-            kotlinx.coroutines.withContext(Ft4CatBudget(com.rtbishop.look4sat.core.domain.ft4.Ft4CatWindow(7_500L), clock)) {
-                // MAIN already has this frequency; the delayed write targets SUB.
-                radio.tuneAndReadTrackingFrequencies(435_100_080L, 145_590_000L)
-            }
-        }
-        assertTrue(expired.exceptionOrNull() is Ft4CatWindowExpired)
-        assertEquals("07:D1", base.payloads.last())
-        now = 13_500L
-        kotlinx.coroutines.withContext(Ft4CatBudget(com.rtbishop.look4sat.core.domain.ft4.Ft4CatWindow(15_000L), clock)) {
-            assertTrue(radio.tuneAndReadTrackingFrequencies(435_100_080L, 145_590_000L) != null)
-        }
-        radio.disconnect()
-    }
-
     @Test fun ic820DirectModeSetupSupportsFmSsbAndCwWithoutPhysicalExchange() = runTest {
         val link = ScriptedCivTransport(civAddress = 0x42, trackFrequencyWrites = true, ic820BandAccess = true)
         val radio = Ic705Controller(null, "USB", 0x42, link, IcomCivVariant.IC820)
@@ -67,24 +29,6 @@ class Ic705ControllerTest {
         for (mode in listOf("FM", "USB", "LSB", "CW")) assertTrue(radio.setSplitModes(mode, mode))
         assertFalse(link.payloads.contains("07:B0"))
         assertEquals(4, link.payloads.count { it == "07:D0" })
-        radio.disconnect()
-    }
-
-    @Test fun ic820DoesNotStartVerifiedTuneWithInsufficientFt4Budget() = runTest {
-        val link = ScriptedCivTransport(civAddress = 0x42, trackFrequencyWrites = true, ic820BandAccess = true)
-        val radio = Ic705Controller(null, "USB", 0x42, link, IcomCivVariant.IC820)
-        assertTrue(radio.connect())
-        assertTrue(radio.prepareSatelliteBands(435_100_000L, 145_900_000L))
-        link.payloads.clear()
-        val clock = com.rtbishop.look4sat.core.domain.time.SystemDisciplinedClock(
-            object : com.rtbishop.look4sat.core.domain.time.MonotonicTimeSource {
-                override fun elapsedRealtimeNanos() = 7_300_000_000L
-                override fun wallClockMillis() = 7_300L
-            })
-        kotlinx.coroutines.withContext(Ft4CatBudget(com.rtbishop.look4sat.core.domain.ft4.Ft4CatWindow(7_500L), clock)) {
-            assertNull(radio.tuneAndReadTrackingFrequencies(435_100_080L, 145_900_080L))
-        }
-        assertTrue(link.payloads.isEmpty())
         radio.disconnect()
     }
 

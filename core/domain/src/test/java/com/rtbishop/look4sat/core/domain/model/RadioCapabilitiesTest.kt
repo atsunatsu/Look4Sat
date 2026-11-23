@@ -8,11 +8,11 @@ import org.junit.Test
 
 class RadioCapabilitiesTest {
 
-    @Test fun bluetoothPickerPreservesLegacyAdaptersAndOffersSupportedL4sWithoutFtx1() {
+    @Test fun bluetoothPickerAddsFtx1WithoutChangingItsNativeCatCapabilities() {
         assertEquals(listOf(RadioControlSettings.MODEL_YAESU_FT817,RadioControlSettings.MODEL_YAESU_FT857,
+            RadioControlSettings.MODEL_YAESU_FTX1,
             RadioControlSettings.MODEL_ICOM_IC705,RadioControlSettings.MODEL_QUANSHENG_UVK1,
-            RadioControlSettings.MODEL_QUANSHENG_UVK5V3,RadioControlSettings.MODEL_ICOM_IC9700,
-            RadioControlSettings.MODEL_VERO_N76),
+            RadioControlSettings.MODEL_QUANSHENG_UVK5V3,RadioControlSettings.MODEL_ICOM_IC9700,RadioControlSettings.MODEL_VERO_N76),
             RadioModelCatalog.modelsForTransport(RadioControlSettings.TRANSPORT_BLUETOOTH))
         assertTrue(RadioControlSettings.MODEL_YAESU_FTX1 in RadioModelCatalog.modelsForTransport(RadioControlSettings.TRANSPORT_USB))
         assertFalse(RadioControlSettings.MODEL_YAESU_FTX1 in RadioModelCatalog.modelsForTransport(RadioControlSettings.TRANSPORT_TCP))
@@ -27,6 +27,16 @@ class RadioCapabilitiesTest {
     fun catalogDefinesEverySupportedModelExactlyOnce() {
         assertEquals(
             listOf(
+                RadioControlSettings.MODEL_YAESU_FT847,
+                RadioControlSettings.MODEL_YAESU_FT991,
+                RadioControlSettings.MODEL_ICOM_IC9100,
+                RadioControlSettings.MODEL_ICOM_IC821,
+                RadioControlSettings.MODEL_ICOM_IC7300,
+                RadioControlSettings.MODEL_ICOM_IC905,
+                RadioControlSettings.MODEL_ICOM_IC7100,
+                RadioControlSettings.MODEL_ICOM_IC706,
+                RadioControlSettings.MODEL_ICOM_IC706MKII,
+                RadioControlSettings.MODEL_ICOM_IC706MKIIG,
                 RadioControlSettings.MODEL_YAESU_FT817,
                 RadioControlSettings.MODEL_YAESU_FT857,
                 RadioControlSettings.MODEL_YAESU_FTX1,
@@ -36,7 +46,16 @@ class RadioCapabilitiesTest {
                 RadioControlSettings.MODEL_ICOM_IC820,
                 RadioControlSettings.MODEL_QUANSHENG_UVK1,
                 RadioControlSettings.MODEL_QUANSHENG_UVK5V3,
-                RadioControlSettings.MODEL_VERO_N76
+                RadioControlSettings.MODEL_VERO_N76,
+                RadioControlSettings.MODEL_KENWOOD_TH_D74,
+                RadioControlSettings.MODEL_KENWOOD_TH_D75,
+                RadioControlSettings.MODEL_KENWOOD_TS_2000,
+                RadioControlSettings.MODEL_KENWOOD_TS_790,
+                RadioControlSettings.MODEL_KENWOOD_TS_990,
+                RadioControlSettings.MODEL_KENWOOD_TS_890,
+                RadioControlSettings.MODEL_KENWOOD_TS_590,
+                RadioControlSettings.MODEL_KENWOOD_TS_590SG,
+                RadioControlSettings.MODEL_FLEX_SMARTSDR
             ),
             RadioModelCatalog.supportedModels
         )

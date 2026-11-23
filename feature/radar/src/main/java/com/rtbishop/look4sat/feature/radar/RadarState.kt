@@ -36,6 +36,7 @@ data class RadioPanelState(
 )
 
 data class RadioControlSubState(
+    val externalUsbPtt: Boolean = false,
     val catEnabled: Boolean = false,
     val catTransport: String = RadioControlSettings.TRANSPORT_BLUETOOTH,
     val isL4sModel: Boolean = false,
@@ -61,8 +62,8 @@ data class RadioControlSubState(
     val calculatorReference: CalculatorReference? = null
 ) {
     val catControlsActive get() = catEnabled && catTransport != RadioControlSettings.TRANSPORT_VOX
-    val remoteControlsVisible get() = catControlsActive && remoteRadio?.connected == true &&
-        remoteRadio.capabilities?.let { it.voicePtt || it.cwText || it.nativeSettings || remoteRadio.isN76 } == true
+    val remoteControlsVisible get() = catControlsActive && (externalUsbPtt && txPanel.isConnected || remoteRadio?.connected == true &&
+        remoteRadio.capabilities?.let { it.voicePtt || it.cwText || it.nativeSettings || remoteRadio.isN76 } == true)
     val voicePttVisible get() = remoteControlsVisible && remoteRadio?.capabilities?.voicePtt == true
     val stopRemoteTxVisible get() = remoteControlsVisible &&
         remoteRadio?.capabilities?.let { it.voicePtt || it.cwText } == true

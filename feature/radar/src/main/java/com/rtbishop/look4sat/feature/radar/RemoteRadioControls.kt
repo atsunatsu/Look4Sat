@@ -47,6 +47,7 @@ internal fun RadioControlSubState.canSendL4sCw(): Boolean =
 
 @Composable
 internal fun RemoteRadioControls(control: RadioControlSubState, onAction: (RadarAction) -> Unit) {
+    if (control.externalUsbPtt && control.txPanel.isConnected) UsbPttControls(control, onAction)
     if (!control.remoteControlsVisible) return
     val remote = control.remoteRadio ?: return
     val context = LocalContext.current
@@ -91,7 +92,7 @@ internal fun RemoteRadioControls(control: RadioControlSubState, onAction: (Radar
                 style=MaterialTheme.typography.bodySmall)
         }
         }
-        if (control.voicePttVisible) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (control.voicePttVisible && !control.externalUsbPtt) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp)

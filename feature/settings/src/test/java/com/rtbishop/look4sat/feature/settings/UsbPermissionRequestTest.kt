@@ -19,6 +19,12 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class UsbPermissionRequestTest {
+    @Test fun pttGrantIsBoundToItsOwnPortSelectionAndRejectsCatSelectionChanges() {
+        val ptt = PendingUsbSelection("ptt", "PTT", "9:2:3:100:200", "IC-820", "token")
+        assertTrue(ptt.accepts("token", "ptt", "IC-820", true))
+        assertFalse(ptt.accepts("token", "tx", "IC-820", true))
+        assertFalse(ptt.accepts("previous", "ptt", "IC-820", true))
+    }
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val manager = context.getSystemService(UsbManager::class.java)
     private val device = Shadow.newInstanceOf(UsbDevice::class.java).apply {

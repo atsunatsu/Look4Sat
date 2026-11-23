@@ -219,4 +219,13 @@
 
     <string name="cw_console_increase_offset">Ofseti artır</string>
     <string name="cw_console_decrease_offset">Ofseti azalt</string>
+    <string name="rc_usb_ptt_title">PTT kontrolü</string>
+    <string name="rc_usb_ptt_same">USB CAT bağlantısı</string>
+    <string name="rc_usb_ptt_separate">Ayrı USB bağlantısı</string>
+    <string name="rc_usb_ptt_select">PTT bağlantısını seç</string>
+    <string name="rc_usb_ptt_high">Aktif yüksek</string>
+    <string name="rc_usb_ptt_low">Aktif düşük</string>
+    <string name="rc_usb_ptt_invalid">Kullanılabilir bir PTT bağlantısı veya USB CAT üzerinde boş bir RTS/DTR hattı seçin.</string>
+    <string name="rc_usb_ptt_keyed">USB PTT hattı etkin</string>
+    <string name="rc_usb_ptt_hold">USB PTT için basılı tut</string>
 </resources>

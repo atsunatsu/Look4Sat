@@ -676,4 +676,13 @@
     <string name="lotw_upload_result_copy_details">复制错误详情</string>
     <string name="lotw_upload_result_retry">安全重试</string>
     <string name="lotw_upload_result_close">关闭</string>
+    <string name="rc_usb_ptt_title">PTT 控制</string>
+    <string name="rc_usb_ptt_same">USB CAT 同口</string>
+    <string name="rc_usb_ptt_separate">独立 USB 口</string>
+    <string name="rc_usb_ptt_select">选择 PTT 端口</string>
+    <string name="rc_usb_ptt_high">高电平有效</string>
+    <string name="rc_usb_ptt_low">低电平有效</string>
+    <string name="rc_usb_ptt_invalid">请选择可用的 PTT 端口，或 USB CAT 口上未占用的 RTS/DTR 线。</string>
+    <string name="rc_usb_ptt_keyed">USB PTT 控制线已激活</string>
+    <string name="rc_usb_ptt_hold">按住 USB PTT</string>
 </resources>
