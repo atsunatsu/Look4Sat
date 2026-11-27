@@ -1,44 +1,163 @@
-# Look4Sat-BA7OPF
+<!--
+  Look4Sat — BA7OPF Edition
+  Independently maintained fork of rt-bishop/Look4Sat.
+-->
 
-[![Release](https://img.shields.io/github/v/release/atsunatsu/Look4Sat)](https://github.com/atsunatsu/Look4Sat/releases)
+<div align="center">
+  <img src="fastlane/metadata/android/en-US/images/icon.png" alt="Look4Sat app icon" width="112" />
 
-**BA7OPF 定制版** — 基于 [rt-bishop/Look4Sat](https://github.com/rt-bishop/Look4Sat) 的业余无线电卫星追踪器，增加了线性卫星频率计算器等功能。
+  <h1>Look4Sat — BA7OPF Edition</h1>
 
-非官方修改版（fork），独立维护；首次发布 2026-09，持续修改中。
+  <p><strong>Satellite tracking, pass prediction, and operating tools for amateur radio operators.</strong></p>
 
-## 本仓库特色功能
+  <p>
+    <a href="https://github.com/atsunatsu/Look4Sat/releases/latest">
+      <img src="https://img.shields.io/github/v/release/atsunatsu/Look4Sat?label=latest%20release" alt="Latest release" />
+    </a>
+    <a href="https://github.com/atsunatsu/Look4Sat/releases">
+      <img src="https://img.shields.io/github/downloads/atsunatsu/Look4Sat/total?label=downloads" alt="GitHub downloads" />
+    </a>
+    <a href="https://github.com/atsunatsu/Look4Sat/blob/main/LICENSE">
+      <img src="https://img.shields.io/github/license/atsunatsu/Look4Sat" alt="GPL-3.0 license" />
+    </a>
+    <img src="https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 7.0 or later" />
+  </p>
 
-- **网格地图模式（Grid Mode）** — 地图页内置 VUCC 网格覆盖图：已通联网格绿色填充、漫游网格蓝色 45° 斜纹（疏朗半透明样式）、当前所在方格淡黄加粗框；点击已通联网格弹出该网格内通联明细弹窗；进入网格模式默认 VUCC 视图
-- **奖状边界模式（Award Boundaries）** — 在网格地图上叠加 DXCC / WAPC / WAJA / WAZ / WAS 国界·省界·分区边界，已确认区域绿色填充
-- **LoTW 网格同步** — 直连 ARRL Logbook（账号密码验证）下载确认报告，worked / roamed 网格自动更新（兼容任意字段顺序的 ADIF 解析）；同步失败按凭据错误/限流/超时分类提示
-- **双站过境匹配（Mutual Pass）** — 输入友台经纬度/网格，筛选双方同时可见的卫星过境，在地图上同时显示双方仰角曲线和地面轨迹，支持一键跳转雷达页查看详情
-- **线性卫星转发器频率计算器** — 在雷达页的 Calculator 标签页中，支持 TX/RX 双向多普勒频率计算，以及下行频率偏移（offset）输入，方便操作带偏移的线性卫星
-- **CW 解码器** — 集成 Morse Expert 解码引擎，支持瀑布图、实时解码文本（arm64 + armeabi-v7a 双架构）
-- **AMSAT 状态页** — 实时查看卫星的业余无线电转发器状态（开启/关闭/待机），支持 72 小时历史记录回放，启动时预取缓存
-- **应用内更新检查** — 设置页可选择 GitHub 或第三方代理，自动模式依次尝试备用更新源，下载 APK 前校验包名、版本与安装签名
-- **自定义 TLE 数据源** — 可添加自定义 TLE/Celestrak CSV 数据源，长按拖拽排序，数据源启停开关与 HTTP 状态码显示
-- **中文界面优化** — 翻译修正、UI 布局调整，系统语言自动切换
+  <p>
+    <a href="https://github.com/atsunatsu/Look4Sat/releases/latest"><strong>Download APK</strong></a>
+    · <a href="https://github.com/atsunatsu/Look4Sat/releases">All releases</a>
+    · <a href="https://github.com/rt-bishop/Look4Sat">Upstream project</a>
+  </p>
+</div>
 
-## 上游仓库
+> **About this repository:** This is an independently maintained fork of [rt-bishop/Look4Sat](https://github.com/rt-bishop/Look4Sat), with additional features for satellite operators and amateur-radio logging. It is not the upstream project. Upstream tracking functionality and the original project remain credited to their authors.
 
-本仓库是 [rt-bishop/Look4Sat](https://github.com/rt-bishop/Look4Sat) 的分支，上游仓库的原始功能包括：
+## Screenshots
 
-- 基于 Celestrak / SatNOGS 数据的 9000+ 活跃卫星追踪
-- SGP4/SDP4 轨道预测，10 天过境预报
-- 极坐标雷达图、地面轨迹图
-- SSTV 图像解码
-- 无广告、无跟踪、完全离线
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="24%" alt="Look4Sat screenshot 1" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="24%" alt="Look4Sat screenshot 2" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="24%" alt="Look4Sat screenshot 3" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="24%" alt="Look4Sat screenshot 4" />
+</p>
 
-## 许可证
+## Features
 
-GNU General Public License v3.0。详见 [LICENSE](LICENSE)。
+### Satellite tracking and prediction
 
-## Star History
+- Track thousands of satellites using orbital data from **CelesTrak**, **SatNOGS**, **AMSAT**, **ARISS**, and configurable sources.
+- Calculate satellite positions and predict passes up to **10 days ahead** with SGP4/SDP4.
+- Browse upcoming and active passes, including pass progress, visibility, and orbital information.
+- Explore satellite footprints, ground tracks, and positions on an interactive map or polar radar.
+- Import and update orbital elements in TLE and OMM/CSV formats. Add custom TLE or CSV sources and manage their order.
+- Use **CelesTrak ISS SupGP** data, derived from NASA Orbital Ephemeris Message (OEM) fits, for time-appropriate ISS predictions. Cached segments and ordinary ISS elements provide fallback coverage.
 
-<a href="https://star-history.dera.page/#atsunatsu/Look4Sat&type=timeline&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=atsunatsu/Look4Sat&type=timeline&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=atsunatsu/Look4Sat&type=timeline&legend=top-left" />
-   <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=atsunatsu/Look4Sat&type=timeline&legend=top-left" />
- </picture>
-</a>
+### Amateur-radio operating tools
+
+- Browse satellite transponders and their uplink/downlink information.
+- Calculate Doppler-corrected TX/RX frequencies for linear transponders, including passband mapping and user-defined frequency offsets.
+- Control supported radios through available USB/serial, Bluetooth SPP, or Hamlib `rigctld` connections. Supported models and capabilities depend on the selected radio profile.
+- Decode CW with a live text display and waterfall.
+- Use the CW operating console and message presets during a pass.
+- Receive and decode SSTV images.
+- View the AMSAT satellite status timeline, including recent reports, and submit satellite status reports.
+- Find **mutual passes**: identify satellites that are simultaneously visible from two ground stations, compare their elevation curves, and open the pass in the radar or map view.
+
+### Grid maps and award tracking
+
+- View Maidenhead grid squares and VUCC-oriented worked-grid coverage on the map.
+- Keep worked grids and manually marked grids separate, with station-specific records and an aggregated **All** station view.
+- Inspect grid details, local QSO records, and first-worked callsigns.
+- Use **GridMaster** satellite activity data to display:
+  - Most Wanted grid activity percentages.
+  - A grid activity time heatmap based on the latest reported activity.
+  - Recent active callsigns for individual grids.
+- Filter the activity heatmap by its time bands.
+- Overlay award and geographic boundaries, including **DXCC, WAPC, WAJA, WAZ, WAS, and WAIPA**.
+- Draw configurable satellite elevation contours on the map.
+
+### QSO logging and synchronization
+
+- Keep a local satellite QSO logbook and associate contacts with satellite passes and transponders.
+- Exchange log records using ADIF-compatible data.
+- Synchronize confirmed QSOs and worked grids with **ARRL Logbook of The World (LoTW)**.
+- Upload eligible QSOs to LoTW using an imported LoTW certificate.
+- Connect to **Wavelog** to retrieve and upload QSOs. Where supported by the server API, confirmation updates can also be synchronized incrementally.
+- Review upload previews and validation results before submitting records.
+
+### Designed for everyday use
+
+- Ad-free and offline-first: orbital calculations run on the device, and downloaded data is cached locally.
+- Multiple station locations and Maidenhead locators.
+- Configurable satellite and transponder data sources.
+- Local map data is available; online map layers and external integrations require a network connection.
+- Localized interface: English, Chinese, Spanish, Russian, Sinhala, Turkish, and Ukrainian.
+
+## Getting started
+
+1. Install the APK from [GitHub Releases](https://github.com/atsunatsu/Look4Sat/releases/latest).
+2. Open **Settings** and set your station location. Use an accurate latitude/longitude or Maidenhead locator.
+3. Update the satellite orbital data sources.
+4. Select a satellite to inspect its next passes, open the radar, or view its ground track on the map.
+5. Configure a radio, logbook, or external service only if you need those features.
+
+For reliable predictions, keep orbital elements up to date and make sure your station location is correct.
+
+## Download and compatibility
+
+- **Minimum Android version:** Android 7.0 (API 24).
+- **Download:** [Latest APK and release notes](https://github.com/atsunatsu/Look4Sat/releases/latest).
+- **Package ID:** `cn.ba7opf.look4sat`. This fork uses a different application ID from upstream, so it installs as a separate app and does not share the upstream app's local data.
+
+Please use the release notes to review changes before updating.
+
+## Data sources and attribution
+
+Look4Sat uses data and services provided by several independent projects:
+
+- [CelesTrak](https://celestrak.org/) — satellite orbital elements, including ISS SupGP.
+- [SatNOGS](https://satnogs.org/) — satellite and transmitter information.
+- [AMSAT](https://www.amsat.org/) — amateur-satellite information and status reporting.
+- [GridMaster](https://gridmaster.fr/) — aggregated satellite grid activity and recent activator data.
+- [ARRL LoTW](https://lotw.arrl.org/) — QSO confirmation and upload services.
+- [Wavelog](https://www.wavelog.org/) — self-hosted amateur-radio logbook integration.
+
+Grid activity data displayed by this application is attributed to **[GridMaster.fr](https://gridmaster.fr/)**. The GridMaster integration reads public aggregate data; it does not upload your local QSO records or callsigns to GridMaster.
+
+External services are optional unless a feature requires them. Their availability, API limits, and terms are controlled by their respective providers.
+
+## Build from source
+
+The project uses Kotlin, Jetpack Compose, Gradle, and the Android SDK.
+
+Requirements:
+
+- JDK 17
+- Android SDK
+- Android 7.0 (API 24) or later for the installed application
+
+Build a debug APK:
+
+```bash
+git clone https://github.com/atsunatsu/Look4Sat.git
+cd Look4Sat
+./gradlew assembleDebug
+```
+
+Run unit tests:
+
+```bash
+./gradlew test
+```
+
+## Upstream project and acknowledgements
+
+This project is based on [Look4Sat by Arty Bishop (rt-bishop)](https://github.com/rt-bishop/Look4Sat). The upstream project provides the original Android satellite-tracking foundation, orbital prediction, and core application architecture.
+
+Thanks to the maintainers and contributors of CelesTrak, SatNOGS, AMSAT, GridMaster, LoTW, Wavelog, and the open-source libraries used by this application.
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party notices and attributions.
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE).
