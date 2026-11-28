@@ -46,6 +46,7 @@ internal fun gridLabelScale(zoom: Double): Float {
  * - marked (but unworked) grids always show GridMaster's latest activator, never
  *   the locally pinned target (which remains visible when Most Wanted is off);
  * - other unworked grids show latest calls only when the switch and range permit.
+ * - an active time-legend filter hides every out-of-range callsign, including worked and marked.
  */
 internal fun gridFirstCallLabel(
     grid: String,
@@ -55,8 +56,10 @@ internal fun gridFirstCallLabel(
     latestGridMasterCalls: Map<String, String> = emptyMap(),
     showRecentActiveCalls: Boolean = true,
     gridMasterActivityEnabled: Boolean = false,
-    unworkedInActivityRange: Boolean = true
+    unworkedInActivityRange: Boolean = true,
+    timeLegendFilterActive: Boolean = false
 ): String? = when {
+    gridMasterActivityEnabled && timeLegendFilterActive && !unworkedInActivityRange -> null
     grid in workedGrids -> {
         if (gridMasterActivityEnabled && showRecentActiveCalls) {
             latestGridMasterCalls[grid] ?: firstCallsByGrid[grid]
@@ -647,7 +650,9 @@ class MaidenheadGridOverlay : Overlay() {
                             latestGridMasterCalls = latestCallLabelsByGrid,
                             showRecentActiveCalls = showRecentActiveCalls,
                             gridMasterActivityEnabled = showActivityOverlay,
-                            unworkedInActivityRange = isInActivityRange
+                            unworkedInActivityRange = isInActivityRange,
+                            timeLegendFilterActive = showRecentActivityTime &&
+                                recentActivityMaxBand != RECENT_ACTIVITY_LAST_BAND
                         )
                     } else label
                     // Keep the text centred for both single- and double-line
