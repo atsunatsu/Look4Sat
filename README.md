@@ -34,11 +34,18 @@
 
 ## Screenshots
 
+Current BA7OPF Edition (v4.4.8-ba7opf.22.3).
+
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="24%" alt="Look4Sat screenshot 1" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="24%" alt="Look4Sat screenshot 2" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="24%" alt="Look4Sat screenshot 3" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="24%" alt="Look4Sat screenshot 4" />
+  <img src="docs/screenshots/grid-map.jpg" width="24%" alt="VUCC worked and marked grids" />
+  <img src="docs/screenshots/grid-activity.jpg" width="24%" alt="GridMaster activity time heatmap" />
+  <img src="docs/screenshots/grid-details.jpg" width="24%" alt="Grid details and recent active stations" />
+  <img src="docs/screenshots/passes.jpg" width="24%" alt="Upcoming satellite passes" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/radar-log.jpg" width="24%" alt="Polar radar and pass logging" />
+  <img src="docs/screenshots/logbook.jpg" width="24%" alt="Satellite QSO logbook" />
+  <img src="docs/screenshots/mutual-pass.jpg" width="24%" alt="Mutual pass prediction and both station tracks" />
 </p>
 
 ## Features
