@@ -61,7 +61,8 @@ internal data class GridActivityRecentOperator(
 internal data class GridActivityBulkLatestSnapshot(
     val operatorsByGrid: Map<String, GridActivityRecentOperator>,
     val downloadedAt: Long,
-    val fromCache: Boolean
+    val fromCache: Boolean,
+    val contentDownloadedAt: Long = downloadedAt
 )
 
 /** Latest GridMaster operators fetched for the currently visible 4-character grids. */
@@ -96,6 +97,8 @@ internal object GridActivityStore {
     private const val MAX_BYTES = 2_000_000
     private val requestBudgetMutex = Mutex()
     private val latestCallLoadMutex = Mutex()
+    private val percentagesLoadMutex = Mutex()
+    private val bulkLoadMutex = Mutex()
     // Kept in memory for the current process; the append-only journal persists each result cheaply.
     private val latestCallCaches = mutableMapOf<String, MutableMap<String, CachedGridActivityCall>>()
 
@@ -112,6 +115,14 @@ internal object GridActivityStore {
         context: Context,
         award: GridActivityAward = GridActivityAward.SATELLITE,
         forceRefresh: Boolean = false
+    ): GridActivitySnapshot? = percentagesLoadMutex.withLock {
+        loadPercentagesRaw(context, award, forceRefresh)
+    }
+
+    private suspend fun loadPercentagesRaw(
+        context: Context,
+        award: GridActivityAward,
+        forceRefresh: Boolean
     ): GridActivitySnapshot? = withContext(Dispatchers.IO) {
             // Keep the original Satellite cache filename for seamless v21.1 upgrades;
             // each additional award receives its own independent cache and timestamp.
@@ -141,6 +152,7 @@ internal object GridActivityStore {
                 val responseEtag: String?
                 val response = try {
                     if (connection.responseCode == HttpURLConnection.HTTP_NOT_MODIFIED && cached != null) {
+                        currentCoroutineContext().ensureActive()
                         file.setLastModified(System.currentTimeMillis())
                         return@withContext cached.copy(downloadedAt = file.lastModified())
                     }
@@ -162,6 +174,7 @@ internal object GridActivityStore {
                     connection.disconnect()
                 }
                 val parsed = parse(response, award.minimumGridCount)
+                currentCoroutineContext().ensureActive()
                 // Only a fully validated download replaces the previous good cache.
                 etagFile(file).delete()
                 val tmp = File(file.parentFile, file.name + ".tmp")
@@ -192,17 +205,20 @@ internal object GridActivityStore {
         award: GridActivityAward = GridActivityAward.SATELLITE,
         forceRefresh: Boolean = false
     ): GridActivityBulkLatestSnapshot? = withContext(Dispatchers.IO) {
-        val bulk = loadBulkLatestRaw(context, award, forceRefresh)
+        val bulk = bulkLoadMutex.withLock { loadBulkLatestRaw(context, award, forceRefresh) }
         latestCallLoadMutex.withLock {
             val details = loadDetailCache(context, award)
             val merged = bulk?.operatorsByGrid.orEmpty().toMutableMap()
             details.forEach { (grid, entry) ->
                 val detail = entry.operators.firstOrNull() ?: return@forEach
-                val winner = newerOperator(merged[grid], detail, entry.checkedAt >= (bulk?.downloadedAt ?: 0L))
+                val winner = newerOperator(merged[grid], detail, entry.checkedAt >= (bulk?.contentDownloadedAt ?: 0L))
                 if (winner != null) merged[grid] = winner
             }
             if (bulk == null && merged.isEmpty()) null
-            else GridActivityBulkLatestSnapshot(merged.toMap(), bulk?.downloadedAt ?: 0L, bulk?.fromCache ?: true)
+            else GridActivityBulkLatestSnapshot(
+                merged.toMap(), bulk?.downloadedAt ?: 0L, bulk?.fromCache ?: true,
+                bulk?.contentDownloadedAt ?: 0L
+            )
         }
     }
 
@@ -219,8 +235,9 @@ internal object GridActivityStore {
             if (file.isFile) {
                 GridActivityBulkLatestSnapshot(
                     parseBulkLatest(file.readText(), award.minimumGridCount),
-                    file.lastModified(),
-                    fromCache = true
+                    bulkCheckedAt(file),
+                    fromCache = true,
+                    contentDownloadedAt = file.lastModified()
                 )
             } else null
         } catch (_: Exception) {
@@ -245,8 +262,10 @@ internal object GridActivityStore {
             val responseEtag: String?
             val response = try {
                 if (connection.responseCode == HttpURLConnection.HTTP_NOT_MODIFIED && cached != null) {
-                    file.setLastModified(System.currentTimeMillis())
-                    return@withContext cached.copy(downloadedAt = file.lastModified())
+                    currentCoroutineContext().ensureActive()
+                    val checkedAt = System.currentTimeMillis()
+                    bulkCheckedFile(file).writeText(checkedAt.toString())
+                    return@withContext cached.copy(downloadedAt = checkedAt)
                 }
                 checkSuccessfulResponse(connection)
                 responseEtag = connection.getHeaderField("ETag")
@@ -265,6 +284,8 @@ internal object GridActivityStore {
                 connection.disconnect()
             }
             val parsed = parseBulkLatest(response, award.minimumGridCount)
+            currentCoroutineContext().ensureActive()
+            bulkCheckedFile(file).delete()
             etagFile(file).delete()
             val tmp = File(file.parentFile, file.name + ".tmp")
             tmp.writeText(response)
@@ -389,6 +410,19 @@ internal object GridActivityStore {
             preferDetailOnTie -> detail
             else -> bulk
         }
+    }
+
+    // A 304 validates freshness without replacing the payload. Preserve its original
+    // fetch time to prevent an unchanged bulk record from displacing a newer detail.
+    private fun bulkCheckedFile(file: File) = File(file.parentFile, file.name + ".checked")
+
+    private fun bulkCheckedAt(file: File): Long {
+        val checked = try {
+            bulkCheckedFile(file).takeIf { it.isFile }?.readText()?.trim()?.toLongOrNull()
+        } catch (_: IOException) {
+            null
+        }
+        return maxOf(file.lastModified(), checked ?: 0L)
     }
 
     private fun etagFile(file: File) = File(file.parentFile, file.name + ".etag")
