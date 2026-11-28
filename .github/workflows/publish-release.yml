@@ -389,15 +389,15 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v4.4.8-ba7opf.22.4
-          - Localize the radar log actions for generating QSO posts and uploading to LoTW/Wavelog in English, while retaining the existing Chinese fallback for Traditional Chinese locales.
-          - Keep the Logbook title centered on the original single-line header, with compact action buttons so the English title remains visible.
-          - Fix spacing in the GridMaster.fr data attribution.
+          ## v4.4.8-ba7opf.22.5
+          - Refresh GridMaster data daily at 10:00 UTC (18:00 Beijing time), and revalidate both aggregate endpoints on manual refresh.
+          - Synchronize recent callsigns and activity dates between grid details and the map, preserving newer records and offline data.
+          - Hide callsigns excluded by the activity-time legend filter, including worked and marked grids; keep independent personal grid fills unchanged.
 
-          ## v4.4.8-ba7opf.22.4
-          - 雷达日志页底部的生成通联记录、上传 LoTW/Wavelog 按钮增加英文文案，并沿用项目现有的中文资源回退规则。
-          - 日志本标题保持在操作按钮同一行居中显示，并缩紧按钮宽度，避免英文标题被截断。
-          - 修复 GridMaster.fr 数据来源说明中的空格显示。
+          ## v4.4.8-ba7opf.22.5
+          - GridMaster 自动刷新时间改为北京时间 18:00（UTC 10:00），手动更新同时检查两个批量接口。
+          - 同步网格详情与地图的最近活跃呼号和日期，保留较新记录及离线缓存。
+          - 修复活跃时间图例筛选后仍显示被排除网格呼号的问题，保留独立的已通联和已标记网格填色。
           RELEASE_NOTES
           )"
           fi
