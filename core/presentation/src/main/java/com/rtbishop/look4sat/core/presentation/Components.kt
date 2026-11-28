@@ -383,56 +383,95 @@ fun SharedDialog(
     onExtra: (() -> Unit)? = null,
     titleFontSize: Int = 16,
     titleTextAlign: TextAlign = if (onCancel != null && onAccept != null) TextAlign.Center else TextAlign.Start,
+    /** Place the title on its own row above action buttons when the header is crowded. */
+    titleAboveActions: Boolean = false,
     content: @Composable (padding: Dp) -> Unit
 ) {
     DialogShell(onDismissRequest = onDismissRequest) { padding ->
-        // Measured width of the optional second leading button. A spacer of the same width goes
-        // after the title so the two sides of the header stay balanced: without it the title
-        // would be centred in the room the extra button leaves over, i.e. off to the right.
-        var extraLeadingWidth by remember { mutableStateOf(0) }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = padding, top = padding, end = padding)
-        ) {
-            if (onCancel != null) {
-                CardButton(onClick = onCancel, text = cancelText ?: stringResource(R.string.btn_cancel))
-            }
-            if (onExtra != null) {
-                Spacer(modifier = Modifier.width(4.dp))
-                CardButton(
-                    onClick = onExtra,
-                    text = extraText.orEmpty(),
-                    modifier = Modifier.onSizeChanged { extraLeadingWidth = it.width }
-                )
-            }
-            Text(
-                text = title,
-                fontSize = titleFontSize.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = titleTextAlign,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        if (titleAboveActions) {
+            Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(
-                        start = if (onCancel != null) padding else 0.dp,
-                        end = if (onAccept != null) padding else 0.dp
-                    )
-            )
-            // Balances the extra leading button (and its 4 dp gap) on the trailing side.
-            if (onExtra != null && extraLeadingWidth > 0) {
-                val extraWidth = with(LocalDensity.current) { extraLeadingWidth.toDp() } + 4.dp
-                Spacer(modifier = Modifier.width(extraWidth))
-            }
-            if (onAccept != null) {
-                CardButton(
-                    onClick = onAccept,
-                    text = acceptText ?: stringResource(R.string.btn_accept),
-                    isEnabled = acceptEnabled
+                    .fillMaxWidth()
+                    .padding(start = padding, top = padding, end = padding),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = titleFontSize.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = titleTextAlign,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
                 )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    if (onCancel != null) {
+                        CardButton(onClick = onCancel, text = cancelText ?: stringResource(R.string.btn_cancel))
+                    }
+                    if (onExtra != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        CardButton(onClick = onExtra, text = extraText.orEmpty())
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (onAccept != null) {
+                        CardButton(
+                            onClick = onAccept,
+                            text = acceptText ?: stringResource(R.string.btn_accept),
+                            isEnabled = acceptEnabled
+                        )
+                    }
+                }
+            }
+        } else {
+            // Measured width of the optional second leading button. A spacer of the same width goes
+            // after the title so the two sides of the header stay balanced: without it the title
+            // would be centred in the room the extra button leaves over, i.e. off to the right.
+            var extraLeadingWidth by remember { mutableStateOf(0) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = padding, top = padding, end = padding)
+            ) {
+                if (onCancel != null) {
+                    CardButton(onClick = onCancel, text = cancelText ?: stringResource(R.string.btn_cancel))
+                }
+                if (onExtra != null) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    CardButton(
+                        onClick = onExtra,
+                        text = extraText.orEmpty(),
+                        modifier = Modifier.onSizeChanged { extraLeadingWidth = it.width }
+                    )
+                }
+                Text(
+                    text = title,
+                    fontSize = titleFontSize.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = titleTextAlign,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(
+                            start = if (onCancel != null) padding else 0.dp,
+                            end = if (onAccept != null) padding else 0.dp
+                        )
+                )
+                // Balances the extra leading button (and its 4 dp gap) on the trailing side.
+                if (onExtra != null && extraLeadingWidth > 0) {
+                    val extraWidth = with(LocalDensity.current) { extraLeadingWidth.toDp() } + 4.dp
+                    Spacer(modifier = Modifier.width(extraWidth))
+                }
+                if (onAccept != null) {
+                    CardButton(
+                        onClick = onAccept,
+                        text = acceptText ?: stringResource(R.string.btn_accept),
+                        isEnabled = acceptEnabled
+                    )
+                }
             }
         }
         content(padding)
