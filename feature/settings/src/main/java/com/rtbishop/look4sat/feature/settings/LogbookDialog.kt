@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -195,6 +196,9 @@ fun LogbookDialog(
     val onHeader = if (selectionMode) onExitSelection else ({ editTarget = newRecord() })
     SharedDialog(
         title = stringResource(R.string.prefs_logbook_title),
+        titleFontSize = 14,
+        titleTextAlign = TextAlign.Center,
+        compactHeaderActions = true,
         onDismissRequest = onDismiss,
         onCancel = onHeader,
         cancelText = if (selectionMode) {

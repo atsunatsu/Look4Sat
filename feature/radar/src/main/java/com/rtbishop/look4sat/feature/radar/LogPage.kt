@@ -212,12 +212,20 @@ fun LogPage(
                         onClick = { logViewModel.generatePost(satName, maxElev, passWindow) },
                         enabled = recent.isNotEmpty(),
                         modifier = Modifier.weight(1f)
-                    ) { Text("生成通联记录", fontSize = 13.sp) }
+                    ) { Text(stringResource(R.string.radar_log_generate_post), fontSize = 13.sp) }
                     OutlinedButton(
                         onClick = logViewModel::prepareUpload,
                         enabled = !logUiState.busy,
                         modifier = Modifier.weight(1f)
-                    ) { Text(if (logUiState.wavelogMode) "上传 Wavelog" else "上传 LoTW", fontSize = 13.sp) }
+                    ) {
+                        Text(
+                            stringResource(
+                                if (logUiState.wavelogMode) R.string.radar_log_upload_wavelog
+                                else R.string.radar_log_upload_lotw
+                            ),
+                            fontSize = 13.sp
+                        )
+                    }
                 }
                 if (logUiState.busy) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

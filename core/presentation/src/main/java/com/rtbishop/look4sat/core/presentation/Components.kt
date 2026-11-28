@@ -237,21 +237,51 @@ fun CardButton(
     onClick: () -> Unit,
     text: String,
     modifier: Modifier = Modifier,
-    isEnabled: Boolean = true
+    isEnabled: Boolean = true,
+    fontSize: TextUnit = 16.sp,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+    compact: Boolean = false
 ) {
-    ElevatedButton(
-        onClick = onClick,
-        enabled = isEnabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-        ),
-        shape = MaterialTheme.shapes.small,
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
-    ) { Text(text = text, fontSize = 16.sp, textAlign = TextAlign.Center) }
+    val containerColor = MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = if (isEnabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+    }
+    if (compact) {
+        // Unlike ElevatedButton, a clickable Surface has no 64 dp minimum width.
+        // This lets short dialog actions stay content-sized and gives the centered title room.
+        Surface(
+            onClick = onClick,
+            enabled = isEnabled,
+            shape = MaterialTheme.shapes.small,
+            color = containerColor,
+            contentColor = contentColor,
+            shadowElevation = 1.dp,
+            modifier = modifier
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.padding(contentPadding)
+            ) {
+                Text(text = text, fontSize = fontSize, textAlign = TextAlign.Center)
+            }
+        }
+    } else {
+        ElevatedButton(
+            onClick = onClick,
+            enabled = isEnabled,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = containerColor,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledContainerColor = containerColor,
+                disabledContentColor = contentColor
+            ),
+            shape = MaterialTheme.shapes.small,
+            modifier = modifier,
+            contentPadding = contentPadding
+        ) { Text(text = text, fontSize = fontSize, textAlign = TextAlign.Center) }
+    }
 }
 
 @Composable
@@ -383,12 +413,19 @@ fun SharedDialog(
     onExtra: (() -> Unit)? = null,
     titleFontSize: Int = 16,
     titleTextAlign: TextAlign = if (onCancel != null && onAccept != null) TextAlign.Center else TextAlign.Start,
+    /** Use compact action buttons while keeping the title centered in the original header row. */
+    compactHeaderActions: Boolean = false,
     content: @Composable (padding: Dp) -> Unit
 ) {
     DialogShell(onDismissRequest = onDismissRequest) { padding ->
-        // Measured width of the optional second leading button. A spacer of the same width goes
-        // after the title so the two sides of the header stay balanced: without it the title
-        // would be centred in the room the extra button leaves over, i.e. off to the right.
+        val actionFontSize = if (compactHeaderActions) 14.sp else 16.sp
+        val actionPadding = if (compactHeaderActions) {
+            PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+        } else {
+            PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+        }
+        // Keep the original single-row layout. Compact actions leave enough room for the
+        // centered title to remain fully visible in English as well as Chinese.
         var extraLeadingWidth by remember { mutableStateOf(0) }
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -397,14 +434,23 @@ fun SharedDialog(
                 .padding(start = padding, top = padding, end = padding)
         ) {
             if (onCancel != null) {
-                CardButton(onClick = onCancel, text = cancelText ?: stringResource(R.string.btn_cancel))
+                CardButton(
+                    onClick = onCancel,
+                    text = cancelText ?: stringResource(R.string.btn_cancel),
+                    fontSize = actionFontSize,
+                    contentPadding = actionPadding,
+                    compact = compactHeaderActions
+                )
             }
             if (onExtra != null) {
                 Spacer(modifier = Modifier.width(4.dp))
                 CardButton(
                     onClick = onExtra,
                     text = extraText.orEmpty(),
-                    modifier = Modifier.onSizeChanged { extraLeadingWidth = it.width }
+                    modifier = Modifier.onSizeChanged { extraLeadingWidth = it.width },
+                    fontSize = actionFontSize,
+                    contentPadding = actionPadding,
+                    compact = compactHeaderActions
                 )
             }
             Text(
@@ -422,7 +468,7 @@ fun SharedDialog(
                         end = if (onAccept != null) padding else 0.dp
                     )
             )
-            // Balances the extra leading button (and its 4 dp gap) on the trailing side.
+            // Balance the second leading action so the title stays centered between the sides.
             if (onExtra != null && extraLeadingWidth > 0) {
                 val extraWidth = with(LocalDensity.current) { extraLeadingWidth.toDp() } + 4.dp
                 Spacer(modifier = Modifier.width(extraWidth))
@@ -431,14 +477,16 @@ fun SharedDialog(
                 CardButton(
                     onClick = onAccept,
                     text = acceptText ?: stringResource(R.string.btn_accept),
-                    isEnabled = acceptEnabled
+                    isEnabled = acceptEnabled,
+                    fontSize = actionFontSize,
+                    contentPadding = actionPadding,
+                    compact = compactHeaderActions
                 )
             }
         }
         content(padding)
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DialogShell(
