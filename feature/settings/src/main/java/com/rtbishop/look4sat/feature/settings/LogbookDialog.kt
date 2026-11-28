@@ -196,8 +196,8 @@ fun LogbookDialog(
     SharedDialog(
         title = stringResource(R.string.prefs_logbook_title),
         titleFontSize = 14,
-        titleTextAlign = TextAlign.Start,
-        compactInlineHeader = true,
+        titleTextAlign = TextAlign.Center,
+        compactHeaderActions = true,
         onDismissRequest = onDismiss,
         onCancel = onHeader,
         cancelText = if (selectionMode) {
