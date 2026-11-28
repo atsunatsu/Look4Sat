@@ -629,7 +629,12 @@ class MaidenheadGridOverlay : Overlay() {
                         recentActivityBands[label]?.let {
                             isRecentActivityBandVisible(it, recentActivityMaxBand)
                         } == true
-                    } else percent != null
+                    } else percent != null ||
+                        (showActivityOverlay && activityFilterMin == 0 && activityFilterMax == 100 &&
+                            label !in activityPercentages && label in latestCallLabelsByGrid)
+                    // A newly activated grid may reach the detail/bulk endpoint before
+                    // the percentage snapshot. Show its call with the unrestricted
+                    // filter, but never invent a percentage or bypass a restricted filter.
                     val mainLabel = if (showFirstCallLabels) {
                         // Worked grids show latest or local first-QSO depending on the
                         // settings toggle. Marked grids use latest activators in
