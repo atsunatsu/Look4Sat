@@ -237,7 +237,9 @@ fun CardButton(
     onClick: () -> Unit,
     text: String,
     modifier: Modifier = Modifier,
-    isEnabled: Boolean = true
+    isEnabled: Boolean = true,
+    fontSize: TextUnit = 16.sp,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
 ) {
     ElevatedButton(
         onClick = onClick,
@@ -250,8 +252,8 @@ fun CardButton(
         ),
         shape = MaterialTheme.shapes.small,
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
-    ) { Text(text = text, fontSize = 16.sp, textAlign = TextAlign.Center) }
+        contentPadding = contentPadding
+    ) { Text(text = text, fontSize = fontSize, textAlign = TextAlign.Center) }
 }
 
 @Composable
@@ -383,44 +385,55 @@ fun SharedDialog(
     onExtra: (() -> Unit)? = null,
     titleFontSize: Int = 16,
     titleTextAlign: TextAlign = if (onCancel != null && onAccept != null) TextAlign.Center else TextAlign.Start,
-    /** Place the title on its own row above action buttons when the header is crowded. */
-    titleAboveActions: Boolean = false,
+    /** Keep the title and compact action buttons on one line for narrow headers. */
+    compactInlineHeader: Boolean = false,
     content: @Composable (padding: Dp) -> Unit
 ) {
     DialogShell(onDismissRequest = onDismissRequest) { padding ->
-        if (titleAboveActions) {
-            Column(
+        if (compactInlineHeader) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = padding, top = padding, end = padding),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .padding(start = padding, top = padding, end = padding)
             ) {
                 Text(
                     text = title,
                     fontSize = titleFontSize.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary,
-                    textAlign = titleTextAlign,
+                    textAlign = TextAlign.Start,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.weight(1f).padding(end = 4.dp)
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    if (onCancel != null) {
-                        CardButton(onClick = onCancel, text = cancelText ?: stringResource(R.string.btn_cancel))
-                    }
-                    if (onExtra != null) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        CardButton(onClick = onExtra, text = extraText.orEmpty())
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    if (onAccept != null) {
-                        CardButton(
-                            onClick = onAccept,
-                            text = acceptText ?: stringResource(R.string.btn_accept),
-                            isEnabled = acceptEnabled
-                        )
-                    }
+                val compactPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                if (onCancel != null) {
+                    CardButton(
+                        onClick = onCancel,
+                        text = cancelText ?: stringResource(R.string.btn_cancel),
+                        fontSize = 12.sp,
+                        contentPadding = compactPadding
+                    )
+                }
+                if (onExtra != null) {
+                    Spacer(modifier = Modifier.width(2.dp))
+                    CardButton(
+                        onClick = onExtra,
+                        text = extraText.orEmpty(),
+                        fontSize = 12.sp,
+                        contentPadding = compactPadding
+                    )
+                }
+                if (onAccept != null) {
+                    Spacer(modifier = Modifier.width(2.dp))
+                    CardButton(
+                        onClick = onAccept,
+                        text = acceptText ?: stringResource(R.string.btn_accept),
+                        isEnabled = acceptEnabled,
+                        fontSize = 12.sp,
+                        contentPadding = compactPadding
+                    )
                 }
             }
         } else {
@@ -476,7 +489,6 @@ fun SharedDialog(
         }
         content(padding)
     }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
