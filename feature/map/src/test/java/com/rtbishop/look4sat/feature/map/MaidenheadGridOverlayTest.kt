@@ -121,6 +121,47 @@ class MaidenheadGridOverlayTest {
     }
 
     @Test
+    fun timeLegendFilterHidesOutOfRangeCallsignsForAllGridTypes() {
+        val bulk = mapOf("OL62" to "DF2ET", "OL63" to "DL1EGL", "OL61" to "BH6RJD")
+        val worked = setOf("OL62")
+        val first = mapOf("OL62" to "BA7OPF")
+        val mark = com.rtbishop.look4sat.core.domain.model.MarkedStation("LOCAL", 1L)
+        val marked = mapOf("OL63" to listOf(mark))
+        for (recent in listOf(true, false)) {
+            for (grid in bulk.keys) {
+                assertEquals(null, gridFirstCallLabel(
+                    grid, worked, first, marked, bulk,
+                    showRecentActiveCalls = recent, gridMasterActivityEnabled = true,
+                    unworkedInActivityRange = false, timeLegendFilterActive = true
+                ))
+            }
+        }
+        for ((grid, call) in bulk) {
+            assertEquals(call, gridFirstCallLabel(
+                grid, worked, first, marked, bulk,
+                gridMasterActivityEnabled = true,
+                unworkedInActivityRange = true, timeLegendFilterActive = true
+            ))
+        }
+        assertEquals("BA7OPF", gridFirstCallLabel(
+            "OL62", worked, first, marked, bulk,
+            showRecentActiveCalls = false, gridMasterActivityEnabled = true,
+            unworkedInActivityRange = true, timeLegendFilterActive = true
+        ))
+        // Disabling the heatmap or clearing the legend restores local behavior.
+        assertEquals("BA7OPF", gridFirstCallLabel(
+            "OL62", worked, first, marked, bulk,
+            gridMasterActivityEnabled = false,
+            unworkedInActivityRange = false, timeLegendFilterActive = true
+        ))
+        assertEquals("DF2ET", gridFirstCallLabel(
+            "OL62", worked, first, marked, bulk,
+            gridMasterActivityEnabled = true,
+            unworkedInActivityRange = false, timeLegendFilterActive = false
+        ))
+    }
+
+    @Test
     fun unavailableBulkDataKeepsLocalWorkedCallButNeverShowsMarkedTargetInActivityMode() {
         val mark = com.rtbishop.look4sat.core.domain.model.MarkedStation("LOCAL", 1L)
         assertEquals("BA7OPF", gridFirstCallLabel(

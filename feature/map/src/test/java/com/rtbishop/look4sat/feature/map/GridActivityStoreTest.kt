@@ -99,14 +99,33 @@ class GridActivityStoreTest {
     }
 
     @Test
-    fun gridMasterCacheExpiresAtUtcMidnight() {
-        val utcMidnight = 20_000L * GridActivityStore.MILLIS_PER_UTC_DAY
+    fun gridMasterCacheExpiresAtTenUtcNotMidnight() {
+        val midnight = 20_000L * GridActivityStore.MILLIS_PER_UTC_DAY
+        val refresh = midnight + GridActivityStore.REFRESH_OFFSET_MS
+        assertEquals(10L * 60 * 60 * 1000, GridActivityStore.REFRESH_OFFSET_MS)
+        assertTrue(GridActivityStore.isCacheFreshForRefreshCycle(midnight - 1L, midnight))
+        assertTrue(GridActivityStore.isCacheFreshForRefreshCycle(refresh - 1_000L, refresh - 1L))
+        assertFalse(GridActivityStore.isCacheFreshForRefreshCycle(refresh - 1_000L, refresh))
+        assertTrue(GridActivityStore.isCacheFreshForRefreshCycle(refresh, refresh + 1L))
+        assertFalse(GridActivityStore.isCacheFreshForRefreshCycle(refresh + 1L, refresh))
+        assertFalse(GridActivityStore.isCacheFreshForRefreshCycle(0L, refresh))
+        assertEquals(refresh, GridActivityStore.nextRefreshAt(midnight))
+        assertEquals(refresh, GridActivityStore.nextRefreshAt(refresh - 1L))
+        assertEquals(refresh + GridActivityStore.MILLIS_PER_UTC_DAY, GridActivityStore.nextRefreshAt(refresh))
+    }
 
-        assertTrue(GridActivityStore.isCacheFreshForUtcDay(utcMidnight - 1_000L, utcMidnight - 1L))
-        assertFalse(GridActivityStore.isCacheFreshForUtcDay(utcMidnight - 1_000L, utcMidnight))
-        assertTrue(GridActivityStore.isCacheFreshForUtcDay(utcMidnight, utcMidnight + 1L))
-        assertFalse(GridActivityStore.isCacheFreshForUtcDay(utcMidnight + 1L, utcMidnight))
-        assertFalse(GridActivityStore.isCacheFreshForUtcDay(0L, utcMidnight))
+    @Test
+    fun detailCanPopulateMissingGridAndReplaceOlderBulkDataButCannotRegressDate() {
+        val old = GridActivityRecentOperator("OLD", "2026-11-20")
+        val fresh = GridActivityRecentOperator("NEW", "2026-11-28")
+        val sameDay = GridActivityRecentOperator("OTHER", "2026-11-28")
+        assertEquals(fresh, GridActivityStore.newerOperator(null, fresh, false))
+        assertEquals(fresh, GridActivityStore.newerOperator(old, fresh, false))
+        assertEquals(fresh, GridActivityStore.newerOperator(fresh, old, true))
+        assertEquals(fresh, GridActivityStore.newerOperator(fresh, null, true))
+        assertEquals(fresh, GridActivityStore.newerOperator(fresh, GridActivityRecentOperator("UNKNOWN", null), true))
+        assertEquals(sameDay, GridActivityStore.newerOperator(fresh, sameDay, true))
+        assertEquals(fresh, GridActivityStore.newerOperator(fresh, sameDay, false))
     }
 
     @Test

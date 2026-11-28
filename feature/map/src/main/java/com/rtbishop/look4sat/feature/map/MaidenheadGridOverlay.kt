@@ -46,6 +46,7 @@ internal fun gridLabelScale(zoom: Double): Float {
  * - marked (but unworked) grids always show GridMaster's latest activator, never
  *   the locally pinned target (which remains visible when Most Wanted is off);
  * - other unworked grids show latest calls only when the switch and range permit.
+ * - an active time-legend filter hides every out-of-range callsign, including worked and marked.
  */
 internal fun gridFirstCallLabel(
     grid: String,
@@ -55,8 +56,10 @@ internal fun gridFirstCallLabel(
     latestGridMasterCalls: Map<String, String> = emptyMap(),
     showRecentActiveCalls: Boolean = true,
     gridMasterActivityEnabled: Boolean = false,
-    unworkedInActivityRange: Boolean = true
+    unworkedInActivityRange: Boolean = true,
+    timeLegendFilterActive: Boolean = false
 ): String? = when {
+    gridMasterActivityEnabled && timeLegendFilterActive && !unworkedInActivityRange -> null
     grid in workedGrids -> {
         if (gridMasterActivityEnabled && showRecentActiveCalls) {
             latestGridMasterCalls[grid] ?: firstCallsByGrid[grid]
@@ -629,7 +632,12 @@ class MaidenheadGridOverlay : Overlay() {
                         recentActivityBands[label]?.let {
                             isRecentActivityBandVisible(it, recentActivityMaxBand)
                         } == true
-                    } else percent != null
+                    } else percent != null ||
+                        (showActivityOverlay && activityFilterMin == 0 && activityFilterMax == 100 &&
+                            label !in activityPercentages && label in latestCallLabelsByGrid)
+                    // A newly activated grid may reach the detail/bulk endpoint before
+                    // the percentage snapshot. Show its call with the unrestricted
+                    // filter, but never invent a percentage or bypass a restricted filter.
                     val mainLabel = if (showFirstCallLabels) {
                         // Worked grids show latest or local first-QSO depending on the
                         // settings toggle. Marked grids use latest activators in
@@ -642,7 +650,9 @@ class MaidenheadGridOverlay : Overlay() {
                             latestGridMasterCalls = latestCallLabelsByGrid,
                             showRecentActiveCalls = showRecentActiveCalls,
                             gridMasterActivityEnabled = showActivityOverlay,
-                            unworkedInActivityRange = isInActivityRange
+                            unworkedInActivityRange = isInActivityRange,
+                            timeLegendFilterActive = showRecentActivityTime &&
+                                recentActivityMaxBand != RECENT_ACTIVITY_LAST_BAND
                         )
                     } else label
                     // Keep the text centred for both single- and double-line
