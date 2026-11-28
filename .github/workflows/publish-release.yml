@@ -389,15 +389,15 @@ jobs:
           NOTES="$NOTES_IN"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             NOTES="$(cat <<'RELEASE_NOTES'
-          ## v4.4.8-ba7opf.22.3
-          - In All operated-station mode, show the union of marked grids from every station location.
-          - Globally worked green grids take priority over red marks in All. Marks remain saved for their specific station locations and reappear when those locations are selected.
-          - Add regression tests for All aggregation, green-over-red precedence, and station-specific mark preservation.
+          ## v4.4.8-ba7opf.22.4
+          - Localize the radar log actions for generating QSO posts and uploading to LoTW/Wavelog in English, Simplified Chinese, and Traditional Chinese.
+          - Keep the Logbook title centered on the original single-line header, with compact action buttons so the English title remains visible.
+          - Fix spacing in the GridMaster.fr data attribution.
 
-          ## v4.4.8-ba7opf.22.3
-          - 在 All 台址选择下，汇总显示所有台址标记过的网格。
-          - All 模式下已通联的绿色网格优先于红色标记；其他台址的标记不会被删除，切换回单独台址仍可查看。
-          - 增加 All 汇总、绿色优先及单独台址标记保留的回归测试。
+          ## v4.4.8-ba7opf.22.4
+          - 雷达日志页底部的生成通联记录、上传 LoTW/Wavelog 按钮支持英文、简体中文和繁体中文。
+          - 日志本标题保持在操作按钮同一行居中显示，并缩紧按钮宽度，避免英文标题被截断。
+          - 修复 GridMaster.fr 数据来源说明中的空格显示。
           RELEASE_NOTES
           )"
           fi
