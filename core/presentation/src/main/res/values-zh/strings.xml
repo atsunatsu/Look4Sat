@@ -125,6 +125,9 @@
     <string name="radar_cw_start">开始</string>
     <string name="radar_cw_stop">停止</string>
     <string name="radar_cw_reset">清空</string>
+    <string name="radar_log_generate_post">生成通联记录</string>
+    <string name="radar_log_upload_wavelog">上传 Wavelog</string>
+    <string name="radar_log_upload_lotw">上传 LoTW</string>
 
     <!-- Map screen -->
     <string name="map_prev">上一个</string>
