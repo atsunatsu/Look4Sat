@@ -239,21 +239,49 @@ fun CardButton(
     modifier: Modifier = Modifier,
     isEnabled: Boolean = true,
     fontSize: TextUnit = 16.sp,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+    contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+    compact: Boolean = false
 ) {
-    ElevatedButton(
-        onClick = onClick,
-        enabled = isEnabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-        ),
-        shape = MaterialTheme.shapes.small,
-        modifier = modifier,
-        contentPadding = contentPadding
-    ) { Text(text = text, fontSize = fontSize, textAlign = TextAlign.Center) }
+    val containerColor = MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = if (isEnabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+    }
+    if (compact) {
+        // Unlike ElevatedButton, a clickable Surface has no 64 dp minimum width.
+        // This lets short dialog actions stay content-sized and gives the centered title room.
+        Surface(
+            onClick = onClick,
+            enabled = isEnabled,
+            shape = MaterialTheme.shapes.small,
+            color = containerColor,
+            contentColor = contentColor,
+            shadowElevation = 1.dp,
+            modifier = modifier
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.padding(contentPadding)
+            ) {
+                Text(text = text, fontSize = fontSize, textAlign = TextAlign.Center)
+            }
+        }
+    } else {
+        ElevatedButton(
+            onClick = onClick,
+            enabled = isEnabled,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = containerColor,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledContainerColor = containerColor,
+                disabledContentColor = contentColor
+            ),
+            shape = MaterialTheme.shapes.small,
+            modifier = modifier,
+            contentPadding = contentPadding
+        ) { Text(text = text, fontSize = fontSize, textAlign = TextAlign.Center) }
+    }
 }
 
 @Composable
@@ -390,9 +418,9 @@ fun SharedDialog(
     content: @Composable (padding: Dp) -> Unit
 ) {
     DialogShell(onDismissRequest = onDismissRequest) { padding ->
-        val actionFontSize = if (compactHeaderActions) 13.sp else 16.sp
+        val actionFontSize = if (compactHeaderActions) 14.sp else 16.sp
         val actionPadding = if (compactHeaderActions) {
-            PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+            PaddingValues(horizontal = 6.dp, vertical = 6.dp)
         } else {
             PaddingValues(horizontal = 8.dp, vertical = 8.dp)
         }
@@ -410,7 +438,8 @@ fun SharedDialog(
                     onClick = onCancel,
                     text = cancelText ?: stringResource(R.string.btn_cancel),
                     fontSize = actionFontSize,
-                    contentPadding = actionPadding
+                    contentPadding = actionPadding,
+                    compact = compactHeaderActions
                 )
             }
             if (onExtra != null) {
@@ -420,7 +449,8 @@ fun SharedDialog(
                     text = extraText.orEmpty(),
                     modifier = Modifier.onSizeChanged { extraLeadingWidth = it.width },
                     fontSize = actionFontSize,
-                    contentPadding = actionPadding
+                    contentPadding = actionPadding,
+                    compact = compactHeaderActions
                 )
             }
             Text(
@@ -449,7 +479,8 @@ fun SharedDialog(
                     text = acceptText ?: stringResource(R.string.btn_accept),
                     isEnabled = acceptEnabled,
                     fontSize = actionFontSize,
-                    contentPadding = actionPadding
+                    contentPadding = actionPadding,
+                    compact = compactHeaderActions
                 )
             }
         }
