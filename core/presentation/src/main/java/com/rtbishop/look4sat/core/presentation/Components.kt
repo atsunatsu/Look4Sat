@@ -385,111 +385,77 @@ fun SharedDialog(
     onExtra: (() -> Unit)? = null,
     titleFontSize: Int = 16,
     titleTextAlign: TextAlign = if (onCancel != null && onAccept != null) TextAlign.Center else TextAlign.Start,
-    /** Keep the title and compact action buttons on one line for narrow headers. */
-    compactInlineHeader: Boolean = false,
+    /** Use compact action buttons while keeping the title centered in the original header row. */
+    compactHeaderActions: Boolean = false,
     content: @Composable (padding: Dp) -> Unit
 ) {
     DialogShell(onDismissRequest = onDismissRequest) { padding ->
-        if (compactInlineHeader) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = padding, top = padding, end = padding)
-            ) {
-                Text(
-                    text = title,
-                    fontSize = titleFontSize.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary,
-                    textAlign = TextAlign.Start,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(end = 4.dp)
-                )
-                val compactPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
-                if (onCancel != null) {
-                    CardButton(
-                        onClick = onCancel,
-                        text = cancelText ?: stringResource(R.string.btn_cancel),
-                        fontSize = 12.sp,
-                        contentPadding = compactPadding
-                    )
-                }
-                if (onExtra != null) {
-                    Spacer(modifier = Modifier.width(2.dp))
-                    CardButton(
-                        onClick = onExtra,
-                        text = extraText.orEmpty(),
-                        fontSize = 12.sp,
-                        contentPadding = compactPadding
-                    )
-                }
-                if (onAccept != null) {
-                    Spacer(modifier = Modifier.width(2.dp))
-                    CardButton(
-                        onClick = onAccept,
-                        text = acceptText ?: stringResource(R.string.btn_accept),
-                        isEnabled = acceptEnabled,
-                        fontSize = 12.sp,
-                        contentPadding = compactPadding
-                    )
-                }
-            }
+        val actionFontSize = if (compactHeaderActions) 13.sp else 16.sp
+        val actionPadding = if (compactHeaderActions) {
+            PaddingValues(horizontal = 4.dp, vertical = 6.dp)
         } else {
-            // Measured width of the optional second leading button. A spacer of the same width goes
-            // after the title so the two sides of the header stay balanced: without it the title
-            // would be centred in the room the extra button leaves over, i.e. off to the right.
-            var extraLeadingWidth by remember { mutableStateOf(0) }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = padding, top = padding, end = padding)
-            ) {
-                if (onCancel != null) {
-                    CardButton(onClick = onCancel, text = cancelText ?: stringResource(R.string.btn_cancel))
-                }
-                if (onExtra != null) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    CardButton(
-                        onClick = onExtra,
-                        text = extraText.orEmpty(),
-                        modifier = Modifier.onSizeChanged { extraLeadingWidth = it.width }
-                    )
-                }
-                Text(
-                    text = title,
-                    fontSize = titleFontSize.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary,
-                    textAlign = titleTextAlign,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(
-                            start = if (onCancel != null) padding else 0.dp,
-                            end = if (onAccept != null) padding else 0.dp
-                        )
+            PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+        }
+        // Keep the original single-row layout. Compact actions leave enough room for the
+        // centered title to remain fully visible in English as well as Chinese.
+        var extraLeadingWidth by remember { mutableStateOf(0) }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = padding, top = padding, end = padding)
+        ) {
+            if (onCancel != null) {
+                CardButton(
+                    onClick = onCancel,
+                    text = cancelText ?: stringResource(R.string.btn_cancel),
+                    fontSize = actionFontSize,
+                    contentPadding = actionPadding
                 )
-                // Balances the extra leading button (and its 4 dp gap) on the trailing side.
-                if (onExtra != null && extraLeadingWidth > 0) {
-                    val extraWidth = with(LocalDensity.current) { extraLeadingWidth.toDp() } + 4.dp
-                    Spacer(modifier = Modifier.width(extraWidth))
-                }
-                if (onAccept != null) {
-                    CardButton(
-                        onClick = onAccept,
-                        text = acceptText ?: stringResource(R.string.btn_accept),
-                        isEnabled = acceptEnabled
+            }
+            if (onExtra != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                CardButton(
+                    onClick = onExtra,
+                    text = extraText.orEmpty(),
+                    modifier = Modifier.onSizeChanged { extraLeadingWidth = it.width },
+                    fontSize = actionFontSize,
+                    contentPadding = actionPadding
+                )
+            }
+            Text(
+                text = title,
+                fontSize = titleFontSize.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = titleTextAlign,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(
+                        start = if (onCancel != null) padding else 0.dp,
+                        end = if (onAccept != null) padding else 0.dp
                     )
-                }
+            )
+            // Balance the second leading action so the title stays centered between the sides.
+            if (onExtra != null && extraLeadingWidth > 0) {
+                val extraWidth = with(LocalDensity.current) { extraLeadingWidth.toDp() } + 4.dp
+                Spacer(modifier = Modifier.width(extraWidth))
+            }
+            if (onAccept != null) {
+                CardButton(
+                    onClick = onAccept,
+                    text = acceptText ?: stringResource(R.string.btn_accept),
+                    isEnabled = acceptEnabled,
+                    fontSize = actionFontSize,
+                    contentPadding = actionPadding
+                )
             }
         }
         content(padding)
     }
-
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DialogShell(
