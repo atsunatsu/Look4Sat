@@ -195,6 +195,7 @@ fun LogbookDialog(
     val onHeader = if (selectionMode) onExitSelection else ({ editTarget = newRecord() })
     SharedDialog(
         title = stringResource(R.string.prefs_logbook_title),
+        titleAboveActions = true,
         onDismissRequest = onDismiss,
         onCancel = onHeader,
         cancelText = if (selectionMode) {
