@@ -69,12 +69,13 @@ internal data class GridActivityLatestCallSnapshot(
     val callsByGrid: Map<String, String>,
     val operatorsByGrid: Map<String, List<GridActivityRecentOperator>>,
     val checkedGrids: Set<String>,
-    val shouldPauseQueue: Boolean = false
+    val shouldPauseQueue: Boolean = false,
+    val checkedAt: Long = 0L
 )
 
 /**
  * Public, aggregate GridMaster satellite data; no callsigns or local QSOs are uploaded.
- * Refresh the aggregate and per-grid snapshots once per UTC calendar day. Retain the last
+ * Refresh aggregate and per-grid snapshots once per daily 10:00 UTC cycle. Retain the last
  * successfully validated responses so the overlay continues to work offline.
  */
 internal object GridActivityStore {
@@ -87,6 +88,7 @@ internal object GridActivityStore {
         "$BULK_LATEST_ENDPOINT?award=${award.apiCode}"
 
     internal const val MILLIS_PER_UTC_DAY = 24L * 60 * 60 * 1000
+    internal const val REFRESH_OFFSET_MS = 10L * 60 * 60 * 1000
     internal const val REQUEST_REFILL_INTERVAL_MS = 36_000L
     internal const val REQUEST_BUDGET_CAPACITY = 80.0
     private const val REQUEST_BUDGET_FILE = "gridmaster_request_budget.json"
@@ -108,7 +110,8 @@ internal object GridActivityStore {
 
     suspend fun load(
         context: Context,
-        award: GridActivityAward = GridActivityAward.SATELLITE
+        award: GridActivityAward = GridActivityAward.SATELLITE,
+        forceRefresh: Boolean = false
     ): GridActivitySnapshot? = withContext(Dispatchers.IO) {
             // Keep the original Satellite cache filename for seamless v21.1 upgrades;
             // each additional award receives its own independent cache and timestamp.
@@ -121,7 +124,7 @@ internal object GridActivityStore {
                 null
             }
             val now = System.currentTimeMillis()
-            if (cached != null && isCacheFreshForUtcDay(cached.downloadedAt, now)) {
+            if (!forceRefresh && cached != null && isCacheFreshForRefreshCycle(cached.downloadedAt, now)) {
                 return@withContext cached
             }
             try {
@@ -133,9 +136,16 @@ internal object GridActivityStore {
                     instanceFollowRedirects = true
                     setRequestProperty("Accept", "application/json")
                     setRequestProperty("User-Agent", "Look4Sat/1.0 (satellite grid activity)")
+                    configureAggregateRequest(this, file, cached != null)
                 }
+                val responseEtag: String?
                 val response = try {
+                    if (connection.responseCode == HttpURLConnection.HTTP_NOT_MODIFIED && cached != null) {
+                        file.setLastModified(System.currentTimeMillis())
+                        return@withContext cached.copy(downloadedAt = file.lastModified())
+                    }
                     checkSuccessfulResponse(connection)
+                    responseEtag = connection.getHeaderField("ETag")
                     connection.inputStream.use { stream ->
                         // Reject oversized/untrusted responses before parsing or overwriting cache.
                         val bytes = ByteArray(MAX_BYTES + 1)
@@ -153,12 +163,14 @@ internal object GridActivityStore {
                 }
                 val parsed = parse(response, award.minimumGridCount)
                 // Only a fully validated download replaces the previous good cache.
+                etagFile(file).delete()
                 val tmp = File(file.parentFile, file.name + ".tmp")
                 tmp.writeText(response)
                 if (!tmp.renameTo(file)) {
                     file.writeText(response)
                     tmp.delete()
                 }
+                saveEtag(file, responseEtag)
                 GridActivitySnapshot(parsed, file.lastModified(), fromCache = false)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -177,7 +189,27 @@ internal object GridActivityStore {
      */
     suspend fun loadBulkLatest(
         context: Context,
-        award: GridActivityAward = GridActivityAward.SATELLITE
+        award: GridActivityAward = GridActivityAward.SATELLITE,
+        forceRefresh: Boolean = false
+    ): GridActivityBulkLatestSnapshot? = withContext(Dispatchers.IO) {
+        val bulk = loadBulkLatestRaw(context, award, forceRefresh)
+        latestCallLoadMutex.withLock {
+            val details = loadDetailCache(context, award)
+            val merged = bulk?.operatorsByGrid.orEmpty().toMutableMap()
+            details.forEach { (grid, entry) ->
+                val detail = entry.operators.firstOrNull() ?: return@forEach
+                val winner = newerOperator(merged[grid], detail, entry.checkedAt >= (bulk?.downloadedAt ?: 0L))
+                if (winner != null) merged[grid] = winner
+            }
+            if (bulk == null && merged.isEmpty()) null
+            else GridActivityBulkLatestSnapshot(merged.toMap(), bulk?.downloadedAt ?: 0L, bulk?.fromCache ?: true)
+        }
+    }
+
+    private suspend fun loadBulkLatestRaw(
+        context: Context,
+        award: GridActivityAward,
+        forceRefresh: Boolean
     ): GridActivityBulkLatestSnapshot? = withContext(Dispatchers.IO) {
         val file = File(
             context.applicationContext.filesDir,
@@ -195,7 +227,7 @@ internal object GridActivityStore {
             null
         }
         val now = System.currentTimeMillis()
-        if (cached != null && isCacheFreshForUtcDay(cached.downloadedAt, now)) {
+        if (!forceRefresh && cached != null && isCacheFreshForRefreshCycle(cached.downloadedAt, now)) {
             return@withContext cached
         }
         try {
@@ -208,9 +240,16 @@ internal object GridActivityStore {
                     instanceFollowRedirects = true
                     setRequestProperty("Accept", "application/json")
                     setRequestProperty("User-Agent", "Look4Sat/1.0 (satellite grid activity)")
+                    configureAggregateRequest(this, file, cached != null)
                 }
+            val responseEtag: String?
             val response = try {
+                if (connection.responseCode == HttpURLConnection.HTTP_NOT_MODIFIED && cached != null) {
+                    file.setLastModified(System.currentTimeMillis())
+                    return@withContext cached.copy(downloadedAt = file.lastModified())
+                }
                 checkSuccessfulResponse(connection)
+                responseEtag = connection.getHeaderField("ETag")
                 connection.inputStream.use { stream ->
                     val bytes = ByteArray(MAX_BYTES + 1)
                     var count = 0
@@ -226,12 +265,14 @@ internal object GridActivityStore {
                 connection.disconnect()
             }
             val parsed = parseBulkLatest(response, award.minimumGridCount)
+            etagFile(file).delete()
             val tmp = File(file.parentFile, file.name + ".tmp")
             tmp.writeText(response)
             if (!tmp.renameTo(file)) {
                 file.writeText(response)
                 tmp.delete()
             }
+            saveEtag(file, responseEtag)
             GridActivityBulkLatestSnapshot(parsed, file.lastModified(), fromCache = false)
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -251,12 +292,13 @@ internal object GridActivityStore {
 
     /**
      * Fetch one grid at a time for the selected grid's detail dialog and optional labels on
-     * worked grids. The cache is shared by both and refreshed once per UTC day.
+     * worked grids. The cache is shared by both and refreshed once per 10:00 UTC cycle.
      */
     suspend fun loadLatestCall(
         context: Context,
         grid: String,
-        award: GridActivityAward = GridActivityAward.SATELLITE
+        award: GridActivityAward = GridActivityAward.SATELLITE,
+        forceRefresh: Boolean = false
     ): GridActivityLatestCallSnapshot = withContext(Dispatchers.IO) {
         val normalized = normalizeGrid(grid)
             ?: return@withContext GridActivityLatestCallSnapshot(emptyMap(), emptyMap(), emptySet())
@@ -274,7 +316,7 @@ internal object GridActivityStore {
             val cache = loadLatestCallCache(award, cacheFile, journalFile)
             var entry = cache[normalized]
             val now = System.currentTimeMillis()
-            if (entry == null || !isCacheFreshForUtcDay(entry.checkedAt, now)) {
+            if (forceRefresh || entry == null || !isCacheFreshForRefreshCycle(entry.checkedAt, now)) {
                 try {
                     awaitRequestPermit(context)
                     currentCoroutineContext().ensureActive()
@@ -317,17 +359,72 @@ internal object GridActivityStore {
             callsByGrid = calls,
             operatorsByGrid = operators,
             checkedGrids = if (entry != null) setOf(grid) else emptySet(),
-            shouldPauseQueue = shouldPauseQueue
+            shouldPauseQueue = shouldPauseQueue,
+            checkedAt = entry?.checkedAt ?: 0L
         )
     }
 
-    /**
-     * A GridMaster cache entry is valid only for the UTC calendar day on which it was fetched.
-     * The first lookup after 00:00 UTC refreshes it, independent of the device's local timezone.
-     */
-    internal fun isCacheFreshForUtcDay(fetchedAt: Long, now: Long): Boolean =
-        fetchedAt > 0L && now >= fetchedAt &&
-            fetchedAt / MILLIS_PER_UTC_DAY == now / MILLIS_PER_UTC_DAY
+    /** Daily refresh at 10:00 UTC (18:00 Beijing time), independent of device timezone. */
+    internal fun refreshCycle(now: Long): Long = (now - REFRESH_OFFSET_MS) / MILLIS_PER_UTC_DAY
+
+    internal fun nextRefreshAt(now: Long): Long =
+        (refreshCycle(now) + 1L) * MILLIS_PER_UTC_DAY + REFRESH_OFFSET_MS
+
+    internal fun isCacheFreshForRefreshCycle(fetchedAt: Long, now: Long): Boolean =
+        fetchedAt > 0L && now >= fetchedAt && refreshCycle(fetchedAt) == refreshCycle(now)
+
+    /** Keep newer QSO dates; for equal dates use the more recently checked endpoint. */
+    internal fun newerOperator(
+        bulk: GridActivityRecentOperator?,
+        detail: GridActivityRecentOperator?,
+        preferDetailOnTie: Boolean
+    ): GridActivityRecentOperator? {
+        if (bulk == null) return detail
+        if (detail == null) return bulk
+        val bulkDate = bulk.date.orEmpty()
+        val detailDate = detail.date.orEmpty()
+        return when {
+            detailDate > bulkDate -> detail
+            detailDate < bulkDate -> bulk
+            preferDetailOnTie -> detail
+            else -> bulk
+        }
+    }
+
+    private fun etagFile(file: File) = File(file.parentFile, file.name + ".etag")
+
+    private fun configureAggregateRequest(connection: HttpURLConnection, file: File, hasValidCache: Boolean) {
+        // Revalidate HTTP caches as well as our own disk cache; the origin may return 304.
+        connection.useCaches = false
+        connection.setRequestProperty("Cache-Control", "no-cache")
+        if (hasValidCache) {
+            try {
+                etagFile(file).takeIf { it.isFile }?.readText()?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { connection.setRequestProperty("If-None-Match", it) }
+            } catch (_: IOException) {
+                // No validator is needed for a normal GET.
+            }
+        }
+    }
+
+    private fun saveEtag(file: File, etag: String?) {
+        try {
+            if (!etag.isNullOrBlank()) etagFile(file).writeText(etag)
+        } catch (_: IOException) {
+            // A valid payload remains usable without an ETag.
+        }
+    }
+
+    private fun loadDetailCache(context: Context, award: GridActivityAward): MutableMap<String, CachedGridActivityCall> {
+        val prefix = "gridmaster_" + award.cacheFileName.removePrefix("gridmaster_")
+            .removeSuffix("_activity.json") + "_latest_calls"
+        return loadLatestCallCache(
+            award,
+            File(context.applicationContext.filesDir, "$prefix.json"),
+            File(context.applicationContext.filesDir, "$prefix.jsonl")
+        )
+    }
 
     internal fun refillRequestBudget(
         state: RequestBudgetState,
@@ -643,6 +740,7 @@ internal object GridActivityStore {
             instanceFollowRedirects = true
             setRequestProperty("Accept", "application/json")
             setRequestProperty("User-Agent", "Look4Sat/1.0 (satellite grid activity)")
+            useCaches = false
         }
         return try {
             checkSuccessfulResponse(connection)
