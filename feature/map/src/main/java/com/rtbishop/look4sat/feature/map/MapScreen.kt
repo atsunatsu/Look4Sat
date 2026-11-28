@@ -834,7 +834,7 @@ private fun MapScreen(
         latestOperatorsByGrid.forEach { (grid, operators) ->
             val latest = GridActivityStore.newerOperator(
                 merged[grid], operators.firstOrNull(),
-                (latestDetailCheckedAtByGrid[grid] ?: 0L) >= (bulkSnapshot?.downloadedAt ?: 0L)
+                (latestDetailCheckedAtByGrid[grid] ?: 0L) >= (bulkSnapshot?.contentDownloadedAt ?: 0L)
             )
             if (latest != null) merged[grid] = latest
         }
@@ -1265,10 +1265,13 @@ private fun MapScreen(
             showRecentActiveCalls = showRecentActiveCalls,
             showRecentActivityTime = showRecentActivityTime,
             recentActivityMaxBand = recentActivityMaxBand,
-            downloadedAt = activitySnapshot?.downloadedAt,
+            downloadedAt = activitySnapshot?.downloadedAt?.let { percentagesAt ->
+                bulkSnapshot?.downloadedAt?.takeIf { it > 0L }?.let { minOf(percentagesAt, it) }
+            },
             loading = activityLoading || bulkLoading,
             unavailable = (showGridActivity || showActivitySettings) &&
-                !activityLoading && activitySnapshot == null,
+                !activityLoading && !bulkLoading &&
+                (activitySnapshot == null || (bulkSnapshot?.downloadedAt ?: 0L) == 0L),
             onMinChange = setActivityMin,
             onMaxChange = setActivityMax,
             onAwardChange = setActivityAward,
